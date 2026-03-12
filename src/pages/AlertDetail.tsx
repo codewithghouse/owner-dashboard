@@ -1,152 +1,148 @@
 import { alertDetail } from "@/data/dummyData";
-import { ArrowLeft, AlertTriangle } from "lucide-react";
-import { Link } from "react-router-dom";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { ArrowLeft, AlertTriangle, GraduationCap, CheckCircle2, Clock, Calendar, MapPin, User, ChevronRight, Circle } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
+import { Button } from "@/components/ui/button";
 
 export default function AlertDetailPage() {
+  const navigate = useNavigate();
+  const { id } = useParams();
   const a = alertDetail;
 
   return (
-    <div className="space-y-8 lg:space-y-12 max-w-[1200px] mx-auto animate-in slide-in-from-bottom-5 duration-700">
-      <Link to="/risks" className="inline-flex items-center gap-3 text-[10px] lg:text-sm font-black text-[#1e3a8a] uppercase tracking-widest hover:gap-5 transition-all">
-        <ArrowLeft className="w-4 h-4" /> Risks Terminal
-      </Link>
-
-      {/* Header */}
-      <div className="bg-white rounded-[40px] border border-slate-100 shadow-xl overflow-hidden p-8 lg:p-14">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10">
-          <div className="flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left">
-            <div className="w-16 h-16 lg:w-24 lg:h-24 rounded-[28px] lg:rounded-[40px] bg-red-50 flex items-center justify-center text-red-600 shadow-xl shrink-0">
-               <AlertTriangle className="w-8 h-8 lg:w-12 lg:h-12" />
+    <div className="space-y-8 max-w-[1400px] mx-auto animate-in fade-in duration-500 pb-16">
+      {/* Header Section */}
+      <div className="bg-white rounded-[2rem] border border-slate-100 p-8 shadow-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+          <div className="flex items-start gap-6">
+            <div className="w-16 h-16 rounded-2xl bg-[#ef4444] flex items-center justify-center text-white shrink-0 shadow-lg shadow-rose-900/10">
+              <GraduationCap className="w-8 h-8" />
             </div>
             <div>
-              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 mb-2">
-                <h1 className="text-2xl lg:text-4xl font-black text-[#1e293b] tracking-tight">{a.title}</h1>
-                <span className="px-4 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest bg-red-500 text-white shadow-lg shadow-red-500/20">{a.severity}</span>
+              <div className="flex flex-wrap items-center gap-3 mb-2">
+                <h1 className="text-2xl lg:text-3xl font-black text-[#1e294b] tracking-tight">{a.title}</h1>
+                <span className="px-3 py-1 rounded-md text-[9px] font-black uppercase tracking-widest bg-[#ef4444] text-white">Critical</span>
+                <div className="px-3 py-1 rounded-md border border-slate-100 bg-slate-50 text-slate-400 text-[9px] font-bold">Alert #RA-2025-0142</div>
               </div>
-              <p className="text-slate-400 text-[10px] lg:text-xs font-black uppercase tracking-[0.2em] opacity-80">
-                Index: #{a.id} • Registered {a.detectedOn} • {a.branch} • {a.grade}
-              </p>
+              <div className="flex items-center gap-4 text-slate-400 text-[11px] font-bold">
+                <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> Detected on {a.detectedOn}</span>
+                <span className="text-slate-200">|</span>
+                <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> {a.branch}</span>
+                <span className="text-slate-200">|</span>
+                <span className="flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> {a.grade}</span>
+              </div>
             </div>
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-4">
-            <button className="px-8 py-4 rounded-2xl border border-slate-100 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all text-slate-500">Acknowledge</button>
-            <button className="px-8 py-4 rounded-2xl bg-[#1e294b] text-white text-[10px] font-black uppercase tracking-widest shadow-xl shadow-slate-900/10 hover:bg-[#1e3a8a] transition-all">Resolve Node</button>
+          <div className="flex items-center gap-3">
+             <Button variant="outline" className="h-11 px-6 rounded-xl border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50">Acknowledge</Button>
+             <Button className="h-11 px-6 rounded-xl bg-[#1e3a8a] text-white text-xs font-bold hover:bg-blue-900 shadow-lg shadow-blue-900/10">Assign</Button>
+             <Button className="h-11 px-6 rounded-xl bg-[#10b981] text-white text-xs font-bold hover:bg-emerald-600 shadow-lg shadow-emerald-900/10">Resolve</Button>
           </div>
         </div>
       </div>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 lg:gap-10">
+      {/* Metrics Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
-          { label: "Temporal State", val: a.currentAttendance.value, col: "text-red-500", sub: a.currentAttendance.change },
-          { label: "Affected Nodes", val: a.studentsAffected.value, col: "text-[#1e293b]", sub: a.studentsAffected.note },
-          { label: "Cycle Duration", val: a.duration.value, col: "text-[#1e293b]", sub: a.duration.note },
-        ].map((card, i) => (
-          <div key={i} className="bg-white p-8 lg:p-10 rounded-[32px] border border-slate-100 shadow-sm transition-all hover:shadow-2xl text-center">
-            <p className="text-slate-400 text-[10px] lg:text-[11px] font-black uppercase tracking-widest mb-6">{card.label}</p>
-            <div className={`text-4xl lg:text-5xl font-black tracking-tighter ${card.col}`}>{card.val}</div>
-            <p className="text-slate-400 text-[10px] font-black mt-6 uppercase tracking-widest opacity-60 underline underline-offset-4">{card.sub}</p>
+          { label: "Current Attendance", value: "78%", note: "↓ 12% from baseline (90%)", color: "text-rose-500" },
+          { label: "Students Affected", value: "42", note: "Out of 48 total", color: "text-[#111827]" },
+          { label: "Duration", value: "5 days", note: "Since Jan 10, 2025", color: "text-[#111827]" },
+        ].map((m, i) => (
+          <div key={i} className="bg-[#fef2f2]/50 border border-rose-100 p-8 rounded-[1.5rem] transition-all hover:bg-white hover:shadow-lg">
+             <p className="text-slate-400 text-[11px] font-bold uppercase tracking-tight mb-4">{m.label}</p>
+             <h3 className={`text-4xl font-black ${m.color} tracking-tighter mb-2`}>{m.value}</h3>
+             <p className="text-[#ef4444] text-[11px] font-bold">{m.note}</p>
           </div>
         ))}
       </div>
 
-      {/* Description */}
-      <div className="bg-[#1e294b] rounded-[48px] p-10 lg:p-16 text-white relative overflow-hidden group">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-red-400/5 rounded-full -translate-y-32 translate-x-32 blur-3xl"></div>
-        <h3 className="text-[10px] font-black mb-8 tracking-[0.4em] uppercase opacity-40">Issue Intelligence Genesis</h3>
-        <p className="text-lg lg:text-3xl font-black leading-tight tracking-tight opacity-90 italic">
-          "{a.description}"
-        </p>
+      {/* Issue Description */}
+      <div className="bg-white rounded-[1.5rem] border border-slate-100 p-8">
+         <h4 className="text-lg font-bold text-[#1e294b] mb-4">Issue Description</h4>
+         <p className="text-slate-600 text-sm leading-relaxed max-w-4xl">
+           Significant attendance decline detected in Grade 8 at North Branch. Pattern analysis shows consistent drop across all sections, with Monday and Friday showing highest absence rates. Preliminary investigation suggests transportation issues and seasonal illness as potential causes.
+         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16">
-        {/* Attendance Trend */}
-        <div className="bg-white p-8 lg:p-14 rounded-[40px] border border-slate-100 shadow-sm">
-          <h3 className="text-sm lg:text-base font-black text-[#1e293b] mb-12 uppercase tracking-widest">Neural Volatility Trend</h3>
-          <div className="h-[280px] lg:h-[350px]">
+      {/* Middle Section: Chart & List */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Trend Chart */}
+        <div className="lg:col-span-7 bg-white p-8 rounded-[1.5rem] border border-slate-100">
+          <h4 className="text-base font-bold text-[#1e294b] mb-12">Attendance Trend</h4>
+          <div className="h-[250px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={a.attendanceTrend} margin={{ left: -20, right: 10 }}>
+              <LineChart data={a.attendanceTrend} margin={{ left: -20, right: 30 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="day" stroke="#cbd5e1" fontSize={10} tickLine={false} axisLine={false} />
-                <YAxis domain={[65, 95]} hide />
+                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }} dy={10} />
+                <YAxis domain={[70, 95]} axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }} ticks={[70, 75, 80, 85, 90, 95]} />
                 <Tooltip />
-                <Line type="step" dataKey="attendance" stroke="#ef4444" strokeWidth={5} dot={{ r: 6, fill: "#ef4444", strokeWidth: 3, stroke: "#white" }} />
+                <ReferenceLine y={90} stroke="#10b981" strokeDasharray="5 5" label={{ value: 'Baseline', position: 'right', fill: '#10b981', fontSize: 10, fontWeight: 'bold' }} />
+                <Line type="monotone" dataKey="attendance" stroke="#ef4444" strokeWidth={3} dot={{ r: 4, fill: "#ef4444", strokeWidth: 1.5, stroke: "#fff" }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         {/* Affected Students */}
-        <div className="bg-white p-8 lg:p-14 rounded-[40px] border border-slate-100 shadow-sm">
-          <h3 className="text-sm lg:text-base font-black text-[#1e293b] mb-12 uppercase tracking-widest">Compromised Nodes</h3>
-          <div className="space-y-4">
-            {a.affectedStudents.map((s) => (
-              <div key={s.initials} className="flex items-center justify-between p-6 rounded-[24px] bg-[#f8fafc]/50 hover:bg-white hover:shadow-xl transition-all border border-transparent hover:border-slate-100 group">
-                <div className="flex items-center gap-6">
-                  <div className="w-12 h-12 rounded-2xl bg-[#1e294b] text-white flex items-center justify-center text-[10px] font-black group-hover:scale-110 transition-transform">{s.initials}</div>
-                  <span className="text-sm lg:text-lg font-black text-[#1e293b] group-hover:text-[#1e3a8a] transition-colors">{s.name}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                    <span className="text-sm lg:text-lg font-black text-red-500">{s.attendance}</span>
-                    <div className="w-1.5 h-1.5 rounded-full bg-red-400"></div>
-                </div>
-              </div>
-            ))}
-          </div>
+        <div className="lg:col-span-5 bg-white p-8 rounded-[1.5rem] border border-slate-100">
+           <h4 className="text-base font-bold text-[#1e294b] mb-8">Affected Students</h4>
+           <div className="space-y-3">
+             {a.affectedStudents.map((s, idx) => (
+               <div key={idx} className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50/50 hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
+                 <div className="flex items-center gap-4">
+                   <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-[11px] font-black ${idx % 2 === 0 ? 'bg-[#ef4444]' : 'bg-[#f59e0b]'}`}>
+                     {s.initials}
+                   </div>
+                   <span className="text-sm font-bold text-[#1e294b]">{s.name}</span>
+                 </div>
+                 <span className={`text-sm font-black ${idx % 2 === 0 ? 'text-[#ef4444]' : 'text-[#f59e0b]'}`}>{s.attendance}</span>
+               </div>
+             ))}
+           </div>
         </div>
       </div>
 
-      {/* Recommendations */}
-      <div className="space-y-8">
-        <h3 className="text-sm lg:text-base font-black text-[#1e293b] uppercase tracking-widest px-4">Neural Counter-Measures</h3>
-        <div className="grid grid-cols-1 gap-6">
-          {a.recommendations.map((r, i) => (
-            <div key={i} className="flex flex-col md:flex-row md:items-center justify-between p-8 lg:p-14 rounded-[40px] bg-white border border-slate-100 shadow-sm hover:shadow-2xl transition-all gap-10">
-              <div className="flex items-start gap-8 lg:gap-12">
-                <div className="w-16 h-16 rounded-[24px] bg-yellow-50 text-yellow-600 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="w-10 h-10" />
-                </div>
-                <div>
-                  <p className="text-lg lg:text-2xl font-black text-[#1e293b] tracking-tight leading-tight">{r.text}</p>
-                  <div className="flex flex-wrap items-center gap-4 mt-6">
-                    <span className="px-4 py-1 rounded-lg bg-slate-50 text-slate-400 text-[9px] font-black uppercase tracking-widest">Priority: {r.priority}</span>
-                    <span className="px-4 py-1 rounded-lg bg-blue-50 text-[#1e3a8a] text-[9px] font-black uppercase tracking-widest">Time: {r.time}</span>
+      {/* Bottom Row: Actions & Recommendations */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recommended Actions */}
+        <div className="bg-white p-10 rounded-[2rem] border border-slate-100 shadow-sm">
+           <h4 className="text-lg font-bold text-[#1e294b] mb-10">Recommended Actions</h4>
+           <div className="space-y-6">
+              {[
+                { title: "Contact parents of students with <70% attendance", sub: "Priority: High • Estimated time: 2 hours", done: true },
+                { title: "Investigate transportation issues with bus coordinator", sub: "Priority: High • Estimated time: 1 hour", done: true },
+                { title: "Schedule parent-teacher meeting for affected students", sub: "Priority: Medium • Estimated time: 3 hours", done: false },
+              ].map((action, i) => (
+                <div key={i} className="flex items-start gap-5 group">
+                  <div className={`mt-1 shrink-0 ${action.done ? 'text-[#10b981]' : 'text-slate-300'}`}>
+                    {action.done ? <CheckCircle2 className="w-6 h-6 fill-emerald-50" /> : <Circle className="w-6 h-6" />}
+                  </div>
+                  <div className="flex-1 pb-6 border-b border-slate-50 group-last:border-none">
+                     <p className={`text-[15px] font-bold leading-none mb-2 ${action.done ? 'text-slate-800' : 'text-slate-500'}`}>{action.title}</p>
+                     <p className="text-slate-400 text-[11px] font-medium tracking-tight uppercase">{action.sub}</p>
                   </div>
                 </div>
-              </div>
-              <button className="px-10 py-5 bg-[#1e3a8a] text-white text-[10px] font-black rounded-2xl uppercase tracking-[0.2em] shadow-xl shadow-blue-900/10 hover:scale-105 transition-all w-full md:w-auto">Initialize Action</button>
-            </div>
-          ))}
+              ))}
+           </div>
         </div>
-      </div>
 
-      {/* Historical */}
-      <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden p-8 lg:p-14">
-        <h3 className="text-sm lg:text-base font-black text-[#1e293b] mb-12 uppercase tracking-widest">Temporal Log History</h3>
-        <div className="overflow-x-auto -mx-8 sm:mx-0">
-          <div className="inline-block min-w-full align-middle px-8 sm:px-0">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-50 bg-[#f8fafc]/50">
-                  {["Neural Thread", "Temporal Stamp", "Final State"].map((h) => (
-                    <th key={h} className="text-left py-6 px-8 text-[10px] font-black text-slate-400 uppercase tracking-widest">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {a.historicalAlerts.map((h, i) => (
-                  <tr key={i} className="hover:bg-slate-50 transition-all group">
-                    <td className="py-6 px-8 text-[#1e293b] font-black text-sm lg:text-base group-hover:text-[#1e3a8a]">{h.alert}</td>
-                    <td className="py-6 px-8 text-slate-500 font-bold text-xs uppercase tracking-tight">{h.date}</td>
-                    <td className="py-6 px-8">
-                        <span className="px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-green-50 text-green-600 ring-1 ring-green-100">{h.status}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        {/* Similar Historical Alerts */}
+        <div className="bg-white p-10 rounded-[2rem] border border-slate-100 shadow-sm">
+           <h4 className="text-lg font-bold text-[#1e294b] mb-10">Similar Historical Alerts</h4>
+           <div className="space-y-4">
+              {[
+                { title: "Grade 7 Attendance Drop", sub: "Nov 2024 • North Branch • Resolved in 8 days" },
+                { title: "Grade 9 Absenteeism", sub: "Sep 2024 • Main Campus • Resolved in 5 days" },
+              ].map((h, i) => (
+                <div key={i} className="p-6 rounded-2xl bg-slate-50/50 border border-slate-100 flex items-center justify-between hover:bg-slate-50 transition-all cursor-pointer">
+                  <div>
+                    <h5 className="text-[15px] font-bold text-[#1e294b] mb-1.5">{h.title}</h5>
+                    <p className="text-slate-400 text-xs font-medium">{h.sub}</p>
+                  </div>
+                  <span className="px-4 py-1.5 rounded-lg bg-[#dcfce7] text-[#10b981] text-[10px] font-black uppercase tracking-widest">Resolved</span>
+                </div>
+              ))}
+           </div>
         </div>
       </div>
     </div>

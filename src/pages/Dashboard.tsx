@@ -1,135 +1,248 @@
-import { StatCard, PageHeader } from "@/components/shared/StatCard";
 import { dashboardStats, branches, riskDistribution, revenueTrend, criticalAlerts } from "@/data/dummyData";
-import { Heart, Users, Percent, AlertTriangle, Download, Mail, Calendar, Settings } from "lucide-react";
-import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { Heart, Users, Percent, Bell, Download, Mail, Calendar, Settings, ChevronRight, AlertCircle, Info } from "lucide-react";
+import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts";
+
+const COLORS = ['#22c55e', '#f59e0b', '#ef4444'];
 
 export default function Dashboard() {
   return (
-    <div className="space-y-6 lg:space-y-10 max-w-[1600px] mx-auto animate-in fade-in duration-500">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div className="flex flex-col gap-1">
-            <h1 className="text-2xl lg:text-3xl font-bold text-slate-800 text-center sm:text-left">Executive Dashboard</h1>
-            <p className="text-slate-500 text-sm text-center sm:text-left">Real-time overview of all school operations</p>
-        </div>
-        <div className="flex items-center justify-center sm:justify-start gap-4">
-            <div className="flex -space-x-2 overflow-hidden">
-                {[1,2,3,4].map(i => (
-                    <div key={i} className="inline-block h-8 w-8 rounded-full ring-2 ring-white bg-slate-100 border border-slate-200 flex items-center justify-center text-[10px] font-medium text-slate-400">{i}</div>
-                ))}
-            </div>
-            <p className="text-xs font-medium text-slate-400">Security Nodes Active</p>
-        </div>
+    <div className="space-y-8 animate-in fade-in duration-700 pb-10">
+      {/* Header Section */}
+      <div className="flex flex-col gap-1">
+        <h1 className="text-3xl font-extrabold text-[#1e294b] tracking-tight">Executive Dashboard</h1>
+        <p className="text-slate-500 font-medium">Real-time overview of all school operations</p>
       </div>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+      {/* Stat Cards Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { title: "Academic Health Index", value: dashboardStats.academicHealthIndex.value, change: dashboardStats.academicHealthIndex.change, icon: <Heart className="w-5 h-5" />, color: "text-green-600", bg: "bg-green-50" },
-          { title: "Total Students", value: dashboardStats.totalStudents.value.toLocaleString(), change: dashboardStats.totalStudents.change, icon: <Users className="w-5 h-5" />, color: "text-blue-600", bg: "bg-blue-50" },
-          { title: "Fee Collection Rate", value: dashboardStats.feeCollectionRate.value, change: dashboardStats.feeCollectionRate.change, icon: <Percent className="w-5 h-5" />, color: "text-green-600", bg: "bg-green-50" },
-          { title: "Active Alerts", value: dashboardStats.activeAlerts.value, change: dashboardStats.activeAlerts.change, icon: <AlertTriangle className="w-5 h-5" />, color: "text-red-600", bg: "bg-red-50" },
+          { 
+            title: "Academic Health Index", 
+            value: "87.4", 
+            change: "+2.3% vs last month", 
+            icon: Heart, 
+            color: "text-green-500", 
+            iconBg: "bg-green-50" 
+          },
+          { 
+            title: "Total Students", 
+            value: "4,286", 
+            change: "+124 new this term", 
+            icon: Users, 
+            color: "text-blue-500", 
+            iconBg: "bg-blue-50" 
+          },
+          { 
+            title: "Fee Collection Rate", 
+            value: "94.2%", 
+            change: "+1.8% vs last term", 
+            icon: Percent, 
+            color: "text-green-500", 
+            iconBg: "bg-green-50" 
+          },
+          { 
+            title: "Active Alerts", 
+            value: "12", 
+            change: "+3 since yesterday", 
+            icon: Bell, 
+            color: "text-red-500", 
+            iconBg: "bg-red-50" 
+          },
         ].map((stat, i) => (
-          <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm transition-all hover:shadow-md group">
-            <p className="text-slate-500 text-sm font-medium mb-4 group-hover:text-blue-600 transition-colors">{stat.title}</p>
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl lg:text-3xl font-bold text-slate-800">{stat.value}</h2>
-              <div className={`p-3 rounded-xl ${stat.bg} ${stat.color} shadow-sm`}>
-                {stat.icon}
+          <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300">
+            <div className="flex items-start justify-between mb-4">
+              <span className="text-slate-500 text-sm font-semibold tracking-tight">{stat.title}</span>
+              <div className={`p-2 rounded-lg ${stat.iconBg}`}>
+                <stat.icon className={`w-5 h-5 ${stat.color}`} />
               </div>
             </div>
-            <p className={`${stat.color} text-xs font-semibold mt-4 flex items-center gap-2`}>
-                <span className="w-1.5 h-1.5 rounded-full bg-current"></span> {stat.change}
-            </p>
+            <div className="flex flex-col gap-1">
+              <span className="text-4xl font-bold text-[#1e294b] tracking-tight">{stat.value}</span>
+              <div className="flex items-center gap-1 mt-2">
+                <span className={`text-xs font-bold ${stat.color === 'text-red-500' ? 'text-red-500' : 'text-green-500'}`}>
+                  {stat.change.split(' ')[0]}
+                </span>
+                <span className="text-slate-400 text-xs font-medium">{stat.change.split(' ').slice(1).join(' ')}</span>
+              </div>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Middle Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+      {/* Middle Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Branch Overview */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-6 lg:p-8 shadow-sm">
-          <h3 className="text-base font-bold text-slate-800 mb-6">Branch Overview</h3>
-          <div className="space-y-4">
-            {branches.map((b) => (
-              <div key={b.name} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-all group cursor-pointer border border-transparent hover:border-slate-100">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-slate-800 text-white flex items-center justify-center text-xs font-bold">{b.name[0]}</div>
-                    <div>
-                        <p className="font-bold text-sm text-slate-800 group-hover:text-blue-600 transition-colors">{b.name}</p>
-                        <p className="text-[11px] text-slate-500 font-medium">{b.students.toLocaleString()} students</p>
-                    </div>
+        <div className="lg:col-span-4 bg-white rounded-3xl border border-slate-100 p-8 shadow-sm">
+          <h3 className="text-lg font-bold text-[#1e294b] mb-8">Branch Overview</h3>
+          <div className="flex flex-col gap-6">
+            {branches.map((branch, i) => (
+              <div key={i} className="flex items-center justify-between group cursor-pointer">
+                <div>
+                  <h4 className="text-[15px] font-bold text-[#1e294b] group-hover:text-blue-600 transition-colors">{branch.name}</h4>
+                  <p className="text-slate-400 text-xs font-medium">{branch.students.toLocaleString()} students</p>
                 </div>
-                <span className={`text-[10px] font-bold px-3 py-1 rounded-lg ${
-                b.ahi >= 90 ? "bg-green-50 text-green-600" : b.ahi >= 85 ? "bg-amber-50 text-amber-600" : "bg-red-50 text-red-600"
+                <div className={`px-4 py-1.5 rounded-lg text-xs font-bold ${
+                  branch.ahi >= 90 ? 'bg-green-500 text-white' : 
+                  branch.ahi >= 85 ? 'bg-emerald-500 text-white' : 'bg-orange-500 text-white'
                 }`}>
-                {b.ahi}% AHI
-                </span>
+                  {branch.ahi}% AHI
+                </div>
               </div>
             ))}
           </div>
         </div>
 
         {/* Risk Distribution */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-6 lg:p-8 shadow-sm">
-          <h3 className="text-base font-bold text-slate-800 mb-6">Risk Analysis</h3>
-          <div className="h-[200px] lg:h-[250px]">
+        <div className="lg:col-span-4 bg-white rounded-3xl border border-slate-100 p-8 shadow-sm">
+          <h3 className="text-lg font-bold text-[#1e294b] mb-6">Risk Distribution</h3>
+          <div className="h-[240px] relative flex items-center justify-center">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={riskDistribution} cx="50%" cy="50%" innerRadius={60} outerRadius={80} dataKey="value" paddingAngle={4} stroke="none">
-                  {riskDistribution.map((entry, i) => (
-                    <Cell key={i} fill={entry.fill} className="hover:opacity-80 transition-opacity" />
-                  ))}
+                <Pie
+                  data={[
+                    { name: "Safe", value: 70, fill: "#22c55e" },
+                    { name: "Warning", value: 18, fill: "#f59e0b" },
+                    { name: "Critical", value: 12, fill: "#ef4444" },
+                  ]}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={70}
+                  outerRadius={100}
+                  paddingAngle={10}
+                  cornerRadius={12}
+                  dataKey="value"
+                  stroke="none"
+                  startAngle={90}
+                  endAngle={-270}
+                >
+                  <Cell fill="#22c55e" />
+                  <Cell fill="#f59e0b" />
+                  <Cell fill="#ef4444" />
                 </Pie>
                 <Tooltip 
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                  contentStyle={{ 
+                    borderRadius: '20px', 
+                    border: 'none', 
+                    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                    padding: '12px'
+                  }}
                   itemStyle={{ fontWeight: 'bold', fontSize: '12px' }}
                 />
               </PieChart>
             </ResponsiveContainer>
+            {/* Center Text for Realism */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-6">
+              <span className="text-3xl font-bold text-[#1e294b]">92%</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">AHI Score</span>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-4 mt-4">
-            {riskDistribution.map((r, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: r.fill }}></div>
-                <span className="text-[10px] font-bold text-slate-500">{r.name}</span>
-              </div>
-            ))}
+          <div className="flex items-center justify-center gap-6 mt-4">
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+              <span className="text-[11px] font-bold text-slate-500">Low Risk</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-orange-500"></div>
+              <span className="text-[11px] font-bold text-slate-500">Moderate</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+              <span className="text-[11px] font-bold text-slate-500">Critical</span>
+            </div>
           </div>
         </div>
 
         {/* Revenue Trend */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-6 lg:p-8 shadow-sm">
-          <h3 className="text-base font-bold text-slate-800 mb-6">Revenue Flow</h3>
-          <div className="h-[200px] lg:h-[250px]">
+        <div className="lg:col-span-4 bg-white rounded-3xl border border-slate-100 p-8 shadow-sm">
+          <h3 className="text-lg font-bold text-[#1e294b] mb-6">Revenue Trend</h3>
+          <div className="h-[240px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={revenueTrend} margin={{ left: -20, right: 10 }}>
+              <AreaChart data={revenueTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#1e3a8a" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="#1e3a8a" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="month" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
-                <YAxis hide />
-                <Tooltip />
-                <Line type="monotone" dataKey="revenue" stroke="#1e3a8a" strokeWidth={3} dot={{ r: 4, fill: "#1e3a8a", strokeWidth: 2, stroke: "#fff" }} />
-              </LineChart>
+                <XAxis 
+                  dataKey="month" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 500 }}
+                  dy={10}
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 500 }}
+                  domain={[0, 600]}
+                />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                  itemStyle={{ fontWeight: 'bold', fontSize: '12px' }}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="revenue" 
+                  stroke="#1e3a8a" 
+                  strokeWidth={3} 
+                  fillOpacity={1} 
+                  fill="url(#revenueGradient)" 
+                  dot={{ r: 4, fill: "#1e3a8a", strokeWidth: 2, stroke: "#fff" }}
+                  activeDot={{ r: 6, strokeWidth: 0 }}
+                />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
       </div>
 
-      {/* Bottom Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 pb-10">
+      {/* Bottom Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Critical Alerts */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-6 lg:p-8 shadow-sm">
-          <h3 className="text-base font-bold text-slate-800 mb-6">Priority Alerts</h3>
-          <div className="space-y-3">
-            {criticalAlerts.map((a) => (
-              <div key={a.id} className={`flex items-start gap-4 p-4 rounded-xl border-l-4 transition-all hover:bg-slate-50 cursor-pointer ${
-                a.severity === "critical" ? "border-l-red-500 bg-red-50/20" : "border-l-amber-500 bg-amber-50/20"
-              }`}>
-                <div className={`p-2 rounded-lg shrink-0 ${a.severity === "critical" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"}`}>
-                  <AlertTriangle className="w-5 h-5" />
+        <div className="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm">
+          <h3 className="text-lg font-bold text-[#1e294b] mb-6">Critical Alerts</h3>
+          <div className="space-y-4">
+            {[
+              { 
+                id: 1, 
+                message: "Attendance drop in Grade 8 - North Branch", 
+                time: "2 hours ago", 
+                type: "danger",
+                icon: AlertCircle,
+                bg: "bg-red-50",
+                border: "border-l-red-500"
+              },
+              { 
+                id: 2, 
+                message: "Fee defaulters exceeding 30 days", 
+                time: "5 hours ago", 
+                type: "warning",
+                icon: AlertCircle,
+                bg: "bg-amber-50",
+                border: "border-l-amber-500"
+              },
+              { 
+                id: 3, 
+                message: "Teacher performance variance detected", 
+                time: "1 day ago", 
+                type: "warning",
+                icon: AlertCircle,
+                bg: "bg-amber-50",
+                border: "border-l-amber-500"
+              },
+            ].map((alert) => (
+              <div 
+                key={alert.id} 
+                className={`flex items-start gap-4 p-5 rounded-2xl border-l-4 ${alert.border} ${alert.bg} transition-all hover:scale-[1.01] cursor-pointer`}
+              >
+                <div className={`p-2 rounded-xl bg-white shadow-sm`}>
+                  <alert.icon className={`w-5 h-5 ${alert.type === 'danger' ? 'text-red-500' : 'text-amber-500'}`} />
                 </div>
-                <div>
-                  <p className="text-sm font-bold text-slate-800 leading-tight">{a.message}</p>
-                  <p className="text-[11px] text-slate-400 font-medium mt-1">{a.time}</p>
+                <div className="flex-1">
+                  <h4 className="text-sm font-bold text-[#1e294b] leading-tight">{alert.message}</h4>
+                  <p className="text-slate-400 text-xs font-semibold mt-1">{alert.time}</p>
                 </div>
               </div>
             ))}
@@ -137,31 +250,36 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-6 lg:p-8 shadow-sm">
-          <h3 className="text-base font-bold text-slate-800 mb-6">Quick Actions</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4">
-            {[
-              { label: "Generate Report", icon: Download, variant: "primary" },
-              { label: "Relay Message", icon: Mail, variant: "primary" },
-              { label: "Sync Schedule", icon: Calendar, variant: "secondary" },
-              { label: "Core Config", icon: Settings, variant: "secondary" },
-            ].map((action) => (
-              <button
-                key={action.label}
-                className={`flex items-center gap-4 px-6 py-4 rounded-xl text-xs font-bold transition-all group ${
-                  action.variant === "primary"
-                    ? "bg-[#1e3a8a] text-white hover:bg-[#152a6a] shadow-lg shadow-blue-900/15"
-                    : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-100"
-                }`}
-              >
-                <action.icon className={`w-4 h-4 transition-transform group-hover:scale-110 ${action.variant === 'primary' ? 'text-blue-100' : 'text-slate-400'}`} />
-                {action.label}
-              </button>
-            ))}
+        <div className="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm">
+          <h3 className="text-lg font-bold text-[#1e294b] mb-6">Quick Actions</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button className="flex items-center gap-4 bg-[#1e294b] text-white p-5 rounded-2xl shadow-lg shadow-blue-900/20 hover:bg-[#151d36] transition-all group">
+              <div className="p-2.5 rounded-xl bg-white/10 group-hover:scale-110 transition-transform">
+                <Download className="w-5 h-5" />
+              </div>
+              <span className="text-sm font-bold">Export Report</span>
+            </button>
+            <button className="flex items-center gap-4 bg-white border border-slate-100 text-[#1e294b] p-5 rounded-2xl shadow-sm hover:bg-slate-50 transition-all group">
+              <div className="p-2.5 rounded-xl bg-slate-50 group-hover:scale-110 transition-transform">
+                <Mail className="w-5 h-5 text-slate-400" />
+              </div>
+              <span className="text-sm font-bold">Message Branches</span>
+            </button>
+            <button className="flex items-center gap-4 bg-white border border-slate-100 text-[#1e294b] p-5 rounded-2xl shadow-sm hover:bg-slate-50 transition-all group">
+              <div className="p-2.5 rounded-xl bg-slate-50 group-hover:scale-110 transition-transform">
+                <Calendar className="w-5 h-5 text-slate-400" />
+              </div>
+              <span className="text-sm font-bold">Schedule Meeting</span>
+            </button>
+            <button className="flex items-center gap-4 bg-white border border-slate-100 text-[#1e294b] p-5 rounded-2xl shadow-sm hover:bg-slate-50 transition-all group">
+              <div className="p-2.5 rounded-xl bg-slate-50 group-hover:scale-110 transition-transform">
+                <Settings className="w-5 h-5 text-slate-400" />
+              </div>
+              <span className="text-sm font-bold">System Settings</span>
+            </button>
           </div>
         </div>
       </div>
     </div>
-
   );
 }

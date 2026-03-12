@@ -4,10 +4,10 @@ import {
   Legend, BarChart, Bar, Cell
 } from "recharts";
 import { useState, useMemo } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, CheckCircle, AlertTriangle, Building2, TrendingDown,
-  TrendingUp, FileText, MapPin, Calendar, Clock, ChevronRight
+  ArrowLeft, CheckCircle, AlertTriangle, Building2,
+  ChevronRight, X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -23,49 +23,104 @@ export default function BranchesComparison() {
 
   const branchesArray = Object.values(branchesData);
 
+  const getMetricColor = (value: number) => {
+    if (value >= 94) return 'text-[#22c55e]';
+    if (value >= 90) return 'text-[#f59e0b]';
+    return 'text-[#ef4444]';
+  };
+
+  // Get status config based on branch status
+  const getStatusConfig = (status: string) => {
+    if (status === 'Strong') return { bg: 'bg-emerald-500', text: 'text-white' };
+    if (status === 'Good') return { bg: 'bg-blue-500', text: 'text-white' };
+    return { bg: 'bg-[#ef4444]', text: 'text-white' };
+  };
+
+  // Generate action plan details based on branch
+  const getActionPlanDetails = (branch: any) => {
+    if (branch.name === 'South Branch') {
+      return [
+        { task: 'Implement Math Remediation Program', sub: 'Target: 150 students • Timeline: 6 weeks • Budget: $8,000', priority: 'High Priority', prColor: 'bg-[#ef4444]' },
+        { task: 'Attendance Improvement Initiative', sub: 'Parent meetings • Incentive program • Transport review', priority: 'Medium Priority', prColor: 'bg-[#f59e0b]' },
+        { task: 'Fee Collection Drive', sub: 'Automated reminders • Payment plans • Follow-up calls', priority: 'Medium Priority', prColor: 'bg-[#f59e0b]' },
+      ];
+    }
+    if (branch.name === 'North Branch') {
+      return [
+        { task: 'Upgrade Primary Science Labs', sub: 'Equipment procurement • Lab renovation • Safety protocols', priority: 'High Priority', prColor: 'bg-[#ef4444]' },
+        { task: 'Optimize Teacher-Student Ratio', sub: 'New hires for G6-G8 • Schedule revision • Resource allocation', priority: 'Medium Priority', prColor: 'bg-[#f59e0b]' },
+      ];
+    }
+    return [
+      { task: 'Expand Chemistry Lab Capacity', sub: 'Additional workstations • Safety upgrades • Equipment install', priority: 'Medium Priority', prColor: 'bg-[#f59e0b]' },
+      { task: 'Launch Faculty Research Grant', sub: 'Budget allocation • Application process • Review committee', priority: 'Low Priority', prColor: 'bg-slate-400' },
+    ];
+  };
+
+  // KPI notes based on branch
+  const getKPINotes = (branch: any) => {
+    if (branch.name === 'South Branch') {
+      return [
+        { label: 'Academic Health Index', value: `${branch.ahi}%`, note: '↓ 11% below Main', color: `text-[${branch.color}]` },
+        { label: 'Fee Collection', value: `${branch.feeCollection}%`, note: '↓ 5% below target', color: `text-[${branch.color}]` },
+        { label: 'Pass Rate', value: `${branch.passRate}%`, note: '↓ 6% below Main', color: `text-[${branch.color}]` },
+        { label: 'Active Alerts', value: `${branch.activeAlerts}`, note: 'Highest among branches', color: 'text-[#ef4444]' },
+      ];
+    }
+    if (branch.name === 'North Branch') {
+      return [
+        { label: 'Academic Health Index', value: `${branch.ahi}%`, note: '↓ 4% below Main', color: `text-[${branch.color}]` },
+        { label: 'Fee Collection', value: `${branch.feeCollection}%`, note: '↓ 2% below target', color: `text-[${branch.color}]` },
+        { label: 'Pass Rate', value: `${branch.passRate}%`, note: '↓ 3% below Main', color: `text-[${branch.color}]` },
+        { label: 'Active Alerts', value: `${branch.activeAlerts}`, note: 'Moderate risk', color: 'text-[#f59e0b]' },
+      ];
+    }
+    return [
+      { label: 'Academic Health Index', value: `${branch.ahi}%`, note: 'Highest across network', color: `text-[${branch.color}]` },
+      { label: 'Fee Collection', value: `${branch.feeCollection}%`, note: 'Above target', color: `text-[${branch.color}]` },
+      { label: 'Pass Rate', value: `${branch.passRate}%`, note: 'Network leader', color: `text-[${branch.color}]` },
+      { label: 'Active Alerts', value: `${branch.activeAlerts}`, note: 'Lowest count', color: 'text-[#22c55e]' },
+    ];
+  };
+
   return (
-    <div className="space-y-6 lg:space-y-10 max-w-[1600px] mx-auto animate-in fade-in duration-500">
+    <div className="space-y-10 max-w-[1600px] mx-auto animate-in fade-in duration-500 pb-10">
 
       {!selectedBranch ? (
-        /* ==================== 1. BRANCHES COMPARISON OVERVIEW ==================== */
-        <div className="space-y-8 lg:space-y-10">
-          <div className="flex flex-col gap-1 lg:gap-2">
-            <h1 className="text-2xl lg:text-3xl font-black text-[#1e293b] tracking-tight">Branches Comparison</h1>
-            <p className="text-slate-400 font-medium text-xs lg:text-sm">Side-by-side performance analysis across school network</p>
+        <div className="space-y-10">
+          {/* Header */}
+          <div className="flex flex-col gap-1">
+            <h1 className="text-3xl font-extrabold text-[#111827] tracking-tight">Branches Comparison</h1>
+            <p className="text-slate-400 font-medium text-sm">Side-by-side performance analysis</p>
           </div>
 
-          {/* Three Vertical Branch Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+          {/* Three Branch Cards Row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {branchesArray.map((b) => (
               <div
                 key={b.name}
-                className="bg-white p-6 lg:p-8 rounded-[24px] lg:rounded-[32px] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-slate-200/50 transition-all cursor-pointer group"
+                className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-lg transition-all cursor-pointer group"
                 onClick={() => navigate(`/branches/${b.name.toLowerCase().replace(/\s+/g, '-')}`)}
               >
                 <div className="flex items-center gap-4 mb-8">
-                  <div className="w-12 h-12 lg:w-16 lg:h-16 rounded-[18px] lg:rounded-[22px] flex items-center justify-center text-white shadow-lg shrink-0" style={{ backgroundColor: b.color }}>
-                    <Building2 className="w-6 h-6 lg:w-8 lg:h-8" />
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg shrink-0" style={{ backgroundColor: b.color }}>
+                    <Building2 className="w-7 h-7" />
                   </div>
                   <div>
-                    <h3 className="text-lg lg:text-xl font-black text-[#1e293b] group-hover:text-[#1e3a8a] transition-colors">{b.name}</h3>
-                    <p className="text-[10px] lg:text-xs font-black text-slate-400 uppercase tracking-widest">{b.students.toLocaleString()} students</p>
+                    <h3 className="text-lg font-bold text-[#111827] group-hover:text-blue-600 transition-colors">{b.name}</h3>
+                    <p className="text-xs font-bold text-slate-400">{b.students.toLocaleString()} students</p>
                   </div>
                 </div>
-
-                <div className="space-y-3">
+                <div className="space-y-0 divide-y divide-slate-50">
                   {[
-                    { label: "AH Index", value: b.ahi },
+                    { label: "AHI", value: b.ahi },
                     { label: "Fee Collection", value: b.feeCollection },
                     { label: "Pass Rate", value: b.passRate },
                     { label: "Attendance", value: b.attendance },
                   ].map((metric) => (
-                    <div
-                      key={metric.label}
-                      className="flex justify-between items-center px-5 py-4 rounded-2xl border border-transparent group-hover:border-slate-50 transition-all"
-                      style={{ backgroundColor: b.color + '05' }}
-                    >
-                      <span className="text-[10px] font-black text-slate-400 tracking-widest uppercase">{metric.label}</span>
-                      <span className="text-base lg:text-lg font-black" style={{ color: b.color }}>{metric.value}%</span>
+                    <div key={metric.label} className="flex justify-between items-center py-5">
+                      <span className="text-sm font-medium text-slate-500">{metric.label}</span>
+                      <span className={`text-sm font-black ${getMetricColor(metric.value)}`}>{metric.value}%</span>
                     </div>
                   ))}
                 </div>
@@ -74,198 +129,230 @@ export default function BranchesComparison() {
           </div>
 
           {/* Charts Row */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-            {/* Performance Ranking */}
-            <div className="bg-white p-6 lg:p-10 rounded-[32px] border border-slate-100 shadow-sm">
-              <h3 className="text-sm lg:text-base font-black text-[#1e293b] mb-10 uppercase tracking-widest text-center sm:text-left">Network Performance Stack</h3>
-              <div className="h-[300px] lg:h-[350px]">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm">
+              <h3 className="text-lg font-bold text-[#111827] mb-12">Performance Ranking</h3>
+              <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={performanceRanking} layout="vertical" barGap={8} margin={{ left: -10, right: 20 }}>
-                    <XAxis type="number" hide domain={[0, 100]} />
-                    <YAxis dataKey="metric" type="category" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} width={80} />
+                  <BarChart data={performanceRanking} layout="vertical" barGap={4} margin={{ left: 0, right: 20 }}>
+                    <XAxis type="number" domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }} ticks={[0, 20, 40, 60, 80, 100]} />
+                    <YAxis dataKey="metric" type="category" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11, fontWeight: 'bold' }} width={80} />
                     <Tooltip cursor={{ fill: '#f8fafc' }} />
-                    <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: 10 }} />
-                    <Bar dataKey="main" name="Main" fill="#1e3a8a" radius={[0, 2, 2, 0]} barSize={8} />
-                    <Bar dataKey="north" name="North" fill="#3b82f6" radius={[0, 2, 2, 0]} barSize={8} opacity={0.6} />
-                    <Bar dataKey="south" name="South" fill="#f59e0b" radius={[0, 2, 2, 0]} barSize={8} opacity={0.4} />
+                    <Legend verticalAlign="bottom" align="center" wrapperStyle={{ paddingTop: '20px' }}
+                      content={({ payload }) => (
+                        <div className="flex justify-center gap-6 mt-6">
+                          {payload?.map((entry: any, index: number) => (
+                            <div key={index} className="flex items-center gap-2">
+                              <div className="w-4 h-4 rounded-sm" style={{ backgroundColor: entry.color }}></div>
+                              <span className="text-[11px] font-bold text-slate-500">{entry.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    />
+                    <Bar dataKey="main" name="Main" fill="#1e3a8a" radius={[0, 2, 2, 0]} barSize={10} />
+                    <Bar dataKey="north" name="North" fill="#3b82f6" radius={[0, 2, 2, 0]} barSize={10} />
+                    <Bar dataKey="south" name="South" fill="#f59e0b" radius={[0, 2, 2, 0]} barSize={10} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            {/* Comparative Trends */}
-            <div className="bg-white p-6 lg:p-10 rounded-[32px] border border-slate-100 shadow-sm">
-              <h3 className="text-sm lg:text-base font-black text-[#1e293b] mb-10 uppercase tracking-widest text-center sm:text-left">Longitudinal Trends</h3>
-              <div className="h-[300px] lg:h-[350px]">
+            <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm">
+              <h3 className="text-lg font-bold text-[#111827] mb-12">Comparative Trends</h3>
+              <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={comparativeTrends}>
+                  <LineChart data={comparativeTrends} margin={{ left: -10, right: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="month" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
-                    <YAxis domain={[0, 100]} hide />
+                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 'bold' }} dy={10} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 'bold' }} domain={[0, 100]} ticks={[0, 20, 40, 60, 80, 100]} />
                     <Tooltip />
-                    <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: 10 }} />
-                    <Line type="monotone" dataKey="main" name="Main" stroke="#1e3a8a" strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} />
-                    <Line type="monotone" dataKey="north" name="North" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} opacity={0.5} />
-                    <Line type="monotone" dataKey="south" name="South" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} opacity={0.3} />
+                    <Legend verticalAlign="bottom" align="center" wrapperStyle={{ paddingTop: '20px' }}
+                      content={({ payload }) => (
+                        <div className="flex justify-center gap-6 mt-6">
+                          {payload?.map((entry: any, index: number) => (
+                            <div key={index} className="flex items-center gap-2">
+                              <div className="w-4 h-4 rounded-full border-[2.5px] bg-white" style={{ borderColor: entry.color }}></div>
+                              <span className="text-[11px] font-bold text-slate-500">{entry.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    />
+                    <Line type="monotone" dataKey="main" name="Main" stroke="#1e3a8a" strokeWidth={3} dot={{ r: 5, fill: "#fff", strokeWidth: 2.5, stroke: "#1e3a8a" }} />
+                    <Line type="monotone" dataKey="north" name="North" stroke="#3b82f6" strokeWidth={3} dot={{ r: 5, fill: "#fff", strokeWidth: 2.5, stroke: "#3b82f6" }} />
+                    <Line type="monotone" dataKey="south" name="South" stroke="#f59e0b" strokeWidth={3} dot={{ r: 5, fill: "#fff", strokeWidth: 2.5, stroke: "#f59e0b" }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             </div>
           </div>
-        </div>
-      ) : (
-        /* ==================== 2. INDIVIDUAL BRANCH DRILL-DOWN ==================== */
-        <div className="bg-white rounded-[32px] lg:rounded-[60px] border border-slate-100 shadow-xl overflow-hidden border-t-8 animate-in slide-in-from-bottom-5 duration-700" style={{ borderTopColor: selectedBranch.color }}>
-          <div className="p-6 lg:p-14">
 
-            {/* Header Block */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 mb-12 lg:mb-16">
-              <div className="flex flex-col sm:flex-row items-center gap-6 lg:gap-10 text-center sm:text-left">
-                <button onClick={() => navigate('/branches')} className="w-12 h-12 lg:w-16 lg:h-16 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-[#1e3a8a] hover:text-white transition-all shadow-sm shrink-0">
-                  <ArrowLeft className="w-6 h-6 lg:w-8 lg:h-8" />
-                </button>
-                <div className="w-20 h-20 lg:w-28 lg:h-28 rounded-[32px] lg:rounded-[44px] flex items-center justify-center text-white shadow-2xl shrink-0" style={{ backgroundColor: selectedBranch.color }}>
-                  <Building2 className="w-10 h-10 lg:w-14 lg:h-14" />
-                </div>
-                <div>
-                  <h2 className="text-3xl lg:text-5xl font-black text-[#1e293b] tracking-tight">{selectedBranch.name}</h2>
-                  <p className="text-slate-400 text-xs lg:text-lg font-bold mt-2 uppercase tracking-tight">
-                    {selectedBranch.students.toLocaleString()} students • {selectedBranch.teachers} teachers
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-col sm:flex-row items-center gap-4 lg:gap-6">
-                <div className="px-8 py-3 rounded-2xl bg-orange-50 text-[#f59e0b] font-black text-[10px] lg:text-xs uppercase tracking-widest ring-1 ring-orange-100 w-full sm:w-auto text-center shrink-0">
-                  {selectedBranch.status} Range
-                </div>
-                <Button className="bg-[#1e3a8a] hover:bg-[#152a6a] text-white font-black h-14 lg:h-16 px-10 lg:px-14 rounded-2xl shadow-xl shadow-blue-900/20 gap-3 uppercase tracking-widest text-[10px] lg:text-xs w-full sm:w-auto">
-                  Execute Review
-                </Button>
-              </div>
-            </div>
-
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8 mb-16 lg:mb-24">
+          {/* Efficiency Metrics */}
+          <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-10">
+            <h3 className="text-xl font-bold text-[#111827] mb-10">Efficiency Metrics</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               {[
-                { label: "Academic Health", value: selectedBranch.ahi, note: "↓ 11% vs Network Mean" },
-                { label: "Fee Collection", value: selectedBranch.feeCollection, note: "↓ 5% vs Goal" },
-                { label: "Net Pass Rate", value: selectedBranch.passRate, note: "↓ 6% vs Network Mean" },
-                { label: "Active Alerts", value: selectedBranch.activeAlerts, note: "Highest Cluster", isAlert: true },
-              ].map((kpi, i) => (
-                <div key={i} className={`p-8 lg:p-10 rounded-[32px] lg:rounded-[40px] border transition-all hover:bg-white hover:shadow-2xl ${kpi.isAlert ? 'border-red-100 bg-red-50/5 hover:shadow-red-900/5' : 'border-slate-100 bg-[#f8fafc]/50 hover:shadow-slate-900/5'}`}>
-                  <p className="text-slate-400 text-[10px] lg:text-[11px] font-black uppercase tracking-widest">{kpi.label}</p>
-                  <h3 className={`text-4xl lg:text-5xl font-black mt-4 lg:mt-6 tracking-tight ${kpi.isAlert ? 'text-red-600' : 'text-[#1e293b]'}`}>{kpi.value}{!kpi.isAlert && '%'}</h3>
-                  <p className={`text-[10px] lg:text-xs font-black mt-3 lg:mt-4 uppercase tracking-widest ${kpi.isAlert ? 'text-red-500' : 'text-orange-500'}`}>
-                    {kpi.note}
-                  </p>
+                { label: "Revenue/Student", value: "$1,324", note: "Main leads", col: "text-[#1e3a8a]" },
+                { label: "Teacher Ratio", value: "1:18", note: "Main optimal", col: "text-[#1e3a8a]" },
+                { label: "Resource Util.", value: "87%", note: "Main highest", col: "text-[#1e3a8a]" },
+                { label: "Growth Rate", value: "+12%", note: "North fastest", col: "text-[#22c55e]" },
+              ].map((m, i) => (
+                <div key={i} className="bg-[#f8fafc]/50 border border-slate-100 p-8 rounded-[1.5rem] text-center transition-all hover:bg-white hover:shadow-lg">
+                  <p className="text-slate-400 text-[11px] font-bold uppercase tracking-tight mb-4">{m.label}</p>
+                  <h3 className={`text-3xl font-black ${m.col} tracking-tighter mb-2`}>{m.value}</h3>
+                  <p className="text-[#22c55e] text-[11px] font-bold">{m.note}</p>
                 </div>
               ))}
             </div>
-
-            {/* Comparison Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24 mb-20 lg:mb-32">
-              <div>
-                <h3 className="text-sm lg:text-base font-black text-[#1e293b] mb-10 lg:mb-14 uppercase tracking-widest text-center lg:text-left">Longitudinal Performance</h3>
-                <div className="h-[280px] lg:h-[350px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={selectedBranch.historicalPerformance}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="year" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
-                      <YAxis hide domain={[60, 100]} />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="score" stroke={selectedBranch.color} strokeWidth={5} dot={{ r: 6, fill: selectedBranch.color, strokeWidth: 3, stroke: '#fff' }} />
-                      <Line type="monotone" dataKey="schoolAvg" name="Network Avg" stroke="#cbd5e1" strokeWidth={2} strokeDasharray="8 8" dot={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
+          </div>
+        </div>
+      ) : (
+        /* ==================== INDIVIDUAL BRANCH DETAIL ==================== */
+        <div className="animate-in fade-in duration-700 space-y-8 pb-10">
+          {/* Main Profile Card */}
+          <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
+            <div className="p-8 lg:p-12">
+              {/* Header */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-10">
+                <div className="flex items-center gap-6">
+                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-white shadow-lg shrink-0" style={{ backgroundColor: selectedBranch.color }}>
+                    <Building2 className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl lg:text-3xl font-bold text-[#111827] tracking-tight">{selectedBranch.name}</h2>
+                    <p className="text-slate-400 font-medium text-sm mt-1">
+                      {selectedBranch.students.toLocaleString()} students • {selectedBranch.teachers} teachers • Established {selectedBranch.established}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className={`px-5 py-2 rounded-lg text-[11px] font-black uppercase tracking-widest ${getStatusConfig(selectedBranch.status).bg} ${getStatusConfig(selectedBranch.status).text}`}>
+                    {selectedBranch.status}
+                  </span>
+                  <Button className="h-10 px-5 rounded-lg bg-[#1e294b] text-white text-[11px] font-bold hover:bg-[#1e3a8a] shadow-lg">
+                    Generate Report
+                  </Button>
+                  <button onClick={() => navigate('/branches')} className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:bg-slate-100 transition-all">
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
               </div>
-              <div>
-                <h3 className="text-sm lg:text-base font-black text-[#1e293b] mb-10 lg:mb-14 uppercase tracking-widest text-center lg:text-left">Network Benchmarking</h3>
-                <div className="h-[280px] lg:h-[350px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={[
-                      { metric: "AHI", current: selectedBranch.ahi, avg: 88 },
-                      { metric: "Fees", current: selectedBranch.feeCollection, avg: 94 },
-                      { metric: "Pass", current: selectedBranch.passRate, avg: 92 },
-                      { metric: "Attnd", current: selectedBranch.attendance, avg: 92 },
-                    ]} barGap={12} margin={{ left: -10, right: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="metric" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
-                      <YAxis hide domain={[0, 100]} />
-                      <Tooltip />
-                      <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: 10 }} />
-                      <Bar dataKey="current" name="Branch" fill={selectedBranch.color} radius={[2, 2, 0, 0]} barSize={20} />
-                      <Bar dataKey="avg" name="Network Avg" fill="#cbd5e1" radius={[2, 2, 0, 0]} barSize={20} opacity={0.3} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
 
-            {/* Strengths & Improvements */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-20 lg:mb-32">
-              <div className="p-8 lg:p-14 rounded-[40px] lg:rounded-[56px] border border-green-100 bg-green-50/5 hover:bg-white hover:shadow-2xl hover:shadow-green-900/5 transition-all">
-                <h3 className="text-xl lg:text-2xl font-black text-[#1e3a8a] mb-10 flex items-center gap-4">
-                  <div className="w-10 h-10 lg:w-14 lg:h-14 rounded-2xl bg-green-500/10 flex items-center justify-center text-green-600 shrink-0">
-                    <CheckCircle className="w-6 h-6 lg:w-8 lg:h-8" />
-                  </div>
-                  Strategic Strengths
-                </h3>
-                <ul className="space-y-6 lg:space-y-8">
-                  {selectedBranch.strengths.map((s, i) => (
-                    <li key={i} className="text-slate-600 font-bold text-base lg:text-lg flex items-start gap-4">
-                      <span className="w-2 h-2 rounded-full bg-green-500 mt-2.5 lg:mt-3 shrink-0"></span> {s}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="p-8 lg:p-14 rounded-[40px] lg:rounded-[56px] border border-red-100 bg-red-50/5 hover:bg-white hover:shadow-2xl hover:shadow-red-900/5 transition-all">
-                <h3 className="text-xl lg:text-2xl font-black text-[#1e3a8a] mb-10 flex items-center gap-4">
-                  <div className="w-10 h-10 lg:w-14 lg:h-14 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-600 shrink-0">
-                    <AlertTriangle className="w-6 h-6 lg:w-8 lg:h-8" />
-                  </div>
-                  Deficiency Areas
-                </h3>
-                <ul className="space-y-6 lg:space-y-8">
-                  {selectedBranch.improvements.map((s, i) => (
-                    <li key={i} className="text-slate-600 font-bold text-base lg:text-lg flex items-start gap-4">
-                      <span className="w-2 h-2 rounded-full bg-red-400 mt-2.5 lg:mt-3 shrink-0"></span> {s}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-
-            {/* Action Plan */}
-            <div className="p-8 lg:p-14 bg-slate-50/30 rounded-[40px] lg:rounded-[60px] border border-slate-50">
-              <h3 className="text-xl lg:text-3xl font-black text-[#1e293b] mb-12 uppercase tracking-tight text-center lg:text-left">Operational Recovery Plan</h3>
-              <div className="space-y-4 lg:space-y-6">
-                {selectedBranch.actionPlan.map((plan, idx) => (
-                  <div key={idx} className="bg-white p-6 lg:p-10 rounded-[32px] lg:rounded-[40px] border border-slate-100 flex flex-col md:flex-row md:items-center justify-between shadow-sm hover:border-[#1e3a8a]/20 hover:shadow-2xl hover:shadow-slate-200/50 transition-all">
-                    <div className="flex items-center gap-6 lg:gap-10 mb-6 md:mb-0">
-                      <div className="w-12 h-12 lg:w-16 lg:h-16 rounded-full bg-slate-50 flex items-center justify-center font-black text-xl lg:text-2xl text-[#1e3a8a] shadow-inner shrink-0">{idx + 1}</div>
-                      <div>
-                        <h4 className="text-lg lg:text-xl font-black text-[#1e293b]">{plan.task}</h4>
-                        <div className="flex items-center gap-4 mt-2">
-                          <p className="text-[10px] lg:text-xs font-black text-slate-400 uppercase tracking-widest">{plan.status}</p>
-                          <span className="text-slate-200">|</span>
-                          <p className="text-[10px] lg:text-xs font-black text-slate-400 uppercase tracking-widest">30 Day Cycle</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between sm:justify-end gap-6 border-t md:border-t-0 pt-6 md:pt-0">
-                      <span className={`px-6 lg:px-8 py-2.5 rounded-2xl text-[10px] lg:text-xs font-black uppercase tracking-widest ${plan.priority === 'Critical' || plan.priority === 'High' ? 'bg-red-500 text-white shadow-xl shadow-red-900/15' : 'bg-slate-100 text-slate-600'}`}>
-                        {plan.priority} 
-                      </span>
-                      <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-300">
-                        <ChevronRight className="w-5 h-5 lg:w-6 lg:h-6" />
-                      </div>
-                    </div>
+              {/* KPI Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-12">
+                {getKPINotes(selectedBranch).map((kpi, i) => (
+                  <div key={i} className="p-6 rounded-[1.2rem] border border-slate-100 bg-[#fffbeb]/30 transition-all hover:bg-white hover:shadow-lg">
+                    <p className="text-slate-400 text-[11px] font-bold uppercase tracking-tight mb-3">{kpi.label}</p>
+                    <h3 className="text-3xl font-black tracking-tighter mb-1.5" style={{ color: i === 3 ? '#ef4444' : selectedBranch.color }}>{kpi.value}</h3>
+                    <p className="text-[11px] font-bold" style={{ color: i === 3 ? '#ef4444' : selectedBranch.color }}>{kpi.note}</p>
                   </div>
                 ))}
               </div>
-            </div>
 
+              {/* Charts Row */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-12">
+                {/* Historical Performance */}
+                <div>
+                  <h3 className="text-base font-bold text-[#111827] mb-10">Historical Performance</h3>
+                  <div className="h-[260px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={selectedBranch.historicalPerformance} margin={{ left: -20, right: 10 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis dataKey="year" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 'bold' }} dy={10} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 'bold' }} domain={[70, 95]} ticks={[70, 75, 80, 85, 90]} />
+                        <Tooltip />
+                        <Line type="monotone" dataKey="schoolAvg" name="School Avg" stroke="#22c55e" strokeWidth={2} strokeDasharray="6 6" dot={false} />
+                        <Line type="monotone" dataKey="score" name={selectedBranch.name} stroke={selectedBranch.color} strokeWidth={3} dot={{ r: 5, fill: "#fff", strokeWidth: 2.5, stroke: selectedBranch.color }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Benchmark Comparison */}
+                <div>
+                  <h3 className="text-base font-bold text-[#111827] mb-10">Benchmark Comparison</h3>
+                  <div className="h-[260px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={[
+                        { metric: "AHI", branch: selectedBranch.ahi, avg: 88 },
+                        { metric: "Fee Coll.", branch: selectedBranch.feeCollection, avg: 94 },
+                        { metric: "Pass Rate", branch: selectedBranch.passRate, avg: 93 },
+                        { metric: "Attendance", branch: selectedBranch.attendance, avg: 92 },
+                        { metric: "Growth", branch: selectedBranch.ahi - 7, avg: selectedBranch.ahi - 5 },
+                      ]} barGap={6} margin={{ bottom: 20 }}>
+                        <XAxis dataKey="metric" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }} dy={10} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }} domain={[0, 100]} ticks={[0, 20, 40, 60, 80]} />
+                        <Tooltip cursor={{ fill: '#f8fafc' }} />
+                        <Legend verticalAlign="bottom" align="center" wrapperStyle={{ paddingTop: '10px' }}
+                          content={({ payload }) => (
+                            <div className="flex justify-center gap-6 mt-4">
+                              {payload?.map((entry: any, index: number) => (
+                                <div key={index} className="flex items-center gap-2">
+                                  <div className="w-4 h-4 rounded-sm" style={{ backgroundColor: entry.color }}></div>
+                                  <span className="text-[10px] font-bold text-slate-500">{entry.value}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        />
+                        <Bar dataKey="branch" name={selectedBranch.name.split(' ')[0]} fill={selectedBranch.color} radius={[3, 3, 0, 0]} barSize={18} />
+                        <Bar dataKey="avg" name="School Avg" fill="#d1d5db" radius={[3, 3, 0, 0]} barSize={18} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              {/* Strengths & Improvements */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                {/* Strengths */}
+                <div className="p-8 rounded-[1.5rem] border border-emerald-100 bg-[#f0fdf4]/50">
+                  <h4 className="text-base font-bold text-[#22c55e] mb-6 flex items-center gap-2.5">
+                    <CheckCircle className="w-5 h-5 text-[#22c55e]" /> Strengths
+                  </h4>
+                  <ul className="space-y-3">
+                    {selectedBranch.strengths.map((s, i) => (
+                      <li key={i} className="text-slate-700 font-medium text-sm leading-relaxed">• {s}</li>
+                    ))}
+                  </ul>
+                </div>
+                {/* Areas for Improvement */}
+                <div className="p-8 rounded-[1.5rem] border border-rose-100 bg-[#fef2f2]/50">
+                  <h4 className="text-base font-bold text-[#ef4444] mb-6 flex items-center gap-2.5">
+                    <AlertTriangle className="w-5 h-5 text-[#ef4444]" /> Areas for Improvement
+                  </h4>
+                  <ul className="space-y-3">
+                    {selectedBranch.improvements.map((s, i) => (
+                      <li key={i} className="text-slate-700 font-medium text-sm leading-relaxed">• {s}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Recommended Action Plan */}
+          <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-10">
+            <h3 className="text-xl font-bold text-[#111827] mb-10">Recommended Action Plan</h3>
+            <div className="space-y-0 divide-y divide-slate-50">
+              {getActionPlanDetails(selectedBranch).map((plan, idx) => (
+                <div key={idx} className="flex items-center justify-between py-7 gap-8 group">
+                  <div className="flex items-center gap-6">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-black text-sm shrink-0" style={{ backgroundColor: selectedBranch.color }}>
+                      {idx + 1}
+                    </div>
+                    <div>
+                      <h4 className="text-[15px] font-bold text-[#111827] mb-1 group-hover:text-blue-600 transition-colors">{plan.task}</h4>
+                      <p className="text-slate-400 text-xs font-medium">{plan.sub}</p>
+                    </div>
+                  </div>
+                  <span className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-white whitespace-nowrap ${plan.prColor}`}>
+                    {plan.priority}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
