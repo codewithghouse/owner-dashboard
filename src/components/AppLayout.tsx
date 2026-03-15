@@ -3,8 +3,11 @@ import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
   DollarSign, AlertTriangle, GitBranch, FileText, Settings, 
-  Menu, X, UserCog
+  Menu, X, UserCog, LogOut
 } from "lucide-react";
+import { auth, db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { signOut } from "firebase/auth";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -21,11 +24,29 @@ const navItems = [
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [schoolData, setSchoolData] = useState<any>(null);
   const location = useLocation();
   
   const currentPage = navItems.find(
     (item) => item.to === "/" ? location.pathname === "/" : location.pathname.startsWith(item.to)
   );
+
+  useEffect(() => {
+    const fetchSchoolData = async () => {
+      if (auth.currentUser) {
+        const docRef = doc(db, "schools", auth.currentUser.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setSchoolData(docSnap.data());
+        }
+      }
+    };
+    fetchSchoolData();
+  }, []);
+
+  const handleLogout = () => {
+    signOut(auth);
+  };
 
   // Close sidebar on route change on mobile
   useEffect(() => {
@@ -50,10 +71,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       `}>
         <div className="flex items-center justify-between px-6 py-8 border-b border-slate-50 lg:justify-start lg:gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-[#1e3a8a] rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/10">
-              <GraduationCap className="w-5 h-5 text-white" />
+            <div className="w-9 h-9 bg-[#1e3a8a] rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/10 shrink-0">
+              < GraduationCap className="w-5 h-5 text-white" />
             </div>
-            <span className="text-lg font-bold text-[#1e294b] tracking-tight">EDUINTELLECT</span>
+            <span className="text-lg font-bold text-[#1e294b] tracking-tight uppercase truncate">
+              {schoolData?.schoolName || "EDUINTELLECT"}
+            </span>
           </div>
           <button 
             className="p-2 -mr-2 text-slate-400 hover:text-[#1e3a8a] lg:hidden transition-colors"
@@ -85,13 +108,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <div className="p-6 border-t border-slate-50">
+        <div className="p-4 border-t border-slate-50 space-y-2">
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">System v1.0.4</p>
                 <div className="h-1 w-full bg-slate-200 rounded-full overflow-hidden">
                     <div className="h-full bg-blue-500 w-3/4"></div>
                 </div>
             </div>
+            <button 
+              onClick={handleLogout}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-rose-500 hover:bg-rose-50 transition-all"
+            >
+              <LogOut className="w-5 h-5" /> Logout
+            </button>
         </div>
       </aside>
 
@@ -137,11 +166,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex items-center gap-3 sm:gap-6">
             <div className="hidden sm:flex flex-col text-right">
-                <p className="text-xs font-bold text-slate-800 leading-tight">School Chairman</p>
-                <p className="text-[10px] font-medium text-slate-400">admin@edu.com</p>
+                <p className="text-xs font-bold text-slate-800 leading-tight">
+                  {schoolData?.ownerName || "School Chairman"}
+                </p>
+                <p className="text-[10px] font-medium text-slate-400">
+                  {auth.currentUser?.email || "admin@edu.com"}
+                </p>
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 lg:w-10 lg:h-10 rounded-xl bg-[#1e294b] text-white flex items-center justify-center text-xs font-bold shadow-lg shadow-slate-900/10 hover:scale-105 active:scale-95 transition-all cursor-pointer">SC</div>
+              <div 
+                onClick={handleLogout}
+                className="w-9 h-9 lg:w-10 lg:h-10 rounded-xl bg-[#1e294b] text-white flex items-center justify-center text-xs font-bold shadow-lg shadow-slate-900/10 hover:scale-105 active:scale-95 transition-all cursor-pointer uppercase"
+              >
+                {schoolData?.ownerName?.substring(0, 2) || "SC"}
+              </div>
             </div>
           </div>
         </header>
@@ -156,4 +194,3 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-
