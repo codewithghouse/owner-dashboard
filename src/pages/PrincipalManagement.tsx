@@ -1,69 +1,138 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   UserPlus, Users, CheckCircle2, Clock, Mail, MoreVertical,
   Building2, Search, X, Send, Shield, RefreshCcw, Ban,
   ChevronRight, AlertTriangle, Phone, MapPin, Calendar,
-  Plus, Edit3, Trash2, Globe, Hash
+  Plus, Edit3, Trash2, Globe, Hash, Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { db, auth } from "@/lib/firebase";
+import { 
+  collection, addDoc, onSnapshot, query, 
+  where, serverTimestamp, getDoc, doc 
+} from "firebase/firestore";
+import { sendInvitationEmail } from "@/lib/resend";
+import { toast } from "sonner";
 
-// Dummy branches data (will be replaced with BaaS later)
-const initialBranches = [
-  { id: 'B001', name: 'Main Campus', color: '#1e3a8a', location: 'Sector 21, Noida', established: '2012', students: 2145, teachers: 112, status: 'Active' as const },
-  { id: 'B002', name: 'North Branch', color: '#22c55e', location: 'Civil Lines, Delhi', established: '2016', students: 1203, teachers: 68, status: 'Active' as const },
-  { id: 'B003', name: 'South Branch', color: '#f59e0b', location: 'Koramangala, Bangalore', established: '2019', students: 938, teachers: 52, status: 'Active' as const },
-  { id: 'B004', name: 'East Branch', color: '#8b5cf6', location: 'Salt Lake, Kolkata', established: '2025', students: 0, teachers: 0, status: 'Upcoming' as const },
-  { id: 'B005', name: 'West Branch', color: '#ec4899', location: 'Bandra, Mumbai', established: 'Planned', students: 0, teachers: 0, status: 'Planned' as const },
-];
-
-// Dummy principals data (will be replaced with BaaS later)
-const principalsData = [
-  {
-    id: 'P001', name: 'Dr. Rajesh Sharma', email: 'rajesh.sharma@eduintellect.edu', phone: '+91 98765 43210',
-    branch: 'Main Campus', branchColor: '#1e3a8a', avatar: 'RS', status: 'Active' as const,
-    joinDate: 'Aug 15, 2020', lastActive: '2 hours ago', studentsManaged: 2145, teachersManaged: 112,
-  },
-  {
-    id: 'P002', name: 'Mrs. Priya Nair', email: 'priya.nair@eduintellect.edu', phone: '+91 87654 32109',
-    branch: 'North Branch', branchColor: '#22c55e', avatar: 'PN', status: 'Active' as const,
-    joinDate: 'Jan 10, 2021', lastActive: '30 mins ago', studentsManaged: 1203, teachersManaged: 68,
-  },
-  {
-    id: 'P003', name: 'Mr. Arjun Mehta', email: 'arjun.mehta@eduintellect.edu', phone: '+91 76543 21098',
-    branch: 'South Branch', branchColor: '#f59e0b', avatar: 'AM', status: 'Active' as const,
-    joinDate: 'Mar 22, 2022', lastActive: '1 day ago', studentsManaged: 938, teachersManaged: 52,
-  },
-  {
-    id: 'P004', name: 'Dr. Kavitha Reddy', email: 'kavitha.reddy@gmail.com', phone: '+91 65432 10987',
-    branch: 'East Branch', branchColor: '#8b5cf6', avatar: 'KR', status: 'Invited' as const,
-    joinDate: 'Invited on Jan 8, 2025', lastActive: 'Pending acceptance', studentsManaged: 0, teachersManaged: 0,
-  },
-  {
-    id: 'P005', name: 'Mr. Sanjay Gupta', email: 'sanjay.gupta@yahoo.com', phone: '',
-    branch: 'Unassigned', branchColor: '#94a3b8', avatar: 'SG', status: 'Deactivated' as const,
-    joinDate: 'Sep 5, 2019', lastActive: 'Deactivated on Dec 1, 2024', studentsManaged: 0, teachersManaged: 0,
-  },
-];
-
+// Constant options remains same
 const branchColorOptions = [
   '#1e3a8a', '#3b82f6', '#22c55e', '#10b981', '#f59e0b', '#f97316',
   '#ef4444', '#ec4899', '#8b5cf6', '#6366f1', '#14b8a6', '#06b6d4',
 ];
 
 export default function PrincipalManagement() {
-  const [activeTab, setActiveTab] = useState<'principals' | 'branches'>('principals');
+  const [activeTab, setActiveTab] = useState<'principals' | 'branches'>('branches');
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showAddBranchModal, setShowAddBranchModal] = useState(false);
-  const [selectedPrincipal, setSelectedPrincipal] = useState<typeof principalsData[0] | null>(null);
+  const [selectedPrincipal, setSelectedPrincipal] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [inviteForm, setInviteForm] = useState({ name: '', email: '', branch: '' });
+  const [inviteForm, setInviteForm] = useState({ name: '', email: '', branch: '', branchColor: '#1e3a8a' });
   const [branchForm, setBranchForm] = useState({ name: '', location: '', color: '#3b82f6' });
   const [showActionMenu, setShowActionMenu] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  
+  // Real Source Data
+  const [branches, setBranches] = useState<any[]>([]);
+  const [principals, setPrincipals] = useState<any[]>([]);
+  const [schoolInfo, setSchoolInfo] = useState<any>(null);
 
-  const branches = initialBranches;
+  useEffect(() => {
+    if (!auth.currentUser) return;
 
-  const filteredPrincipals = principalsData.filter(p =>
+    // Fetch School Name for Emails
+    const fetchSchool = async () => {
+      const docSnap = await getDoc(doc(db, "schools", auth.currentUser!.uid));
+      if (docSnap.exists()) setSchoolInfo(docSnap.data());
+    };
+    fetchSchool();
+
+    // Sync Branches
+    const branchesRef = collection(db, "schools", auth.currentUser.uid, "branches");
+    const unsubscribeBranches = onSnapshot(branchesRef, (snapshot) => {
+      const branchList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setBranches(branchList);
+    });
+
+    // Sync Principals (from a top-level collection or subcollection?)
+    // Let's use a root 'principals' collection filtered by schoolId for easier cross-portal access
+    const principalsRef = collection(db, "principals");
+    const q = query(principalsRef, where("schoolId", "==", auth.currentUser.uid));
+    const unsubscribePrincipals = onSnapshot(q, (snapshot) => {
+      const principalList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setPrincipals(principalList);
+    });
+
+    return () => {
+      unsubscribeBranches();
+      unsubscribePrincipals();
+    };
+  }, []);
+
+  const handleAddBranch = async () => {
+    if (!branchForm.name || !branchForm.location || !auth.currentUser) return;
+    setLoading(true);
+    try {
+      await addDoc(collection(db, "schools", auth.currentUser.uid, "branches"), {
+        ...branchForm,
+        students: 0,
+        teachers: 0,
+        status: 'Active',
+        established: new Date().getFullYear().toString(),
+        createdAt: serverTimestamp()
+      });
+      toast.success("Branch added successfully!");
+      setShowAddBranchModal(false);
+      setBranchForm({ name: '', location: '', color: '#3b82f6' });
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInvitePrincipal = async () => {
+    if (!inviteForm.email || !inviteForm.branch || !auth.currentUser) return;
+    setLoading(true);
+    try {
+      // 1. Save to Whitelist in Firestore
+      await addDoc(collection(db, "principals"), {
+        ...inviteForm,
+        schoolId: auth.currentUser.uid,
+        schoolName: schoolInfo?.schoolName || "Your School",
+        status: 'Invited',
+        avatar: inviteForm.name.substring(0, 2).toUpperCase(),
+        joinDate: new Date().toLocaleDateString(),
+        lastActive: 'Never',
+        studentsManaged: 0,
+        teachersManaged: 0,
+        createdAt: serverTimestamp()
+      });
+
+      // 2. Send Real Email via Resend
+      const emailRes = await sendInvitationEmail({
+        to: inviteForm.email,
+        name: inviteForm.name,
+        branch: inviteForm.branch,
+        schoolName: schoolInfo?.schoolName || "Our School"
+      });
+
+      if (emailRes.success) {
+        toast.success(`Invitation sent to ${inviteForm.email}!`);
+      } else {
+        toast.error("Whitelisted, but email failed to send. Please check API Key.");
+      }
+
+      setShowInviteModal(false);
+      setInviteForm({ name: '', email: '', branch: '', branchColor: '#1e3a8a' });
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredPrincipals = principals.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.branch.toLowerCase().includes(searchQuery.toLowerCase())
@@ -114,10 +183,10 @@ export default function PrincipalManagement() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
         {[
           { label: "Total Branches", value: branches.length.toString(), note: `${branches.filter(b => b.status === 'Active').length} active`, col: "text-blue-500" },
-          { label: "Total Principals", value: principalsData.length.toString(), note: "Across network", col: "text-slate-400" },
-          { label: "Active Principals", value: principalsData.filter(p => p.status === 'Active').length.toString(), note: "Currently managing", col: "text-emerald-500" },
-          { label: "Pending Invites", value: principalsData.filter(p => p.status === 'Invited').length.toString(), note: "Awaiting acceptance", col: "text-amber-500" },
-          { label: "Unassigned", value: branches.filter(b => !principalsData.find(p => p.branch === b.name && p.status === 'Active')).length.toString(), note: "Branches need principal", col: "text-rose-500" },
+          { label: "Total Principals", value: principals.length.toString(), note: "Across network", col: "text-slate-400" },
+          { label: "Active Principals", value: principals.filter(p => p.status === 'Active').length.toString(), note: "Currently managing", col: "text-emerald-500" },
+          { label: "Pending Invites", value: principals.filter(p => p.status === 'Invited').length.toString(), note: "Awaiting acceptance", col: "text-amber-500" },
+          { label: "Unassigned", value: branches.filter(b => !principals.find(p => p.branch === b.name && p.status === 'Active')).length.toString(), note: "Branches need principal", col: "text-rose-500" },
         ].map((stat, i) => (
           <div key={i} className="bg-white p-7 rounded-[1.8rem] border border-slate-100 shadow-sm transition-all hover:shadow-md">
             <p className="text-slate-400 text-[10px] font-black uppercase tracking-tight mb-3">{stat.label}</p>
@@ -162,7 +231,7 @@ export default function PrincipalManagement() {
           {/* Branches Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredBranches.map(branch => {
-              const assignedPrincipal = principalsData.find(p => p.branch === branch.name && (p.status === 'Active' || p.status === 'Invited'));
+              const assignedPrincipal = principals.find(p => p.branch === branch.name && (p.status === 'Active' || p.status === 'Invited'));
               const statusConf = getStatusConfig(branch.status);
               return (
                 <div key={branch.id} className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden transition-all hover:shadow-lg group">
@@ -458,14 +527,11 @@ export default function PrincipalManagement() {
                 Cancel
               </Button>
               <Button
-                onClick={() => {
-                  alert(`Branch "${branchForm.name}" created at ${branchForm.location}! (Will connect to BaaS later)`);
-                  setShowAddBranchModal(false);
-                  setBranchForm({ name: '', location: '', color: '#3b82f6' });
-                }}
+                disabled={loading}
+                onClick={handleAddBranch}
                 className="h-12 px-8 rounded-xl bg-emerald-500 text-white text-sm font-bold hover:bg-emerald-600 shadow-lg flex items-center gap-2"
               >
-                <Plus className="w-4 h-4" /> Create Branch
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Create Branch
               </Button>
             </div>
           </div>
@@ -517,7 +583,7 @@ export default function PrincipalManagement() {
                   {branches.map((branch, i) => (
                     <button
                       key={i}
-                      onClick={() => setInviteForm({ ...inviteForm, branch: branch.name })}
+                      onClick={() => setInviteForm({ ...inviteForm, branch: branch.name, branchColor: branch.color })}
                       className={`flex items-center gap-4 p-4 rounded-2xl border transition-all text-left ${
                         inviteForm.branch === branch.name
                           ? 'border-blue-300 bg-blue-50/50 shadow-sm'
@@ -545,14 +611,11 @@ export default function PrincipalManagement() {
                 Cancel
               </Button>
               <Button
-                onClick={() => {
-                  alert(`Invitation sent to ${inviteForm.email} for ${inviteForm.branch}! Principal will receive dashboard access upon accepting.`);
-                  setShowInviteModal(false);
-                  setInviteForm({ name: '', email: '', branch: '' });
-                }}
+                disabled={loading}
+                onClick={handleInvitePrincipal}
                 className="h-12 px-8 rounded-xl bg-[#1e294b] text-white text-sm font-bold hover:bg-[#1e3a8a] shadow-lg flex items-center gap-2"
               >
-                <Send className="w-4 h-4" /> Send Invitation
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Send Invitation
               </Button>
             </div>
           </div>
