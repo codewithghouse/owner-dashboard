@@ -78,6 +78,10 @@ export default function PrincipalManagement() {
         students: 0,
         teachers: 0,
         status: 'Active',
+        ahi: 0, // Initial Academic Health Index
+        feeCollection: 0,
+        passRate: 0,
+        attendance: 0,
         established: new Date().getFullYear().toString(),
         createdAt: serverTimestamp()
       });

@@ -1,10 +1,25 @@
-import { dashboardStats, branches, riskDistribution, revenueTrend, criticalAlerts } from "@/data/dummyData";
+import { dashboardStats, riskDistribution, revenueTrend, criticalAlerts } from "@/data/dummyData";
+import { useState, useEffect } from "react";
+import { db, auth } from "@/lib/firebase";
+import { collection, onSnapshot } from "firebase/firestore";
 import { Heart, Users, Percent, Bell, Download, Mail, Calendar, Settings, ChevronRight, AlertCircle, Info } from "lucide-react";
 import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts";
 
 const COLORS = ['#22c55e', '#f59e0b', '#ef4444'];
 
 export default function Dashboard() {
+  const [branches, setBranches] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!auth.currentUser) return;
+    const branchesRef = collection(db, "schools", auth.currentUser.uid, "branches");
+    const unsubscribe = onSnapshot(branchesRef, (snapshot) => {
+      const branchList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setBranches(branchList);
+    });
+    return () => unsubscribe();
+  }, []);
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700 pb-10">
       {/* Header Section */}

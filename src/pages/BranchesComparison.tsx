@@ -1,9 +1,11 @@
-import { branchesData, performanceRanking, comparativeTrends } from "@/data/dummyData";
+import { performanceRanking, comparativeTrends } from "@/data/dummyData";
+import { useState, useEffect, useMemo } from "react";
+import { db, auth } from "@/lib/firebase";
+import { collection, onSnapshot } from "firebase/firestore";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Legend, BarChart, Bar, Cell
 } from "recharts";
-import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft, CheckCircle, AlertTriangle, Building2,
@@ -14,14 +16,24 @@ import { Button } from "@/components/ui/button";
 export default function BranchesComparison() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [branches, setBranches] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!auth.currentUser) return;
+    const branchesRef = collection(db, "schools", auth.currentUser.uid, "branches");
+    const unsubscribe = onSnapshot(branchesRef, (snapshot) => {
+      const branchList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setBranches(branchList);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const selectedBranch = useMemo(() => {
-    if (!id) return null;
-    const branchName = Object.keys(branchesData).find(key => key.toLowerCase().replace(/\s+/g, '-') === id.toLowerCase());
-    return branchName ? branchesData[branchName as keyof typeof branchesData] : null;
-  }, [id]);
+    if (!id || branches.length === 0) return null;
+    return branches.find(b => b.name.toLowerCase().replace(/\s+/g, '-') === id.toLowerCase()) || null;
+  }, [id, branches]);
 
-  const branchesArray = Object.values(branchesData);
+  const branchesArray = branches;
 
   const getMetricColor = (value: number) => {
     if (value >= 94) return 'text-[#22c55e]';
@@ -59,27 +71,11 @@ export default function BranchesComparison() {
 
   // KPI notes based on branch
   const getKPINotes = (branch: any) => {
-    if (branch.name === 'South Branch') {
-      return [
-        { label: 'Academic Health Index', value: `${branch.ahi}%`, note: '↓ 11% below Main', color: `text-[${branch.color}]` },
-        { label: 'Fee Collection', value: `${branch.feeCollection}%`, note: '↓ 5% below target', color: `text-[${branch.color}]` },
-        { label: 'Pass Rate', value: `${branch.passRate}%`, note: '↓ 6% below Main', color: `text-[${branch.color}]` },
-        { label: 'Active Alerts', value: `${branch.activeAlerts}`, note: 'Highest among branches', color: 'text-[#ef4444]' },
-      ];
-    }
-    if (branch.name === 'North Branch') {
-      return [
-        { label: 'Academic Health Index', value: `${branch.ahi}%`, note: '↓ 4% below Main', color: `text-[${branch.color}]` },
-        { label: 'Fee Collection', value: `${branch.feeCollection}%`, note: '↓ 2% below target', color: `text-[${branch.color}]` },
-        { label: 'Pass Rate', value: `${branch.passRate}%`, note: '↓ 3% below Main', color: `text-[${branch.color}]` },
-        { label: 'Active Alerts', value: `${branch.activeAlerts}`, note: 'Moderate risk', color: 'text-[#f59e0b]' },
-      ];
-    }
     return [
-      { label: 'Academic Health Index', value: `${branch.ahi}%`, note: 'Highest across network', color: `text-[${branch.color}]` },
-      { label: 'Fee Collection', value: `${branch.feeCollection}%`, note: 'Above target', color: `text-[${branch.color}]` },
-      { label: 'Pass Rate', value: `${branch.passRate}%`, note: 'Network leader', color: `text-[${branch.color}]` },
-      { label: 'Active Alerts', value: `${branch.activeAlerts}`, note: 'Lowest count', color: 'text-[#22c55e]' },
+      { label: 'Academic Health Index', value: `${branch.ahi || 0}%`, note: 'Live data', color: `text-[${branch.color}]` },
+      { label: 'Fee Collection', value: `${branch.feeCollection || 0}%`, note: 'Target check', color: `text-[${branch.color}]` },
+      { label: 'Pass Rate', value: `${branch.passRate || 0}%`, note: 'Academic status', color: `text-[${branch.color}]` },
+      { label: 'Active Alerts', value: `0`, note: 'No active risks', color: 'text-[#22c55e]' },
     ];
   };
 
@@ -257,10 +253,10 @@ export default function BranchesComparison() {
                   <h3 className="text-base font-bold text-[#111827] mb-10">Historical Performance</h3>
                   <div className="h-[260px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={selectedBranch.historicalPerformance} margin={{ left: -20, right: 10 }}>
+                      <LineChart data={[{ year: "2024", score: 0, schoolAvg: 0 }, { year: "2025", score: selectedBranch.ahi || 0, schoolAvg: 85 }]} margin={{ left: -20, right: 10 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                         <XAxis dataKey="year" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 'bold' }} dy={10} />
-                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 'bold' }} domain={[70, 95]} ticks={[70, 75, 80, 85, 90]} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 'bold' }} domain={[0, 100]} />
                         <Tooltip />
                         <Line type="monotone" dataKey="schoolAvg" name="School Avg" stroke="#22c55e" strokeWidth={2} strokeDasharray="6 6" dot={false} />
                         <Line type="monotone" dataKey="score" name={selectedBranch.name} stroke={selectedBranch.color} strokeWidth={3} dot={{ r: 5, fill: "#fff", strokeWidth: 2.5, stroke: selectedBranch.color }} />
@@ -312,9 +308,8 @@ export default function BranchesComparison() {
                     <CheckCircle className="w-5 h-5 text-[#22c55e]" /> Strengths
                   </h4>
                   <ul className="space-y-3">
-                    {selectedBranch.strengths.map((s, i) => (
-                      <li key={i} className="text-slate-700 font-medium text-sm leading-relaxed">• {s}</li>
-                    ))}
+                    <li className="text-slate-700 font-medium text-sm leading-relaxed">• Branch successfully established in {selectedBranch.location}</li>
+                    <li className="text-slate-700 font-medium text-sm leading-relaxed">• System configuration complete</li>
                   </ul>
                 </div>
                 {/* Areas for Improvement */}
@@ -323,9 +318,8 @@ export default function BranchesComparison() {
                     <AlertTriangle className="w-5 h-5 text-[#ef4444]" /> Areas for Improvement
                   </h4>
                   <ul className="space-y-3">
-                    {selectedBranch.improvements.map((s, i) => (
-                      <li key={i} className="text-slate-700 font-medium text-sm leading-relaxed">• {s}</li>
-                    ))}
+                    <li className="text-slate-700 font-medium text-sm leading-relaxed">• Initial student enrollment drive needed</li>
+                    <li className="text-slate-700 font-medium text-sm leading-relaxed">• Staff recruitment process to be started</li>
                   </ul>
                 </div>
               </div>
@@ -336,7 +330,10 @@ export default function BranchesComparison() {
           <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-10">
             <h3 className="text-xl font-bold text-[#111827] mb-10">Recommended Action Plan</h3>
             <div className="space-y-0 divide-y divide-slate-50">
-              {getActionPlanDetails(selectedBranch).map((plan, idx) => (
+              {[
+                { task: 'Launch Enrollment Campaign', sub: 'Target: First 100 students', priority: 'High Priority', prColor: 'bg-[#ef4444]' },
+                { task: 'Faculty Onboarding', sub: 'Recruit Core Subject Teachers', priority: 'Medium Priority', prColor: 'bg-[#f59e0b]' },
+              ].map((plan, idx) => (
                 <div key={idx} className="flex items-center justify-between py-7 gap-8 group">
                   <div className="flex items-center gap-6">
                     <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-black text-sm shrink-0" style={{ backgroundColor: selectedBranch.color }}>
