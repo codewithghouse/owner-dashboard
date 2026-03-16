@@ -124,7 +124,9 @@ export default function PrincipalManagement() {
       if (emailRes.success) {
         toast.success(`Invitation sent to ${inviteForm.email}!`);
       } else {
-        toast.error("Whitelisted, but email failed to send. Please check API Key.");
+        const errorMsg = emailRes.error?.error || emailRes.error || "Email failed to send.";
+        toast.error(`Whitelisted, but email issue: ${JSON.stringify(errorMsg)}`);
+        console.error("Email Sending Error:", emailRes.error);
       }
 
       setShowInviteModal(false);

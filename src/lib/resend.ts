@@ -29,15 +29,21 @@ export const sendInvitationEmail = async ({
       }),
     });
 
-    const data = await response.json();
-
-    if (response.ok) {
-      return { success: true, data };
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      const data = await response.json();
+      if (response.ok) {
+        return { success: true, data };
+      } else {
+        return { success: false, error: data };
+      }
     } else {
-      return { success: false, error: data };
+      const text = await response.text();
+      console.error("Non-JSON response received:", text);
+      return { success: false, error: `Server error (${response.status}): ${text.substring(0, 100)}` };
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Internal API Error:", error);
-    return { success: false, error };
+    return { success: false, error: error.message || "Network error" };
   }
 };
