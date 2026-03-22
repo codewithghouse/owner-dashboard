@@ -106,6 +106,7 @@ export default function PrincipalManagement() {
       // 1. Save to Whitelist in Firestore
       await addDoc(collection(db, "principals"), {
         ...inviteForm,
+        email: inviteForm.email.toLowerCase(), // Enforce lowercase
         schoolId: auth.currentUser.uid,
         schoolName: schoolInfo?.schoolName || "Your School",
         status: 'Invited',
@@ -185,7 +186,7 @@ export default function PrincipalManagement() {
             // Add to Firestore
             await addDoc(collection(db, "principals"), {
               name,
-              email,
+              email: email.toLowerCase(), // Enforce lowercase
               branch: branchMatch?.name || branch,
               branchColor: branchMatch?.color || '#3b82f6',
               schoolId: auth.currentUser!.uid,
