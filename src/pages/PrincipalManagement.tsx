@@ -7,13 +7,15 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { db, auth } from "@/lib/firebase";
+import { db, auth, storage } from "@/lib/firebase";
 import { 
   collection, addDoc, onSnapshot, query, 
-  where, serverTimestamp, getDoc, doc 
+  where, serverTimestamp, getDoc, doc, deleteDoc, updateDoc 
 } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { sendInvitationEmail } from "@/lib/resend";
 import { toast } from "sonner";
+import * as XLSX from 'xlsx';
 
 // Constant options remains same
 const branchColorOptions = [
@@ -24,10 +26,12 @@ const branchColorOptions = [
 export default function PrincipalManagement() {
   const [activeTab, setActiveTab] = useState<'principals' | 'branches'>('branches');
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
   const [showAddBranchModal, setShowAddBranchModal] = useState(false);
   const [selectedPrincipal, setSelectedPrincipal] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [inviteForm, setInviteForm] = useState({ name: '', email: '', branch: '', branchColor: '#1e3a8a' });
+  const [bulkFile, setBulkFile] = useState<File | null>(null);
   const [branchForm, setBranchForm] = useState({ name: '', location: '', color: '#3b82f6' });
   const [showActionMenu, setShowActionMenu] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -122,7 +126,7 @@ export default function PrincipalManagement() {
       });
 
       if (emailRes.success) {
-        toast.success(`Invitation sent to ${inviteForm.email}!`);
+        toast.success(emailRes.message || `Invitation sent to ${inviteForm.email}!`);
       } else {
         const errorMsg = emailRes.error?.error || emailRes.error || "Email failed to send.";
         toast.error(`Whitelisted, but email issue: ${JSON.stringify(errorMsg)}`);
@@ -136,6 +140,118 @@ export default function PrincipalManagement() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBulkInvite = async () => {
+    if (!bulkFile || !auth.currentUser) {
+      toast.error("Please select an Excel file first.");
+      return;
+    }
+    setLoading(true);
+    try {
+      // 1. Upload file to Storage for record keeping
+      const fileRef = ref(storage, `bulk-invites/${auth.currentUser.uid}_${Date.now()}_${bulkFile.name}`);
+      await uploadBytes(fileRef, bulkFile);
+      const fileUrl = await getDownloadURL(fileRef);
+
+      // 2. Parse Excel File
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: 'binary' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const rows: any[] = XLSX.utils.sheet_to_json(sheet);
+
+        if (rows.length === 0) {
+          toast.error("The Excel file is empty.");
+          setLoading(false);
+          return;
+        }
+
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const row of rows) {
+          const { name, email, branch } = row;
+          if (!name || !email || !branch) {
+            failCount++;
+            continue;
+          }
+
+          try {
+            const branchMatch = branches.find(b => b.name.toLowerCase() === branch.toLowerCase());
+            
+            // Add to Firestore
+            await addDoc(collection(db, "principals"), {
+              name,
+              email,
+              branch: branchMatch?.name || branch,
+              branchColor: branchMatch?.color || '#3b82f6',
+              schoolId: auth.currentUser!.uid,
+              schoolName: schoolInfo?.schoolName || "Your School",
+              status: 'Invited',
+              avatar: name.substring(0, 2).toUpperCase(),
+              joinDate: new Date().toLocaleDateString(),
+              lastActive: 'Never',
+              studentsManaged: 0,
+              teachersManaged: 0,
+              createdAt: serverTimestamp(),
+              sourceFile: fileUrl
+            });
+
+            // Send Email
+            await sendInvitationEmail({
+              to: email,
+              name,
+              branch: branchMatch?.name || branch,
+              schoolName: schoolInfo?.schoolName || "Our School"
+            });
+            
+            successCount++;
+          } catch (err) {
+            failCount++;
+            console.error(`Failed to invite ${email}:`, err);
+          }
+        }
+
+        toast.success(`Bulk processing complete! ${successCount} invited, ${failCount} skipped.`);
+        setShowBulkModal(false);
+        setBulkFile(null);
+        setLoading(false);
+      };
+      
+      reader.readAsBinaryString(bulkFile);
+    } catch (err: any) {
+      toast.error("Bulk upload failed: " + err.message);
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteBranch = async (id: string) => {
+    if (!auth.currentUser || !window.confirm("Are you sure you want to delete this branch? All associated data will be removed.")) return;
+    try {
+      await deleteDoc(doc(db, "schools", auth.currentUser.uid, "branches", id));
+      toast.success("Branch deleted successfully");
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleDeletePrincipal = async (id: string) => {
+    if (!auth.currentUser || !window.confirm("Are you sure you want to delete this principal? Access will be revoked.")) return;
+    try {
+      await deleteDoc(doc(db, "principals", id));
+      toast.success("Principal removed successfully");
+      if (selectedPrincipal?.id === id) setSelectedPrincipal(null);
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleReassignPrincipal = (branchName: string, color: string) => {
+    setInviteForm({ ...inviteForm, branch: branchName, branchColor: color });
+    setShowInviteModal(true);
   };
 
   const filteredPrincipals = principals.filter(p =>
@@ -175,6 +291,13 @@ export default function PrincipalManagement() {
             className="h-12 rounded-xl px-6 border-slate-200 font-bold text-sm text-slate-600 hover:bg-slate-50 flex items-center gap-2"
           >
             <Building2 className="w-4 h-4" /> Add Branch
+          </Button>
+          <Button
+            onClick={() => setShowBulkModal(true)}
+            variant="outline"
+            className="h-12 rounded-xl px-6 border-indigo-200 bg-indigo-50/50 text-indigo-700 font-bold text-sm hover:bg-indigo-100 flex items-center gap-2"
+          >
+            <Hash className="w-4 h-4" /> Bulk Invite
           </Button>
           <Button
             onClick={() => setShowInviteModal(true)}
@@ -323,11 +446,16 @@ export default function PrincipalManagement() {
                       <button className="flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border border-slate-100 bg-[#f8fafc] hover:bg-white hover:shadow-md transition-all text-xs font-bold text-slate-500">
                         <Users className="w-3.5 h-3.5" /> Manage
                       </button>
-                      {branch.status !== 'Active' && (
-                        <button className="p-3 rounded-xl border border-rose-100 bg-[#fef2f2] hover:bg-rose-50 transition-all text-xs font-bold text-rose-400">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
+                      <button 
+                        onClick={() => handleReassignPrincipal(branch.name, branch.color)}
+                        className="flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border border-amber-100 bg-amber-50/50 hover:bg-white hover:shadow-md transition-all text-xs font-bold text-amber-600">
+                        <RefreshCcw className="w-3.5 h-3.5" /> Reassign
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteBranch(branch.id)}
+                        className="p-3 rounded-xl border border-rose-100 bg-[#fef2f2] hover:bg-rose-50 transition-all text-xs font-bold text-rose-400">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -443,8 +571,14 @@ export default function PrincipalManagement() {
                                 <button className="w-full flex items-center gap-3 px-5 py-3 text-sm font-bold text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors">
                                   <Mail className="w-4 h-4" /> Send Message
                                 </button>
-                                <div className="border-t border-slate-50 mx-3 my-1"></div>
-                                <button className="w-full flex items-center gap-3 px-5 py-3 text-sm font-bold text-rose-500 hover:bg-rose-50 transition-colors">
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); handleDeletePrincipal(p.id); }}
+                                  className="w-full flex items-center gap-3 px-5 py-3 text-sm font-bold text-rose-500 hover:bg-rose-50 transition-colors">
+                                  <Trash2 className="w-4 h-4" /> Delete Principal
+                                </button>
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); /* Logic for deactivation */ }}
+                                  className="w-full flex items-center gap-3 px-5 py-3 text-sm font-bold text-slate-400 hover:bg-slate-50 transition-colors">
                                   <Ban className="w-4 h-4" /> {p.status === 'Deactivated' ? 'Reactivate' : 'Deactivate'}
                                 </button>
                               </div>
@@ -628,6 +762,73 @@ export default function PrincipalManagement() {
         </div>
       )}
 
+      {/* ==================== BULK INVITE MODAL ==================== */}
+      {showBulkModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-300 overflow-hidden">
+            <div className="p-8 border-b border-slate-50 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg">
+                  <Hash className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-[#111827]">Bulk Principal Invite</h3>
+                  <p className="text-slate-400 text-xs font-medium">Upload Excel file to invite multiple principals</p>
+                </div>
+              </div>
+              <button onClick={() => { setShowBulkModal(false); setBulkFile(null); }} className="p-2 rounded-xl hover:bg-slate-50 text-slate-400 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-8 space-y-8">
+              <div className="bg-indigo-50/50 border-2 border-dashed border-indigo-200 rounded-[2rem] p-10 flex flex-col items-center justify-center gap-4 text-center group cursor-pointer relative hover:border-indigo-400 transition-all">
+                <input 
+                  type="file" 
+                  accept=".xlsx, .xls"
+                  onChange={(e) => setBulkFile(e.target.files?.[0] || null)}
+                  className="absolute inset-0 opacity-0 cursor-pointer" 
+                />
+                <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center text-indigo-600 shadow-sm group-hover:scale-110 transition-transform">
+                  <Plus className="w-7 h-7" />
+                </div>
+                <div>
+                  <p className="text-base font-bold text-indigo-900">{bulkFile ? bulkFile.name : "Select Excel File"}</p>
+                  <p className="text-xs font-medium text-indigo-500 mt-1">{bulkFile ? `${(bulkFile.size / 1024).toFixed(1)} KB` : "Excel sheet with name, email, and branch"}</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Instructions</h4>
+                <div className="bg-slate-50 rounded-2xl p-6 space-y-3">
+                  <div className="flex items-start gap-3 text-xs font-medium text-slate-600">
+                    <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-black shrink-0 mt-0.5">1</div>
+                    <p>Excel should have headers: <span className="font-bold text-[#111827]">name, email, branch</span></p>
+                  </div>
+                  <div className="flex items-start gap-3 text-xs font-medium text-slate-600">
+                    <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-black shrink-0 mt-0.5">2</div>
+                    <p>Branch names should strictly match your existing branches.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-8 border-t border-slate-50 flex items-center justify-between gap-4">
+              <Button variant="outline" onClick={() => { setShowBulkModal(false); setBulkFile(null); }} className="h-12 px-6 rounded-xl border-slate-200 text-sm font-bold">
+                Cancel
+              </Button>
+              <Button
+                disabled={loading || !bulkFile}
+                onClick={handleBulkInvite}
+                className="h-12 px-8 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 shadow-lg flex items-center gap-2"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Start Bulk Migration
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ==================== PRINCIPAL DETAIL MODAL ==================== */}
       {selectedPrincipal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
@@ -715,7 +916,12 @@ export default function PrincipalManagement() {
                   <button className="flex items-center gap-3 p-4 rounded-2xl border border-slate-100 bg-[#f8fafc] hover:bg-white hover:shadow-lg transition-all text-sm font-bold text-slate-600">
                     <Shield className="w-4 h-4 text-emerald-500" /> Edit Permissions
                   </button>
-                  <button className="flex items-center gap-3 p-4 rounded-2xl border border-rose-100 bg-[#fef2f2]/50 hover:bg-white hover:shadow-lg transition-all text-sm font-bold text-rose-500">
+                  <button 
+                    onClick={() => handleDeletePrincipal(selectedPrincipal.id)}
+                    className="flex items-center gap-3 p-4 rounded-2xl border border-rose-100 bg-rose-50/50 hover:bg-white hover:shadow-lg transition-all text-sm font-bold text-rose-600">
+                    <Trash2 className="w-4 h-4" /> Delete Account
+                  </button>
+                  <button className="flex items-center gap-3 p-4 rounded-2xl border border-slate-100 bg-[#f8fafc] hover:bg-white hover:shadow-lg transition-all text-sm font-bold text-slate-400">
                     <Ban className="w-4 h-4" /> {selectedPrincipal.status === 'Deactivated' ? 'Reactivate' : 'Deactivate'}
                   </button>
                 </div>
