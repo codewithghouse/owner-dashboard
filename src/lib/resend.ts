@@ -33,16 +33,16 @@ export const sendInvitationEmail = async ({
     if (contentType && contentType.includes("application/json")) {
       const data = await response.json();
       if (response.ok) {
-        return { success: true, data };
+        return { success: true, data, message: data.message };
       } else {
-        return { success: false, error: data };
+        return { success: false, error: data, message: data.error || data.message };
       }
     } else {
       const text = await response.text();
-      return { success: false, error: `Server error (${response.status}): ${text.substring(0, 100)}` };
+      return { success: false, error: text, message: `Server error (${response.status})` };
     }
   } catch (error: any) {
     console.error("Internal API Error:", error);
-    return { success: false, error: error.message || "Network error" };
+    return { success: false, error: error.message || "Network error", message: error.message };
   }
 };

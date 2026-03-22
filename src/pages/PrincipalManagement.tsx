@@ -119,7 +119,7 @@ export default function PrincipalManagement() {
       });
 
       // 2. Send Real Email via Resend
-      const emailRes = await sendInvitationEmail({
+      const emailRes: any = await sendInvitationEmail({
         to: inviteForm.email,
         name: inviteForm.name,
         branch: inviteForm.branch,
@@ -129,7 +129,7 @@ export default function PrincipalManagement() {
       if (emailRes.success) {
         toast.success(emailRes.message || `Invitation sent to ${inviteForm.email}!`);
       } else {
-        const errorMsg = emailRes.error?.error || emailRes.error || "Email failed to send.";
+        const errorMsg = emailRes.message || emailRes.error?.error || emailRes.error || "Email failed to send.";
         toast.error(`Whitelisted, but email issue: ${JSON.stringify(errorMsg)}`);
         console.error("Email Sending Error:", emailRes.error);
       }
@@ -202,7 +202,7 @@ export default function PrincipalManagement() {
             });
 
             // Send Email
-            await sendInvitationEmail({
+            const emailRes: any = await sendInvitationEmail({
               to: email,
               name,
               branch: branchMatch?.name || branch,
