@@ -34,8 +34,13 @@ export default function LoginPage() {
         toast.error("Access denied. Owner only portal.");
       }
     } catch (error: any) {
-      console.error(error);
-      toast.error(error.message || "Failed to login");
+      if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+        toast.error("Invalid email or password.");
+      } else if (error.code === 'auth/too-many-requests') {
+        toast.error("Too many failed attempts. Please try again later.");
+      } else {
+        toast.error("Login failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
