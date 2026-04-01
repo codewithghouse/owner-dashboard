@@ -17,6 +17,11 @@ import { sendInvitationEmail } from "@/lib/resend";
 import { toast } from "sonner";
 import * as XLSX from 'xlsx';
 
+// Converts a display name to a consistent slug-based ID
+// "South India" → "south_india", "Hyderabad Campus" → "hyderabad_campus"
+const toSlug = (name: string) =>
+  name.toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+
 // Constant options remains same
 const branchColorOptions = [
   '#1e3a8a', '#3b82f6', '#22c55e', '#10b981', '#f59e0b', '#f97316',
@@ -30,7 +35,7 @@ export default function PrincipalManagement() {
   const [showAddBranchModal, setShowAddBranchModal] = useState(false);
   const [selectedPrincipal, setSelectedPrincipal] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [inviteForm, setInviteForm] = useState({ name: '', email: '', branch: '', branchColor: '#1e3a8a' });
+  const [inviteForm, setInviteForm] = useState({ name: '', email: '', branch: '', branchId: '', branchColor: '#1e3a8a' });
   const [bulkFile, setBulkFile] = useState<File | null>(null);
   const [branchForm, setBranchForm] = useState({ name: '', location: '', color: '#3b82f6' });
   const [showActionMenu, setShowActionMenu] = useState<string | null>(null);
@@ -79,6 +84,7 @@ export default function PrincipalManagement() {
     try {
       await addDoc(collection(db, "schools", auth.currentUser.uid, "branches"), {
         ...branchForm,
+        branchId: toSlug(branchForm.name),
         students: 0,
         teachers: 0,
         status: 'Active',
@@ -106,7 +112,9 @@ export default function PrincipalManagement() {
       // 1. Save to Whitelist in Firestore
       await addDoc(collection(db, "principals"), {
         ...inviteForm,
-        email: inviteForm.email.toLowerCase(), // Enforce lowercase
+        email: inviteForm.email.toLowerCase(),
+        branchId: inviteForm.branchId || toSlug(inviteForm.branch),
+        role: "principal",
         schoolId: auth.currentUser.uid,
         schoolName: schoolInfo?.schoolName || "Your School",
         status: 'Invited',
@@ -135,7 +143,7 @@ export default function PrincipalManagement() {
       }
 
       setShowInviteModal(false);
-      setInviteForm({ name: '', email: '', branch: '', branchColor: '#1e3a8a' });
+      setInviteForm({ name: '', email: '', branch: '', branchId: '', branchColor: '#1e3a8a' });
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -186,9 +194,10 @@ export default function PrincipalManagement() {
             // Add to Firestore
             await addDoc(collection(db, "principals"), {
               name,
-              email: email.toLowerCase(), // Enforce lowercase
+              email: email.toLowerCase(),
               branch: branchMatch?.name || branch,
-              branchColor: branchMatch?.color || '#3b82f6',
+              branchId: branchMatch?.branchId || toSlug(branch),
+              role: "principal",
               schoolId: auth.currentUser!.uid,
               schoolName: schoolInfo?.schoolName || "Your School",
               status: 'Invited',
@@ -251,7 +260,8 @@ export default function PrincipalManagement() {
   };
 
   const handleReassignPrincipal = (branchName: string, color: string) => {
-    setInviteForm({ ...inviteForm, branch: branchName, branchColor: color });
+    const branchId = branches.find(b => b.name === branchName)?.branchId || toSlug(branchName);
+    setInviteForm({ ...inviteForm, branch: branchName, branchId, branchColor: color });
     setShowInviteModal(true);
   };
 
@@ -724,7 +734,7 @@ export default function PrincipalManagement() {
                   {branches.map((branch, i) => (
                     <button
                       key={i}
-                      onClick={() => setInviteForm({ ...inviteForm, branch: branch.name, branchColor: branch.color })}
+                      onClick={() => setInviteForm({ ...inviteForm, branch: branch.name, branchId: branch.branchId || toSlug(branch.name), branchColor: branch.color })}
                       className={`flex items-center gap-4 p-4 rounded-2xl border transition-all text-left ${
                         inviteForm.branch === branch.name
                           ? 'border-blue-300 bg-blue-50/50 shadow-sm'

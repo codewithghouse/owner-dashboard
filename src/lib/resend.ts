@@ -32,14 +32,17 @@ export const sendInvitationEmail = async ({
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.includes("application/json")) {
       const data = await response.json();
+      console.log("Resend full response:", response.status, JSON.stringify(data));
       if (response.ok) {
         return { success: true, data, message: data.message };
       } else {
-        return { success: false, error: data, message: data.error || data.message };
+        const msg = data.message || data.error || JSON.stringify(data);
+        return { success: false, error: data, message: msg };
       }
     } else {
       const text = await response.text();
-      return { success: false, error: text, message: `Server error (${response.status})` };
+      console.log("Resend non-JSON response:", response.status, text);
+      return { success: false, error: text, message: `Server error (${response.status}): ${text}` };
     }
   } catch (error: any) {
     console.error("Internal API Error:", error);
