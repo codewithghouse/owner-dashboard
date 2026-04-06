@@ -106,7 +106,11 @@ export default function PrincipalManagement() {
   };
 
   const handleInvitePrincipal = async () => {
-    if (!inviteForm.email || !inviteForm.branch || !auth.currentUser) return;
+    if (!inviteForm.email || !inviteForm.name || !inviteForm.branch || !auth.currentUser) {
+      toast.error("Please fill in all required fields (Name, Email, and Branch).");
+      return;
+    }
+
     setLoading(true);
     try {
       // 1. Save to Whitelist in Firestore
@@ -116,7 +120,7 @@ export default function PrincipalManagement() {
         branchId: inviteForm.branchId || toSlug(inviteForm.branch),
         role: "principal",
         schoolId: auth.currentUser.uid,
-        schoolName: schoolInfo?.schoolName || "Your School",
+        schoolName: schoolInfo?.schoolName || "Our School",
         status: 'Invited',
         avatar: inviteForm.name.substring(0, 2).toUpperCase(),
         joinDate: new Date().toLocaleDateString(),
@@ -136,16 +140,16 @@ export default function PrincipalManagement() {
 
       if (emailRes.success) {
         toast.success(emailRes.message || `Invitation sent to ${inviteForm.email}!`);
+        setShowInviteModal(false);
+        setInviteForm({ name: '', email: '', branch: '', branchId: '', branchColor: '#1e3a8a' });
       } else {
-        const errorMsg = emailRes.message || emailRes.error?.error || emailRes.error || "Email failed to send.";
-        toast.error(`Whitelisted, but email issue: ${JSON.stringify(errorMsg)}`);
-        console.error("Email Sending Error:", emailRes.error);
+        const errorMsg = emailRes.message || emailRes.error?.message || emailRes.error || "Email failed to send.";
+        toast.error(`Principal added to list, but email failed: ${errorMsg}`);
+        console.error("Email Sending Error Details:", emailRes.error);
+        // We keep the modal open so the user can see the error and retry if needed
       }
-
-      setShowInviteModal(false);
-      setInviteForm({ name: '', email: '', branch: '', branchId: '', branchColor: '#1e3a8a' });
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error("Process failed: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -158,82 +162,73 @@ export default function PrincipalManagement() {
     }
     setLoading(true);
     try {
-      // 1. Upload file to Storage for record keeping
+      // 1. Upload file to Storage
       const fileRef = ref(storage, `bulk-invites/${auth.currentUser.uid}_${Date.now()}_${bulkFile.name}`);
       await uploadBytes(fileRef, bulkFile);
       const fileUrl = await getDownloadURL(fileRef);
 
-      // 2. Parse Excel File
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const rows: any[] = XLSX.utils.sheet_to_json(sheet);
+      // 2. Parse and Process Excel File
+      const data = await bulkFile.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      const rows: any[] = XLSX.utils.sheet_to_json(sheet);
 
-        if (rows.length === 0) {
-          toast.error("The Excel file is empty.");
-          setLoading(false);
-          return;
+      if (rows.length === 0) {
+        throw new Error("The Excel file is empty.");
+      }
+
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const row of rows) {
+        const { name, email, branch } = row;
+        if (!name || !email || !branch) {
+          failCount++;
+          continue;
         }
 
-        let successCount = 0;
-        let failCount = 0;
+        try {
+          const branchMatch = branches.find(b => b.name.toLowerCase() === branch.toLowerCase());
+          
+          await addDoc(collection(db, "principals"), {
+            name,
+            email: email.toLowerCase(),
+            branch: branchMatch?.name || branch,
+            branchId: branchMatch?.branchId || toSlug(branch),
+            role: "principal",
+            schoolId: auth.currentUser!.uid,
+            schoolName: schoolInfo?.schoolName || "Our School",
+            status: 'Invited',
+            avatar: name.substring(0, 2).toUpperCase(),
+            joinDate: new Date().toLocaleDateString(),
+            lastActive: 'Never',
+            studentsManaged: 0,
+            teachersManaged: 0,
+            createdAt: serverTimestamp(),
+            sourceFile: fileUrl
+          });
 
-        for (const row of rows) {
-          const { name, email, branch } = row;
-          if (!name || !email || !branch) {
-            failCount++;
-            continue;
-          }
-
-          try {
-            const branchMatch = branches.find(b => b.name.toLowerCase() === branch.toLowerCase());
-            
-            // Add to Firestore
-            await addDoc(collection(db, "principals"), {
-              name,
-              email: email.toLowerCase(),
-              branch: branchMatch?.name || branch,
-              branchId: branchMatch?.branchId || toSlug(branch),
-              role: "principal",
-              schoolId: auth.currentUser!.uid,
-              schoolName: schoolInfo?.schoolName || "Your School",
-              status: 'Invited',
-              avatar: name.substring(0, 2).toUpperCase(),
-              joinDate: new Date().toLocaleDateString(),
-              lastActive: 'Never',
-              studentsManaged: 0,
-              teachersManaged: 0,
-              createdAt: serverTimestamp(),
-              sourceFile: fileUrl
-            });
-
-            // Send Email
-            const emailRes: any = await sendInvitationEmail({
-              to: email,
-              name,
-              branch: branchMatch?.name || branch,
-              schoolName: schoolInfo?.schoolName || "Our School"
-            });
-            
-            successCount++;
-          } catch (err) {
-            failCount++;
-            console.error(`Failed to invite ${email}:`, err);
-          }
+          await sendInvitationEmail({
+            to: email,
+            name,
+            branch: branchMatch?.name || branch,
+            schoolName: schoolInfo?.schoolName || "Our School"
+          });
+          
+          successCount++;
+        } catch (err) {
+          failCount++;
+          console.error(`Failed to invite ${email}:`, err);
         }
+      }
 
-        toast.success(`Bulk processing complete! ${successCount} invited, ${failCount} skipped.`);
-        setShowBulkModal(false);
-        setBulkFile(null);
-        setLoading(false);
-      };
-      
-      reader.readAsBinaryString(bulkFile);
+      toast.success(`Bulk processing complete! ${successCount} invited, ${failCount} skipped.`);
+      setShowBulkModal(false);
+      setBulkFile(null);
     } catch (err: any) {
       toast.error("Bulk upload failed: " + err.message);
+    } finally {
       setLoading(false);
     }
   };

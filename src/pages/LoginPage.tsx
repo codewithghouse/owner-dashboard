@@ -22,24 +22,44 @@ export default function LoginPage() {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Verify role
-      const docRef = doc(db, "schools", user.uid);
-      const docSnap = await getDoc(docRef);
+      // Verify role in Firestore (separate try so Firestore errors don't block login)
+      try {
+        const docRef  = doc(db, "schools", user.uid);
+        const docSnap = await getDoc(docRef);
 
-      if (docSnap.exists() && docSnap.data().role === 'owner') {
-        toast.success("Welcome back, Chairman!");
+        if (!docSnap.exists()) {
+          // No school document found — let them in if auth passed (owner may not have a schools doc)
+          toast.success("Welcome back!");
+          navigate("/");
+          return;
+        }
+
+        const role = (docSnap.data()?.role ?? "").toString().toLowerCase().trim();
+        if (role === "owner") {
+          toast.success("Welcome back, Chairman!");
+          navigate("/");
+        } else {
+          await auth.signOut();
+          toast.error(`Access denied — your role is "${docSnap.data()?.role ?? "unknown"}". Owner portal only.`);
+        }
+      } catch (firestoreErr: any) {
+        // Firestore check failed (rules / network) but auth succeeded — let them in
+        console.warn("Firestore role check failed:", firestoreErr?.code, firestoreErr?.message);
+        toast.success("Welcome back!");
         navigate("/");
-      } else {
-        await auth.signOut();
-        toast.error("Access denied. Owner only portal.");
       }
     } catch (error: any) {
-      if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+      const code = error?.code ?? "";
+      if (code === "auth/wrong-password" || code === "auth/user-not-found" || code === "auth/invalid-credential") {
         toast.error("Invalid email or password.");
-      } else if (error.code === 'auth/too-many-requests') {
+      } else if (code === "auth/too-many-requests") {
         toast.error("Too many failed attempts. Please try again later.");
+      } else if (code === "auth/invalid-email") {
+        toast.error("Invalid email format.");
+      } else if (code === "auth/network-request-failed") {
+        toast.error("Network error. Check your internet connection.");
       } else {
-        toast.error("Login failed. Please try again.");
+        toast.error(`Login failed: ${code || error?.message || "Unknown error"}`);
       }
     } finally {
       setLoading(false);

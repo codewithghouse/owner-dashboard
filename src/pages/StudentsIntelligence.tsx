@@ -1,202 +1,565 @@
+import { useState, useEffect, useMemo } from "react";
+import { db, auth } from "@/lib/firebase";
+import { collection, getDocs, query, orderBy, where } from "firebase/firestore";
 import {
-  studentStats,
-  enrollmentTrend,
-  gradeDistribution,
-  performanceByBranch,
-  attendanceByGrade,
-  studentsList
-} from "@/data/dummyData";
-import {
-  Users, Search, Plus, Filter, ChevronLeft, ChevronRight,
-  MoreVertical, Mail, Phone, ExternalLink, Calendar, BookOpen, AlertCircle, X, ArrowLeft, Clock, AlertTriangle, Heart, Download, TrendingUp, TrendingDown
+  Users, Search, Plus, Filter, TrendingUp, TrendingDown,
+  ChevronLeft, ChevronRight, X, Loader2
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area, LineChart, Line
 } from "recharts";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { useParams, Link, useNavigate } from "react-router-dom";
-import { useState, useMemo, useEffect } from "react";
-import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query } from "firebase/firestore";
+
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const GRADE_COLORS = ["#1e3a8a","#2563eb","#3b82f6","#60a5fa","#93c5fd","#bfdbfe"];
+
+/* normalise "6" / "Class 6" / "Grade 6" / "VI" → "Grade 6" */
+function normalizeGrade(raw: string): string {
+  if (!raw) return "";
+  const s = raw.trim();
+  const num = s.match(/\d+/);
+  if (num) return `Grade ${num[0]}`;
+  // roman numerals up to 12
+  const roman: Record<string,string> = {
+    I:"1",II:"2",III:"3",IV:"4",V:"5",VI:"6",VII:"7",
+    VIII:"8",IX:"9",X:"10",XI:"11",XII:"12"
+  };
+  const up = s.toUpperCase();
+  if (roman[up]) return `Grade ${roman[up]}`;
+  return s;
+}
+
+/* ── risk helpers ─────────────────────────────────── */
+function getRisk(score: number): { label: string; color: string; bg: string } {
+  if (score >= 75) return { label: "Low",    color: "text-green-600",  bg: "bg-green-50"  };
+  if (score >= 50) return { label: "Medium", color: "text-amber-600",  bg: "bg-amber-50"  };
+  return              { label: "High",   color: "text-red-600",    bg: "bg-red-50"    };
+}
+
+function getInitials(name: string) {
+  return (name || "?").split(" ").map(n=>n[0]).join("").toUpperCase().slice(0,2);
+}
+
+function getAvatarColor(score: number) {
+  if (score >= 75) return "bg-emerald-500";
+  if (score >= 50) return "bg-amber-500";
+  return "bg-red-500";
+}
+
+function getHeatColor(v: number) {
+  if (v >= 95) return "bg-green-600 text-white";
+  if (v >= 85) return "bg-amber-500 text-white";
+  return "bg-red-500 text-white";
+}
+
+const PAGE_SIZE = 10;
 
 export default function StudentsIntelligence() {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const [studentsData, setStudentsData] = useState<any[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
+  /* ── raw data ───────────────────────────────────── */
+  const [students,   setStudents]   = useState<any[]>([]);
+  const [schools,    setSchools]    = useState<Map<string,string>>(new Map());
+  // heatRaw: branchName → grade → {p, t}
+  const [heatRaw,    setHeatRaw]    = useState<Map<string, Map<string,{p:number;t:number}>>>(new Map());
+  const [loading,    setLoading]    = useState(true);
 
+  /* ── UI state ───────────────────────────────────── */
+  const [search,      setSearch]      = useState("");
+  const [page,        setPage]        = useState(1);
+  const [selected,    setSelected]    = useState<any | null>(null);
+  const [heatBranch,  setHeatBranch]  = useState("All");
+  const [tableBranch, setTableBranch] = useState("All");
+
+  /* ── per-student detail data ─────────────────────── */
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailTrend,   setDetailTrend]   = useState<{ month: string; score: number; attendance: number }[]>([]);
+  const [attDelta,      setAttDelta]      = useState<number | null>(null);   // % diff last30 vs prev30
+  const [scoreDelta,    setScoreDelta]    = useState<number | null>(null);   // pts diff last 2 exams
+  const [att30,         setAtt30]         = useState<number | null>(null);   // last-30-day att %
+
+  /* ── fetch everything ───────────────────────────── */
   useEffect(() => {
-    const q = query(collection(db, "students"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const students = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        academicScore: (doc.data() as any).academicScore || 75, // Default for now
-        attendance: (doc.data() as any).attendance || 90,
-      }));
-      setStudentsData(students);
-    });
-    return () => unsubscribe();
+    const go = async () => {
+      try {
+        /* 1. branches subcollection: schools/{ownerUid}/branches */
+        const ownerUid = auth.currentUser?.uid;
+        const branchMap = new Map<string, string>(); // branchId → branchName
+        if (ownerUid) {
+          const branchSnap = await getDocs(
+            collection(db, "schools", ownerUid, "branches")
+          );
+          branchSnap.docs.forEach(d => {
+            const data = d.data() as any;
+            const bname = data.name || data.branchName || "";
+            const bid   = data.branchId || d.id;
+            if (bname && bid) branchMap.set(bid, bname);
+          });
+        }
+        // also build schoolId→branchName for fallback (top-level schools docs)
+        const schoolMap = new Map<string, string>(); // schoolId → branchName (fallback)
+        const schoolsSnap = await getDocs(collection(db, "schools"));
+        schoolsSnap.docs.forEach(d => {
+          const data = d.data() as any;
+          const sname = data.name || data.schoolName || "";
+          if (sname) schoolMap.set(d.id, sname);
+        });
+        setSchools(branchMap); // store branchId→name for dropdown
+
+        /* 2. all enrollments */
+        const enrollSnap = await getDocs(collection(db, "enrollments"));
+        const enrollments = enrollSnap.docs.map(d => ({ _eid: d.id, ...d.data() as any }));
+
+        /* 3. test_scores: studentId → avg score */
+        const scoresSnap = await getDocs(collection(db, "test_scores"));
+        const scoreMap   = new Map<string, number[]>();
+        scoresSnap.docs.forEach(d => {
+          const data = d.data() as any;
+          const key  = data.studentId || data.studentEmail || "";
+          const pct  = parseFloat(data.percentage ?? data.score ?? "");
+          if (key && !isNaN(pct)) {
+            if (!scoreMap.has(key)) scoreMap.set(key, []);
+            scoreMap.get(key)!.push(pct);
+          }
+        });
+
+        /* 4. attendance records */
+        const attSnap  = await getDocs(collection(db, "attendance"));
+
+        /* build student→grade and student→schoolId lookup from enrollments */
+        const stuGradeMap  = new Map<string,string>();
+        const stuSchoolMap = new Map<string,string>();
+        enrollments.forEach(e => {
+          const sid = e.studentId || e.studentEmail || e._eid;
+          const g   = normalizeGrade(e.grade || e.class || e.className || "");
+          if (g)           stuGradeMap.set(sid, g);
+          // store branchId for heatmap grouping
+          if (e.branchId)  stuSchoolMap.set(sid, e.branchId);
+          else if (e.schoolId) stuSchoolMap.set(sid, e.schoolId);
+        });
+
+        /* studentId → { present, total } for per-student attendance % */
+        const attMap   = new Map<string,{p:number;t:number}>();
+        /* branchName → grade → { present, total } for heatmap */
+        const heatMap  = new Map<string, Map<string,{p:number;t:number}>>();
+
+        attSnap.docs.forEach(d => {
+          const data    = d.data() as any;
+          const sid     = data.studentId || data.studentEmail || "";
+          if (!sid) return;
+
+          /* per-student map */
+          if (!attMap.has(sid)) attMap.set(sid, {p:0,t:0});
+          const cur = attMap.get(sid)!;
+          cur.t++;
+          const isPresent = (data.status||"").toLowerCase() === "present";
+          if (isPresent) cur.p++;
+
+          /* heatmap map — resolve branchId → branchName */
+          const bid    = data.branchId || stuSchoolMap.get(sid) || "";
+          const branch = branchMap.get(bid) || schoolMap.get(bid) || schoolMap.get(data.schoolId || "") || data.schoolName || "";
+          const grade  = normalizeGrade(data.grade || data.class || stuGradeMap.get(sid) || "");
+          if (!branch || !grade) return;
+
+          if (!heatMap.has(branch)) heatMap.set(branch, new Map());
+          const gm = heatMap.get(branch)!;
+          if (!gm.has(grade)) gm.set(grade, {p:0,t:0});
+          const hc = gm.get(grade)!;
+          hc.t++;
+          if (isPresent) hc.p++;
+        });
+
+        setHeatRaw(heatMap);
+
+        /* 5. discipline: studentId → count */
+        const discSnap = await getDocs(collection(db, "discipline"));
+        const discMap  = new Map<string,number>();
+        discSnap.docs.forEach(d => {
+          const key = (d.data() as any).studentId || (d.data() as any).studentEmail || "";
+          if (key) discMap.set(key, (discMap.get(key)||0)+1);
+        });
+
+        /* 6. enrich enrollment rows */
+        const enriched = enrollments.map(e => {
+          const sid    = e.studentId || e.studentEmail || e._eid;
+          const scores = scoreMap.get(sid) || [];
+          const avgScore = scores.length
+            ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length)
+            : 0;
+          const att    = attMap.get(sid);
+          const attPct = att && att.t > 0 ? Math.round((att.p/att.t)*100) : 0;
+          const incidents = discMap.get(sid) || 0;
+
+          return {
+            id:          sid,
+            _eid:        e._eid,
+            name:        e.studentName || e.name || "Unknown",
+            grade:       normalizeGrade(e.grade || e.class || e.className || "") || "—",
+            schoolId:    e.schoolId || "",
+            branch:      branchMap.get(e.branchId) || branchMap.get(e.schoolId) || schoolMap.get(e.schoolId) || e.schoolName || "—",
+            score:       avgScore,
+            attendance:  attPct,
+            incidents,
+            createdAt:   e.createdAt,
+          };
+        });
+
+        enriched.sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+        setStudents(enriched);
+      } catch(e) {
+        console.error(e);
+      }
+      setLoading(false);
+    };
+    go();
   }, []);
 
-  const selectedStudent = useMemo(() => {
-    if (id) return studentsData.find(s => s.id === id);
-    return null;
-  }, [id, studentsData]);
+  /* ── derived stats ──────────────────────────────── */
+  const totalEnrollment = students.length;
 
-  // STATUS CONFIGURATION - 100% Marks Based
-  const getStatusConfig = (score: number) => {
-    if (score >= 85) {
-      return {
-        theme: 'emerald',
-        bg: 'bg-emerald-50/50',
-        border: 'border-emerald-100',
-        text: 'text-emerald-600',
-        accent: 'bg-emerald-500',
-        hex: '#10b981',
-        secondaryHex: '#0ea5e9',
-        label: 'Excellent',
-        icon: <TrendingUp className="w-4 h-4" />,
-        shadow: 'shadow-emerald-500/20'
-      };
-    } else if (score >= 70) {
-      return {
-        theme: 'orange',
-        bg: 'bg-orange-50/50',
-        border: 'border-orange-100',
-        text: 'text-orange-600',
-        accent: 'bg-orange-500',
-        hex: '#f59e0b',
-        secondaryHex: '#fbbf24',
-        label: 'Stable',
-        icon: <TrendingUp className="w-4 h-4 rotate-45" />,
-        shadow: 'shadow-orange-500/20'
-      };
+  const avgAttendance = useMemo(() => {
+    const list = students.filter(s=>s.attendance>0);
+    return list.length ? Math.round(list.reduce((s,x)=>s+x.attendance,0)/list.length*10)/10 : 0;
+  }, [students]);
+
+  const atRisk = useMemo(() => students.filter(s=>s.score>0 && s.score<50).length, [students]);
+
+  const highPerformers = useMemo(() => students.filter(s=>s.score>=85).length, [students]);
+
+  /* ── grade distribution for pie ─────────────────── */
+  const gradeDistData = useMemo(() => {
+    const map: Record<string,number> = {};
+    students.forEach(s => { map[s.grade] = (map[s.grade]||0)+1; });
+    return Object.entries(map)
+      .sort((a,b)=>b[1]-a[1])
+      .slice(0,6)
+      .map(([name,value],i)=>({ name, value, fill: GRADE_COLORS[i]||"#94a3b8" }));
+  }, [students]);
+
+  /* ── enrollment trend (last 6 months) ───────────── */
+  const enrollTrend = useMemo(() => {
+    const monthMap: Record<string,number> = {};
+    students.forEach(s => {
+      const d = s.createdAt?.toDate?.();
+      if (d) { const k = MONTH_NAMES[d.getMonth()]; monthMap[k]=(monthMap[k]||0)+1; }
+    });
+    const now  = new Date();
+    return Array.from({length:6},(_,i)=>{
+      const d = new Date(now.getFullYear(), now.getMonth()-5+i, 1);
+      const m = MONTH_NAMES[d.getMonth()];
+      return { month:m, value: monthMap[m]||0 };
+    });
+  }, [students]);
+
+  /* ── performance by branch ──────────────────────── */
+  const perfByBranch = useMemo(() => {
+    const map: Record<string,number[]> = {};
+    students.forEach(s => {
+      if (!s.branch || s.branch==="—" || !s.score) return;
+      if (!map[s.branch]) map[s.branch]=[];
+      map[s.branch].push(s.score);
+    });
+    return Object.entries(map).map(([branch,scores])=>({
+      branch: branch.length > 8 ? branch.split(" ")[0] : branch,
+      value: Math.round(scores.reduce((a,b)=>a+b,0)/scores.length),
+    }));
+  }, [students]);
+
+  /* ── branch list for dropdowns — from branches subcollection ── */
+  const branchList = useMemo(() =>
+    ["All", ...[...schools.values()].filter(Boolean).sort()],
+  [schools]); // schools state now holds branchId→branchName from subcollection
+
+  /* ── attendance heatmap — built from raw attendance records ── */
+  const heatmapGrades = useMemo(() => {
+    const gradeSet = new Set<string>();
+    if (heatBranch !== "All") {
+      heatRaw.get(heatBranch)?.forEach((_, g) => gradeSet.add(g));
     } else {
-      return {
-        theme: 'red',
-        bg: 'bg-red-50/50',
-        border: 'border-red-100',
-        text: 'text-red-600',
-        accent: 'bg-red-500',
-        hex: '#ef4444',
-        secondaryHex: '#f43f5e',
-        label: 'High Risk',
-        icon: <TrendingDown className="w-4 h-4" />,
-        shadow: 'shadow-red-500/20'
-      };
+      heatRaw.forEach(gm => gm.forEach((_, g) => gradeSet.add(g)));
     }
-  };
+    return [...gradeSet].sort((a, b) => {
+      const na = parseInt(a.match(/\d+/)?.[0] || "0");
+      const nb = parseInt(b.match(/\d+/)?.[0] || "0");
+      return na - nb;
+    });
+  }, [heatRaw, heatBranch]);
 
-  // Dynamic Graph History
-  const performanceHistory = useMemo(() => {
-    if (!selectedStudent) return [];
-    const baseScore = selectedStudent.academicScore;
-    const baseAttendance = selectedStudent.attendance;
-    const isImproving = baseScore >= 80;
-    
-    return [
-      { month: 'Jun', score: baseScore - (isImproving ? 10 : -7), attendance: baseAttendance - (isImproving ? 8 : -4) },
-      { month: 'Jul', score: baseScore - (isImproving ? 8 : -5), attendance: baseAttendance - (isImproving ? 6 : -3) },
-      { month: 'Aug', score: baseScore - (isImproving ? 6 : -4), attendance: baseAttendance - (isImproving ? 5 : -2) },
-      { month: 'Sep', score: baseScore - (isImproving ? 4 : -2), attendance: baseAttendance - (isImproving ? 3 : -1) },
-      { month: 'Oct', score: baseScore - (isImproving ? 2 : -1), attendance: baseAttendance - (isImproving ? 1 : 1) },
-      { month: 'Nov', score: baseScore - (isImproving ? 1 : 0), attendance: baseAttendance - (isImproving ? 0 : 2) },
-      { month: 'Dec', score: baseScore, attendance: baseAttendance },
-    ];
-  }, [selectedStudent]);
+  const heatmapData = useMemo(() => {
+    const rows: { branch: string; cells: number[] }[] = [];
+    const source: [string, Map<string, { p: number; t: number }>][] =
+      heatBranch !== "All"
+        ? heatRaw.has(heatBranch) ? [[heatBranch, heatRaw.get(heatBranch)!]] : []
+        : [...heatRaw.entries()];
+    source.forEach(([branch, gradeMap]) => {
+      rows.push({
+        branch,
+        cells: heatmapGrades.map(grade => {
+          const entry = gradeMap.get(grade);
+          return entry && entry.t > 0 ? Math.round((entry.p / entry.t) * 100) : 0;
+        }),
+      });
+    });
+    return rows;
+  }, [heatRaw, heatmapGrades, heatBranch]);
 
-  const getHeatmapColor = (value: number) => {
-    if (value >= 95) return "bg-green-600 text-white";
-    if (value >= 85) return "bg-orange-500 text-white";
-    return "bg-red-600 text-white";
-  };
+  /* ── filtered & paginated ───────────────────────── */
+  const filtered = useMemo(() =>
+    students.filter(s =>
+      (s.name || "").toLowerCase().includes(search.toLowerCase()) &&
+      (tableBranch === "All" || s.branch === tableBranch)
+    ),
+  [students, search, tableBranch]);
 
-  const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase();
-  };
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageStudents = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
 
+  /* group by first letter */
+  const grouped = useMemo(() => {
+    const map: Record<string,any[]> = {};
+    pageStudents.forEach(s => {
+      const key = (s.name||"?")[0].toUpperCase();
+      if (!map[key]) map[key]=[];
+      map[key].push(s);
+    });
+    return Object.entries(map).sort(([a],[b])=>a.localeCompare(b));
+  }, [pageStudents]);
+
+  /* ── fetch real per-student detail when selection changes ── */
+  useEffect(() => {
+    if (!selected) return;
+    setDetailLoading(true);
+    setDetailTrend([]);
+    setAttDelta(null);
+    setScoreDelta(null);
+    setAtt30(null);
+
+    const sid = selected.id; // studentId or studentEmail
+
+    const fetchDetail = async () => {
+      try {
+        const now      = new Date();
+        const ms30     = 30 * 24 * 60 * 60 * 1000;
+        const cut30    = new Date(now.getTime() - ms30);
+        const cut60    = new Date(now.getTime() - ms30 * 2);
+
+        /* ── 1. test_scores for this student ── */
+        const [byId, byEmail] = await Promise.all([
+          getDocs(query(collection(db, "test_scores"),
+            where("studentId", "==", sid))),
+          getDocs(query(collection(db, "test_scores"),
+            where("studentEmail", "==", sid))),
+        ]);
+        // deduplicate by doc id
+        const seenScore = new Set<string>();
+        const scoreDocs: any[] = [];
+        [...byId.docs, ...byEmail.docs].forEach(d => {
+          if (!seenScore.has(d.id)) { seenScore.add(d.id); scoreDocs.push({ _id: d.id, ...d.data() as any }); }
+        });
+        // sort ascending by timestamp (field name is "timestamp" in test_scores)
+        scoreDocs.sort((a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
+
+        /* last-2-exam delta */
+        const pcts = scoreDocs
+          .map(d => parseFloat(d.percentage ?? d.score ?? ""))
+          .filter(n => !isNaN(n));
+        if (pcts.length >= 2) {
+          setScoreDelta(Math.round(pcts[pcts.length - 1] - pcts[pcts.length - 2]));
+        } else {
+          setScoreDelta(null);
+        }
+
+        /* month-wise average score — last 6 months */
+        const scoreByMonth = new Map<string, number[]>();
+        scoreDocs.forEach(d => {
+          // date field is "timestamp" (Firestore Timestamp)
+          const date = d.timestamp?.toDate?.();
+          if (!date) return;
+          const key = MONTH_NAMES[date.getMonth()];
+          const pct = parseFloat(d.percentage ?? d.score ?? "");
+          if (!isNaN(pct)) {
+            if (!scoreByMonth.has(key)) scoreByMonth.set(key, []);
+            scoreByMonth.get(key)!.push(pct);
+          }
+        });
+
+        /* ── 2. attendance for this student ── */
+        const [attById, attByEmail] = await Promise.all([
+          getDocs(query(collection(db, "attendance"),
+            where("studentId", "==", sid))),
+          getDocs(query(collection(db, "attendance"),
+            where("studentEmail", "==", sid))),
+        ]);
+        // deduplicate
+        const seenAtt = new Set<string>();
+        const attDocs: any[] = [];
+        [...attById.docs, ...attByEmail.docs].forEach(d => {
+          if (!seenAtt.has(d.id)) { seenAtt.add(d.id); attDocs.push(d.data() as any); }
+        });
+
+        /* last-30-day vs prev-30-day attendance % */
+        let l30p = 0, l30t = 0, p30p = 0, p30t = 0;
+        const attByMonth = new Map<string, { p: number; t: number }>();
+
+        attDocs.forEach(d => {
+          // "date" is stored as "YYYY-MM-DD" string; "timestamp" is Firestore Timestamp
+          let date: Date | null = null;
+          if (d.timestamp?.toDate) {
+            date = d.timestamp.toDate();
+          } else if (typeof d.date === "string" && d.date) {
+            date = new Date(d.date + "T00:00:00");
+          }
+          const isPresent = (d.status || "").toLowerCase() === "present";
+
+          if (date && !isNaN(date.getTime())) {
+            if (date >= cut30)       { l30t++; if (isPresent) l30p++; }
+            else if (date >= cut60)  { p30t++; if (isPresent) p30p++; }
+
+            const key = MONTH_NAMES[date.getMonth()];
+            if (!attByMonth.has(key)) attByMonth.set(key, { p: 0, t: 0 });
+            const m = attByMonth.get(key)!;
+            m.t++;
+            if (isPresent) m.p++;
+          }
+        });
+
+        const last30Pct  = l30t > 0 ? Math.round((l30p / l30t) * 100) : null;
+        const prev30Pct  = p30t > 0 ? Math.round((p30p / p30t) * 100) : null;
+        setAtt30(last30Pct);
+        setAttDelta(last30Pct !== null && prev30Pct !== null
+          ? last30Pct - prev30Pct : null);
+
+        /* ── 3. build trend: last 6 months ── */
+        const trend = Array.from({ length: 6 }, (_, i) => {
+          const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+          const m = MONTH_NAMES[d.getMonth()];
+          const sc = scoreByMonth.get(m);
+          const at = attByMonth.get(m);
+          return {
+            month:      m,
+            score:      sc ? Math.round(sc.reduce((a, b) => a + b, 0) / sc.length) : 0,
+            attendance: at && at.t > 0 ? Math.round((at.p / at.t) * 100) : 0,
+          };
+        });
+        setDetailTrend(trend);
+      } catch (e) {
+        console.error(e);
+      }
+      setDetailLoading(false);
+    };
+
+    fetchDetail();
+  }, [selected?.id]);
+
+  /* ─────────────────────────────────────────────────── */
   return (
-    <div className="space-y-8 max-w-[1600px] mx-auto animate-in fade-in duration-500 pb-10">
-      {!selectedStudent ? (
-        <>
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-extrabold text-[#1e294b] tracking-tight">Students Intelligence</h1>
-              <p className="text-slate-500 font-medium">Enrollment, performance & behavior analytics</p>
-            </div>
-            <div className="flex items-center gap-4">
-              <Button className="bg-[#1e3a8a] border-none hover:bg-[#152a6a] text-white font-bold h-11 rounded-xl px-6 shadow-lg shadow-blue-900/15 flex items-center gap-2">
-                <Plus className="w-5 h-5" />
-                Add Student
-              </Button>
-            </div>
-          </div>
+    <div className="space-y-8 animate-in fade-in duration-500 pb-10">
 
+      {/* ── Header ──────────────────────────────────── */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold text-[#1e294b] tracking-tight">Students Intelligence</h1>
+          <p className="text-slate-500 font-medium">Enrollment, performance &amp; behavior analytics</p>
+        </div>
+        <button className="self-start flex items-center gap-2 bg-[#1e3a8a] text-white font-bold h-11 rounded-xl px-6 shadow-lg shadow-blue-900/15 hover:bg-[#1e4fc0] transition-all">
+          <Plus className="w-4 h-4" /> Add Student
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-8 h-8 animate-spin text-[#1e3a8a]" />
+        </div>
+      ) : (
+        <>
+          {/* ── Stat Cards ────────────────────────────── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { label: "Total Enrollment", value: "4,286", change: "+124 this term", color: "text-green-500" },
-              { label: "Average Attendance", value: "91.8%", change: "+0.5% vs last month", color: "text-green-500" },
-              { label: "At-Risk Students", value: "186", change: "4.3% of total", color: "text-red-500" },
-              { label: "High Performers", value: "892", change: "20.8% of total", color: "text-green-500" },
-            ].map((stat, i) => (
-              <div key={i} className="bg-white p-7 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-all">
-                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-2">{stat.label}</p>
-                <h3 className="text-4xl font-extrabold text-[#1e294b] tracking-tighter mb-2">{stat.value}</h3>
-                <p className={`text-[11px] font-bold ${stat.color}`}>{stat.change}</p>
+              { label:"Total Enrollment",   value: totalEnrollment.toLocaleString(), sub:`+124 this term`,        color:"text-green-600" },
+              { label:"Average Attendance", value:`${avgAttendance}%`,               sub:"+0.5% vs last month",   color:"text-green-600" },
+              { label:"At-Risk Students",   value: atRisk.toString(),                sub:`${totalEnrollment>0?((atRisk/totalEnrollment)*100).toFixed(1):0}% of total`, color:"text-red-500" },
+              { label:"High Performers",    value: highPerformers.toString(),         sub:`${totalEnrollment>0?((highPerformers/totalEnrollment)*100).toFixed(1):0}% of total`, color:"text-green-600" },
+            ].map(s=>(
+              <div key={s.label} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
+                <p className="text-slate-400 text-[11px] font-bold uppercase tracking-widest mb-2">{s.label}</p>
+                <h3 className="text-4xl font-extrabold text-[#1e294b] tracking-tight mb-1">{s.value}</h3>
+                <p className={`text-[11px] font-bold ${s.color}`}>{s.sub}</p>
               </div>
             ))}
           </div>
 
+          {/* ── Charts Row ────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm">
-              <h3 className="text-lg font-bold text-[#1e294b] mb-6">Grade Distribution</h3>
-              <div className="h-[280px] relative">
+
+            {/* Grade Distribution */}
+            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+              <h3 className="text-base font-bold text-[#1e294b] mb-4">Grade Distribution</h3>
+              <div className="h-[260px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={gradeDistribution} cx="50%" cy="50%" innerRadius={0} outerRadius={100} dataKey="value" stroke="#fff" strokeWidth={2} label={({ name, midAngle, cx, cy, radius, outerRadius }) => { const RADIAN = Math.PI / 180; const x = cx + (outerRadius + 20) * Math.cos(-midAngle * RADIAN); const y = cy + (outerRadius + 20) * Math.sin(-midAngle * RADIAN); return ( <text x={x} y={y} fill="#94a3b8" fontSize={10} fontWeight="bold" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central"> {name} </text> ); }}>
-                      {gradeDistribution.map((entry, index) => ( <Cell key={`cell-${index}`} fill={entry.fill} /> ))}
+                    <Pie
+                      data={gradeDistData.length ? gradeDistData : [{name:"No Data",value:1,fill:"#e2e8f0"}]}
+                      cx="50%" cy="50%"
+                      outerRadius={95}
+                      dataKey="value"
+                      stroke="#fff" strokeWidth={2}
+                      label={({name,midAngle,cx,cy,outerRadius:or})=>{
+                        const R=Math.PI/180;
+                        const x=cx+(or+22)*Math.cos(-midAngle*R);
+                        const y=cy+(or+22)*Math.sin(-midAngle*R);
+                        return <text x={x} y={y} fill="#94a3b8" fontSize={10} fontWeight="bold" textAnchor={x>cx?"start":"end"} dominantBaseline="central">{name}</text>;
+                      }}
+                    >
+                      {gradeDistData.map((e,i)=><Cell key={i} fill={e.fill}/>)}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip contentStyle={{borderRadius:"12px",border:"none",boxShadow:"0 10px 15px rgba(0,0,0,0.1)"}}/>
                   </PieChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm">
-              <h3 className="text-lg font-bold text-[#1e294b] mb-6">Enrollment Trend</h3>
-              <div className="h-[280px]">
+            {/* Enrollment Trend */}
+            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+              <h3 className="text-base font-bold text-[#1e294b] mb-4">Enrollment Trend</h3>
+              <div className="h-[260px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={enrollmentTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <AreaChart data={enrollTrend} margin={{top:10,right:10,left:-20,bottom:0}}>
                     <defs>
-                      <linearGradient id="enrollGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#1e3a8a" stopOpacity={0.1}/>
+                      <linearGradient id="enGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%"  stopColor="#1e3a8a" stopOpacity={0.1}/>
                         <stop offset="95%" stopColor="#1e3a8a" stopOpacity={0}/>
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }} domain={[0, 5000]} ticks={[0, 1000, 2000, 3000, 4000, 5000]} />
-                    <Tooltip />
-                    <Area type="monotone" dataKey="value" stroke="#1e3a8a" strokeWidth={3} fill="url(#enrollGradient)" dot={{ r: 4, fill: "#1e3a8a", strokeWidth: 2, stroke: "#fff" }} />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
+                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fill:"#94a3b8",fontSize:11,fontWeight:600}}/>
+                    <YAxis axisLine={false} tickLine={false} tick={{fill:"#94a3b8",fontSize:11,fontWeight:600}}/>
+                    <Tooltip contentStyle={{borderRadius:"12px",border:"none",boxShadow:"0 10px 15px rgba(0,0,0,0.1)"}}/>
+                    <Area type="monotone" dataKey="value" stroke="#1e3a8a" strokeWidth={3} fill="url(#enGrad)"
+                      dot={{r:4,fill:"#1e3a8a",strokeWidth:2,stroke:"#fff"}}/>
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm">
-              <h3 className="text-lg font-bold text-[#1e294b] mb-6">Performance by Branch</h3>
-              <div className="h-[280px]">
+            {/* Performance by Branch */}
+            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+              <h3 className="text-base font-bold text-[#1e294b] mb-4">Performance by Branch</h3>
+              <div className="h-[260px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={performanceByBranch} layout="vertical" margin={{ left: -10, right: 50, bottom: 10, top: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                    <XAxis type="number" domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 'bold' }} ticks={[0, 20, 40, 60, 80, 100]} dy={10} />
-                    <YAxis dataKey="branch" type="category" axisLine={{ stroke: '#cbd5e1', strokeWidth: 1.5 }} tickLine={{ stroke: '#cbd5e1', strokeWidth: 1.5 }} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 'bold' }} width={80} dx={-5} />
-                    <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
-                    <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={28} label={{ position: 'right', fill: '#64748b', fontSize: 12, fontWeight: '700', formatter: (v: any) => ` ${v}%` }}>
-                      {performanceByBranch.map((entry, index) => ( <Cell key={`cell-${index}`} fill={entry.value >= 85 ? '#16a34a' : '#f59e0b'} /> ))}
+                  <BarChart
+                    data={perfByBranch.length ? perfByBranch : [{branch:"No Data",value:0}]}
+                    layout="vertical"
+                    margin={{left:0,right:40,top:10,bottom:10}}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9"/>
+                    <XAxis type="number" domain={[0,100]} axisLine={false} tickLine={false}
+                      tick={{fill:"#94a3b8",fontSize:11}} ticks={[0,20,40,60,80,100]}/>
+                    <YAxis dataKey="branch" type="category" axisLine={false} tickLine={false}
+                      tick={{fill:"#64748b",fontSize:12,fontWeight:700}} width={55}/>
+                    <Tooltip contentStyle={{borderRadius:"12px",border:"none",boxShadow:"0 10px 15px rgba(0,0,0,0.1)"}}/>
+                    <Bar dataKey="value" radius={[0,6,6,0]} barSize={26}
+                      label={{position:"right",fill:"#64748b",fontSize:12,fontWeight:700,formatter:(v:any)=>`${v}%`}}>
+                      {perfByBranch.map((e,i)=>(
+                        <Cell key={i} fill={e.value>=80?"#16a34a":e.value>=60?"#f59e0b":"#ef4444"}/>
+                      ))}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -204,173 +567,284 @@ export default function StudentsIntelligence() {
             </div>
           </div>
 
-          <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm overflow-x-auto">
-            <div className="flex items-center justify-between mb-8 min-w-[800px]">
-              <h3 className="text-lg font-bold text-[#1e294b]">Attendance Heatmap</h3>
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2"> <div className="w-2.5 h-2.5 rounded-full bg-green-600"></div> <span className="text-xs font-bold text-[#1e294b]">95%+</span> </div>
-                <div className="flex items-center gap-2"> <div className="w-2.5 h-2.5 rounded-full bg-orange-500"></div> <span className="text-xs font-bold text-[#1e294b]">85-94%</span> </div>
-                <div className="flex items-center gap-2"> <div className="w-2.5 h-2.5 rounded-full bg-red-600"></div> <span className="text-xs font-bold text-[#1e294b]">&lt;85%</span> </div>
+          {/* ── Attendance Heatmap ────────────────────── */}
+          <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm overflow-x-auto">
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-6 min-w-[700px]">
+              <h3 className="text-base font-bold text-[#1e294b]">Attendance Heatmap</h3>
+              <div className="flex items-center gap-4">
+                {/* Branch selector */}
+                <select
+                  value={heatBranch}
+                  onChange={e => setHeatBranch(e.target.value)}
+                  className="border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-600 bg-slate-50 outline-none focus:ring-2 focus:ring-[#1e3a8a]/10"
+                >
+                  {branchList.map(b => <option key={b} value={b}>{b === "All" ? "All Branches" : b}</option>)}
+                </select>
+                {/* Legend */}
+                <div className="flex items-center gap-4">
+                  {[["bg-green-600","95%+"],["bg-amber-500","85-94%"],["bg-red-500","<85%"]].map(([c,l])=>(
+                    <div key={l} className="flex items-center gap-1.5">
+                      <div className={`w-2.5 h-2.5 rounded-full ${c}`}/>
+                      <span className="text-xs font-bold text-slate-600">{l}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-            <div className="min-w-[800px]">
-              <div className="grid grid-cols-7 gap-4">
-                <div className="col-span-1"></div>
-                {['Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11'].map(grade => ( <div key={grade} className="text-center font-bold text-slate-400 text-[10px] uppercase tracking-wider mb-2">{grade}</div> ))}
-                <div className="flex flex-col gap-2 justify-center">
-                  {['Main Campus', 'North Branch', 'South Branch'].map(branch => ( <div key={branch} className="text-[10px] font-bold text-slate-400 flex items-center justify-end gap-2 pr-4 h-12 uppercase tracking-tight">{branch}</div> ))}
-                </div>
-                <div className="col-span-6 grid grid-cols-6 gap-2">
-                  {attendanceByGrade.main.map((item, idx) => ( <div key={`main-${idx}`} className={`h-12 rounded-xl flex items-center justify-center font-bold text-sm text-white ${getHeatmapColor(item.attendance)} transition-transform hover:scale-105 cursor-default`}> {item.attendance}% </div> ))}
-                  {attendanceByGrade.north.map((item, idx) => ( <div key={`north-${idx}`} className={`h-12 rounded-xl flex items-center justify-center font-bold text-sm text-white ${getHeatmapColor(item.attendance)} transition-transform hover:scale-105 cursor-default`}> {item.attendance}% </div> ))}
-                  {attendanceByGrade.south.map((item, idx) => ( <div key={`south-${idx}`} className={`h-12 rounded-xl flex items-center justify-center font-bold text-sm text-white ${getHeatmapColor(item.attendance)} transition-transform hover:scale-105 cursor-default`}> {item.attendance}% </div> ))}
-                </div>
+
+            <div className="min-w-[700px]">
+              {/* Grade headers */}
+              <div className="grid gap-2 mb-2" style={{gridTemplateColumns:`160px repeat(${Math.max(heatmapGrades.length,1)},1fr)`}}>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Branch</div>
+                {heatmapGrades.map(g=>(
+                  <div key={g} className="text-center text-[10px] font-bold text-slate-400 uppercase tracking-wide">{g}</div>
+                ))}
+              </div>
+              {/* Rows */}
+              {heatmapData.length === 0 ? (
+                <div className="text-center py-8 text-sm text-slate-400 font-semibold">No attendance data yet</div>
+              ) : (
+                heatmapData.map(row=>(
+                  <div key={row.branch} className="grid gap-2 mb-2" style={{gridTemplateColumns:`160px repeat(${Math.max(heatmapGrades.length,1)},1fr)`}}>
+                    <div className="flex items-center">
+                      <span className="text-[11px] font-bold text-slate-500 tracking-tight truncate pr-2">{row.branch}</span>
+                    </div>
+                    {row.cells.map((val,i)=>(
+                      <div key={i} className={`h-11 rounded-xl flex items-center justify-center font-bold text-sm transition-transform hover:scale-105 ${
+                        val>0 ? getHeatColor(val) : "bg-slate-100 text-slate-400"
+                      }`}>
+                        {val>0 ? `${val}%` : "—"}
+                      </div>
+                    ))}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* ── Student Table ─────────────────────────── */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            {/* Table header + search */}
+            <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
+                <input
+                  value={search}
+                  onChange={e=>{setSearch(e.target.value);setPage(1);}}
+                  placeholder="Search students..."
+                  className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[#1e3a8a]/10 bg-slate-50"
+                />
+              </div>
+              {/* Branch filter dropdown */}
+              <select
+                value={tableBranch}
+                onChange={e=>{setTableBranch(e.target.value);setPage(1);}}
+                className="border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-600 bg-slate-50 outline-none focus:ring-2 focus:ring-[#1e3a8a]/10"
+              >
+                {branchList.map(b=><option key={b} value={b}>{b === "All" ? "All Branches" : b}</option>)}
+              </select>
+              <button className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-50">
+                <Filter className="w-4 h-4"/> Filters
+              </button>
+            </div>
+
+            {/* Columns */}
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[800px]">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    {["Student","Grade","Branch","Attendance","Academic Score","Risk Status","Actions"].map(h=>(
+                      <th key={h} className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {grouped.map(([letter, rows])=>(
+                    <>
+                      {/* Alphabet group header */}
+                      <tr key={`hdr-${letter}`} className="bg-slate-50/60">
+                        <td colSpan={7} className="px-6 py-2 text-xs font-extrabold text-slate-400 uppercase tracking-widest">{letter}</td>
+                      </tr>
+                      {rows.map(s=>{
+                        const risk = getRisk(s.score);
+                        return (
+                          <tr key={s._eid}
+                            className={`border-b border-slate-50 hover:bg-slate-50/50 transition-all ${selected?._eid===s._eid?"bg-blue-50/30":""}`}
+                          >
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-extrabold shrink-0 ${getAvatarColor(s.score)}`}>
+                                  {getInitials(s.name)}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-bold text-[#1e294b]">{s.name}</p>
+                                  <p className="text-[11px] text-slate-400 font-semibold">ID: {s.id.length>12?s.id.slice(0,12):s.id}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-sm font-semibold text-slate-600">{s.grade}</td>
+                            <td className="px-6 py-4 text-sm font-semibold text-slate-600">{s.branch}</td>
+                            <td className="px-6 py-4 text-sm font-bold text-[#1e294b]">
+                              {s.attendance>0?`${s.attendance}%`:"—"}
+                            </td>
+                            <td className="px-6 py-4 text-sm font-bold text-[#1e294b]">
+                              {s.score>0?`${s.score}/100`:"—"}
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`text-sm font-bold ${risk.color}`}>{risk.label}</span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <button
+                                onClick={()=>setSelected(selected?._eid===s._eid ? null : s)}
+                                className="text-sm font-bold text-[#1e3a8a] hover:underline"
+                              >
+                                {selected?._eid===s._eid ? "Close" : "View"}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </>
+                  ))}
+                  {filtered.length===0 && (
+                    <tr><td colSpan={7} className="py-16 text-center text-sm text-slate-400 font-semibold">No students found</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+              <p className="text-xs font-semibold text-slate-400">
+                Showing {Math.min((page-1)*PAGE_SIZE+1, filtered.length)}–{Math.min(page*PAGE_SIZE, filtered.length)} of {filtered.length} students
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={page===1}
+                  onClick={()=>setPage(p=>p-1)}
+                  className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-50 disabled:opacity-40"
+                >Previous</button>
+                {Array.from({length:Math.min(totalPages,4)},(_,i)=>i+1).map(n=>(
+                  <button key={n} onClick={()=>setPage(n)}
+                    className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${page===n?"bg-[#1e3a8a] text-white":"border border-slate-200 text-slate-500 hover:bg-slate-50"}`}>
+                    {n}
+                  </button>
+                ))}
+                {totalPages>4&&<span className="text-slate-400 text-xs">...</span>}
+                <button
+                  disabled={page===totalPages}
+                  onClick={()=>setPage(p=>p+1)}
+                  className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-50 disabled:opacity-40"
+                >Next</button>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden mb-10">
-            <div className="p-8 border-b border-slate-50 bg-[#f8fafc]/30 flex items-center justify-between">
-                <h3 className="text-lg font-extrabold text-[#1e294b]">Student Roster</h3>
-                <div className="flex items-center gap-4">
-                  <div className="relative">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <Input className="pl-10 h-10 w-64 border-slate-100 bg-white rounded-xl text-xs font-bold" placeholder="Quick search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                  </div>
-                  <Button variant="outline" className="h-10 rounded-xl border-slate-100 text-slate-400 font-bold px-4"> <Filter className="w-4 h-4" /> </Button>
-                </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left min-w-[1000px]">
-                <thead>
-                  <tr className="bg-slate-50/50">
-                    <th className="px-8 py-5 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Student Details</th>
-                    <th className="px-8 py-5 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Branch / Grade</th>
-                    <th className="px-8 py-5 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Attendance</th>
-                    <th className="px-8 py-5 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Academic</th>
-                    <th className="px-8 py-5 text-right text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Risk Level</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {studentsData.filter(s => (s.name || "").toLowerCase().includes(searchTerm.toLowerCase())).map((s) => {
-                    const cfg = getStatusConfig(s.academicScore);
-                    return (
-                    <tr key={s.id} className="hover:bg-slate-50/50 transition-all cursor-pointer group" onClick={() => navigate(`/students/${s.id}`)}>
-                      <td className="px-8 py-6">
-                        <div className="flex items-center gap-4">
-                          <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-extrabold text-xs text-white shadow-lg ${cfg.shadow} ${cfg.accent} group-hover:scale-110 transition-transform`}> {getInitials(s.name || "S")} </div>
-                          <div>
-                            <p className="font-extrabold text-[#1e294b] text-sm group-hover:text-blue-600 transition-colors uppercase tracking-tight">{s.name}</p>
-                            <p className="text-[10px] text-slate-400 font-bold">ID: {s.id.substring(0, 8)}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-8 py-6"> <div className="flex flex-col"> <span className="text-[11px] font-extrabold text-slate-600 uppercase tracking-tight">{s.grade}</span> <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{s.branch}</span> </div> </td>
-                      <td className="px-8 py-6 font-extrabold text-[#1e294b] text-sm">{s.attendance}%</td>
-                      <td className="px-8 py-6">
-                        <div className="flex items-center gap-4">
-                            <div className="flex-1 h-2 w-24 bg-slate-100 rounded-full overflow-hidden shadow-inner"> <div className={`h-full ${cfg.accent} rounded-full`} style={{ width: `${s.academicScore}%` }}></div> </div>
-                            <span className="text-[11px] font-extrabold text-slate-700">{s.academicScore}%</span>
-                        </div>
-                      </td>
-                      <td className="px-8 py-6 text-right">
-                        <span className={`px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest border ${cfg.bg} ${cfg.text} ${cfg.border} shadow-sm group-hover:shadow-md transition-all`}>
-                          {cfg.label}
-                        </span>
-                      </td>
-                    </tr>
-                  )})}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </>
-      ) : (
-        <div className="bg-white rounded-[3.5rem] border border-slate-100 shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10 duration-700 pb-16">
-          <div className="p-10 lg:p-16">
-            {/* Header Section */}
-            {(() => {
-              const cfg = getStatusConfig(selectedStudent.academicScore);
-              return (
-              <>
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-12 mb-16">
-                  <div className="flex items-center gap-10">
-                    <div className={`w-24 h-24 lg:w-28 lg:h-28 rounded-full ${cfg.accent} flex items-center justify-center text-white font-extrabold text-4xl shadow-2xl ${cfg.shadow} transition-all border-8 border-white`}>
-                      {getInitials(selectedStudent.name)}
+          {/* ── Student Detail Panel ─────────────────── */}
+          {selected && (()=>{
+            const risk = getRisk(selected.score);
+            const isCritical = selected.score < 50;
+            return (
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-lg overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+                {/* Detail header */}
+                <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white font-extrabold text-lg ${getAvatarColor(selected.score)}`}>
+                      {getInitials(selected.name)}
                     </div>
                     <div>
-                      <h2 className="text-4xl lg:text-5xl font-extrabold text-[#1e294b] tracking-tighter mb-3">{selectedStudent.name}</h2>
-                      <p className="text-slate-500 font-bold text-lg tracking-tight opacity-80 uppercase text-[12px]">
-                        {selectedStudent.grade} <span className="mx-4 text-slate-200">|</span> {selectedStudent.branch} <span className="mx-4 text-slate-200">|</span> <span className="text-slate-400">ID: {selectedStudent.id}</span>
+                      <h2 className="text-lg font-extrabold text-[#1e294b]">{selected.name}</h2>
+                      <p className="text-xs text-slate-400 font-semibold">
+                        {selected.grade} &bull; {selected.branch} &bull; ID: {selected.id}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-5">
-                    <span className={`${cfg.accent} text-white text-[11px] font-extrabold px-8 py-3 rounded-full shadow-2xl ${cfg.shadow} flex items-center gap-3 uppercase tracking-[0.1em]`}>
-                      {cfg.icon} {cfg.label}
+                  <div className="flex items-center gap-3">
+                    <span className={`text-xs font-extrabold px-4 py-1.5 rounded-full text-white ${getAvatarColor(selected.score)}`}>
+                      {risk.label === "High" ? "High Risk" : risk.label === "Medium" ? "Medium Risk" : "Low Risk"}
                     </span>
-                    <Button className="bg-[#1e3a8a] border-none hover:bg-[#152a6a] text-white font-extrabold h-12 px-10 rounded-2xl shadow-2xl shadow-blue-900/30 uppercase text-[11px] tracking-widest">
+                    <button className="bg-[#1e3a8a] text-white text-xs font-bold px-5 py-2.5 rounded-xl hover:bg-[#1e4fc0] transition-all">
                       Contact Parent
-                    </Button>
-                    <button onClick={() => navigate('/students')} className="p-4 rounded-2xl bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition-all border border-slate-100 shadow-sm">
-                      <X className="w-7 h-7" />
+                    </button>
+                    <button onClick={()=>setSelected(null)} className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-400">
+                      <X className="w-4 h-4"/>
                     </button>
                   </div>
                 </div>
 
-                {/* Stats Cards Row */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mb-20">
-                  <div className={`${cfg.bg} p-12 rounded-[3.5rem] border ${cfg.border} shadow-sm transition-all hover:translate-y-[-4px] duration-500`}>
-                    <p className="text-slate-500 text-[11px] font-bold mb-8 uppercase tracking-[0.25em] opacity-60">Attendance (Last 30 Days)</p>
-                    <h3 className={`text-6xl font-extrabold ${cfg.text} tracking-tighter mb-4`}>{selectedStudent.attendance}%</h3>
-                    <p className={`${cfg.text} text-xs font-extrabold leading-tight flex items-center gap-2 uppercase tracking-tight`}>
-                      {selectedStudent.academicScore >= 80 ? '↑ 5%' : '↓ 12%'} <span className="opacity-50 font-bold">vs Prev Month</span>
-                    </p>
-                  </div>
+                <div className="p-6 space-y-6">
+                  {/* 3 stat cards */}
+                  {(() => {
+                    const attDisplay  = att30 !== null ? `${att30}%` : (selected.attendance > 0 ? `${selected.attendance}%` : "—");
+                    const attSubText  = attDelta !== null
+                      ? `${attDelta >= 0 ? "↑" : "↓"} ${Math.abs(attDelta)}% vs last month`
+                      : "No comparison data";
+                    const attSubColor = attDelta === null ? "text-slate-400"
+                      : attDelta >= 0 ? "text-green-500" : "text-red-400";
 
-                  <div className={`${cfg.bg} p-12 rounded-[3.5rem] border ${cfg.border} shadow-sm transition-all hover:translate-y-[-4px] duration-500`}>
-                    <p className="text-slate-500 text-[11px] font-bold mb-8 uppercase tracking-[0.25em] opacity-60">Academic Score</p>
-                    <h3 className={`text-6xl font-extrabold ${cfg.text} tracking-tighter mb-4`}>{selectedStudent.academicScore}/100</h3>
-                    <p className={`${cfg.text} text-xs font-extrabold leading-tight flex items-center gap-2 uppercase tracking-tight`}>
-                      {selectedStudent.academicScore >= 80 ? '↑ 10 pts' : '↓ 8 pts'} <span className="opacity-50 font-bold">on Average</span>
-                    </p>
-                  </div>
+                    const scoreDisplay = selected.score > 0 ? `${selected.score}/100` : "—";
+                    const scoreSubText = scoreDelta !== null
+                      ? `${scoreDelta >= 0 ? "↑" : "↓"} ${Math.abs(scoreDelta)} pts from last exam`
+                      : "No previous exam";
+                    const scoreSubColor = scoreDelta === null ? "text-slate-400"
+                      : scoreDelta >= 0 ? "text-green-500" : "text-red-400";
 
-                  <div className={`${cfg.bg} p-12 rounded-[3.5rem] border ${cfg.border} shadow-sm transition-all hover:translate-y-[-4px] duration-500`}>
-                    <p className="text-slate-500 text-[11px] font-bold mb-8 uppercase tracking-[0.25em] opacity-60">Behavior Incidents</p>
-                    <h3 className={`text-6xl font-extrabold ${cfg.text} tracking-tighter mb-4`}>
-                      {selectedStudent.academicScore >= 85 ? '0' : selectedStudent.academicScore >= 70 ? '1' : '4'}
-                    </h3>
-                    <p className={`${cfg.text} text-[11px] font-black leading-tight uppercase tracking-[0.25em] opacity-80`}>
-                      STATUS: CLEAN
-                    </p>
+                    return (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
+                          <p className="text-xs font-semibold text-slate-500 mb-2">Attendance (Last 30 Days)</p>
+                          <p className={`text-3xl font-extrabold ${isCritical ? "text-red-500" : "text-[#1e294b]"}`}>{attDisplay}</p>
+                          <p className={`text-xs font-semibold mt-1 ${attSubColor}`}>{attSubText}</p>
+                        </div>
+                        <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
+                          <p className="text-xs font-semibold text-slate-500 mb-2">Academic Score</p>
+                          <p className={`text-3xl font-extrabold ${isCritical ? "text-red-500" : "text-[#1e294b]"}`}>{scoreDisplay}</p>
+                          <p className={`text-xs font-semibold mt-1 ${scoreSubColor}`}>{scoreSubText}</p>
+                        </div>
+                        <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
+                          <p className="text-xs font-semibold text-slate-500 mb-2">Behavior Incidents</p>
+                          <p className="text-3xl font-extrabold text-[#1e294b]">{selected.incidents}</p>
+                          <p className="text-xs font-semibold mt-1 text-slate-400">This term</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Performance trend */}
+                  <div>
+                    <h3 className="text-sm font-bold text-[#1e294b] mb-4">Performance Trend</h3>
+                    {detailLoading ? (
+                      <div className="h-[200px] flex items-center justify-center">
+                        <Loader2 className="w-6 h-6 animate-spin text-[#1e3a8a]" />
+                      </div>
+                    ) : detailTrend.every(d => d.score === 0 && d.attendance === 0) ? (
+                      <div className="h-[200px] flex items-center justify-center text-sm text-slate-400 font-semibold">
+                        No trend data available for this student
+                      </div>
+                    ) : (
+                      <div className="h-[200px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={detailTrend} margin={{top:5,right:20,left:-20,bottom:5}}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
+                            <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fill:"#94a3b8",fontSize:11}}/>
+                            <YAxis axisLine={false} tickLine={false} tick={{fill:"#94a3b8",fontSize:11}} domain={[0,100]}/>
+                            <Tooltip contentStyle={{borderRadius:"12px",border:"none",boxShadow:"0 10px 15px rgba(0,0,0,0.1)"}}/>
+                            <Line type="monotone" dataKey="score" name="Score" stroke={isCritical?"#ef4444":"#1e3a8a"} strokeWidth={2.5}
+                              dot={{r:4,fill:isCritical?"#ef4444":"#1e3a8a",strokeWidth:2,stroke:"#fff"}}
+                              connectNulls={false}/>
+                            <Line type="monotone" dataKey="attendance" name="Attendance" stroke="#f59e0b" strokeWidth={2.5} strokeDasharray="5 5"
+                              dot={{r:4,fill:"#f59e0b",strokeWidth:2,stroke:"#fff"}}
+                              connectNulls={false}/>
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
                   </div>
                 </div>
-
-                {/* Performance Trend Chart */}
-                <div className="bg-slate-50/30 p-10 rounded-[4rem] border border-slate-50 shadow-inner">
-                  <h3 className="text-2xl font-black text-[#1e294b] mb-16 pl-6 uppercase tracking-[0.15em] opacity-90">Performance Evolution</h3>
-                  <div className="h-[400px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={performanceHistory} margin={{ top: 20, right: 40, left: 10, bottom: 20 }}>
-                        <CartesianGrid strokeDasharray="5 5" vertical={false} stroke="#e2e8f0" />
-                        <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 14, fontWeight: 800 }} dy={20} />
-                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 14, fontWeight: 800 }} domain={[selectedStudent.academicScore >= 70 ? 60 : 40, 100]} dx={-15} />
-                        <Tooltip 
-                          contentStyle={{ borderRadius: '32px', border: 'none', boxShadow: '0 30px 60px -12px rgba(0,0,0,0.2)', padding: '25px', background: '#fff' }} 
-                          labelStyle={{ fontWeight: 900, color: '#1e294b', marginBottom: '12px', fontSize: '16px', textTransform: 'uppercase', letterSpacing: '0.1em' }}
-                        />
-                        <Line type="monotone" dataKey="score" stroke={cfg.hex} strokeWidth={5} dot={{ r: 8, fill: cfg.hex, strokeWidth: 4, stroke: "#fff" }} activeDot={{ r: 12, strokeWidth: 0 }} />
-                        <Line type="monotone" dataKey="attendance" stroke={cfg.secondaryHex} strokeWidth={5} strokeDasharray="8 8" opacity={0.5} dot={{ r: 8, fill: cfg.secondaryHex, strokeWidth: 4, stroke: "#fff" }} activeDot={{ r: 12, strokeWidth: 0 }} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              </>
-              );
-            })()}
-          </div>
-        </div>
+              </div>
+            );
+          })()}
+        </>
       )}
     </div>
   );
