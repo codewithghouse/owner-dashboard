@@ -66,19 +66,19 @@ export default function RisksAlerts() {
       {/* Header & Filter */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-extrabold text-[#111827] tracking-tight">Risks & Alerts</h1>
-          <p className="text-slate-400 font-medium text-sm">Early warning system & risk monitoring</p>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-[#111827] tracking-tight">Risks & Alerts</h1>
+          <p className="text-slate-400 font-medium text-xs md:text-sm">Early warning system & risk monitoring</p>
         </div>
 
-        <div className="flex items-center gap-4 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
-          <div className="flex items-center gap-3 px-4 py-2 border-r border-slate-50">
-             <Filter className="w-5 h-5 text-slate-400" />
-             <span className="text-xs font-bold text-slate-500 uppercase tracking-tight">Filter Branch</span>
+        <div className="flex items-center gap-2 sm:gap-4 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm w-full md:w-auto overflow-hidden">
+          <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 border-r border-slate-50 shrink-0">
+             <Filter className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
+             <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-tight whitespace-nowrap">Filter Branch</span>
           </div>
           <select 
             value={selectedBranchId}
             onChange={(e) => setSelectedBranchId(e.target.value)}
-            className="px-4 py-2 bg-transparent text-sm font-bold text-slate-800 outline-none cursor-pointer hover:text-[#1e3a8a] transition-colors"
+            className="flex-1 px-3 sm:px-4 py-2 bg-transparent text-xs sm:text-sm font-bold text-slate-800 outline-none cursor-pointer hover:text-[#1e3a8a] transition-colors appearance-none min-w-[120px]"
           >
             <option value="all">All Branches</option>
             {branches.map(b => (
@@ -89,12 +89,12 @@ export default function RisksAlerts() {
       </div>
 
       {/* Stats Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {activeData.stats.map((stat, i) => (
-          <div key={i} className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm transition-all hover:shadow-md">
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-tight mb-4">{stat.label}</p>
-            <h3 className="text-4xl font-extrabold text-[#111827] tracking-tighter mb-2">{stat.value}</h3>
-            <p className={`text-[11px] font-bold ${stat.col}`}>{stat.change}</p>
+          <div key={i} className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] border border-slate-100 shadow-sm transition-all hover:shadow-md">
+            <p className="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-tight mb-3 md:mb-4">{stat.label}</p>
+            <h3 className="text-3xl md:text-4xl font-extrabold text-[#111827] tracking-tighter mb-1 md:mb-2">{stat.value}</h3>
+            <p className={`text-[10px] md:text-[11px] font-bold ${stat.col}`}>{stat.change}</p>
           </div>
         ))}
       </div>
@@ -102,9 +102,9 @@ export default function RisksAlerts() {
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Risk Distribution */}
-        <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm">
-           <h3 className="text-lg font-bold text-[#111827] mb-8">Risk Distribution</h3>
-           <div className="h-[280px] w-full">
+        <div className="bg-white rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 p-6 md:p-8 shadow-sm">
+           <h3 className="text-base md:text-lg font-bold text-[#111827] mb-6 md:mb-8">Risk Distribution</h3>
+           <div className="h-[250px] md:h-[280px] w-full">
              <ResponsiveContainer width="100%" height="100%">
                  <PieChart>
                    <Pie
@@ -139,8 +139,8 @@ export default function RisksAlerts() {
         </div>
 
         {/* Risk Trend */}
-        <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm">
-           <h3 className="text-lg font-bold text-[#111827] mb-12">Risk Trend</h3>
+        <div className="bg-white rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 p-6 md:p-8 shadow-sm">
+           <h3 className="text-base md:text-lg font-bold text-[#111827] mb-10 md:mb-12">Risk Trend</h3>
            <div className="h-[250px] w-full">
              <ResponsiveContainer width="100%" height="100%">
                <LineChart data={activeData.trend} margin={{ left: -10, right: 10 }}>
@@ -171,8 +171,8 @@ export default function RisksAlerts() {
         </div>
 
         {/* Branch-wise Risk */}
-        <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm">
-           <h3 className="text-lg font-bold text-[#111827] mb-12">Branch-wise Risk</h3>
+        <div className="bg-white rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 p-6 md:p-8 shadow-sm">
+           <h3 className="text-base md:text-lg font-bold text-[#111827] mb-10 md:mb-12">Branch-wise Risk</h3>
            <div className="h-[250px] w-full">
              <ResponsiveContainer width="100%" height="100%">
                <BarChart data={activeData.branchRisks} margin={{ bottom: 10 }}>
@@ -191,36 +191,36 @@ export default function RisksAlerts() {
       </div>
 
       {/* Active Alerts List */}
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden p-10 lg:p-14">
-        <h3 className="text-xl font-extrabold text-[#111827] mb-12 uppercase tracking-wide">Active Alerts</h3>
+      <div className="bg-white rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden p-6 md:p-10 lg:p-14">
+        <h3 className="text-lg md:text-xl font-extrabold text-[#111827] mb-8 md:mb-12 uppercase tracking-wide">Active Alerts</h3>
         <div className="space-y-6">
           {activeData.alerts.length === 0 ? (
-            <div className="py-20 flex flex-col items-center justify-center text-center">
-              <CheckCircle2 className="w-16 h-16 text-emerald-500 mb-6 opacity-20" />
-              <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Great! No active alerts found</p>
+            <div className="py-12 md:py-20 flex flex-col items-center justify-center text-center">
+              <CheckCircle2 className="w-12 h-12 md:w-16 md:h-16 text-emerald-500 mb-4 md:mb-6 opacity-20" />
+              <p className="text-[11px] md:text-sm font-black text-slate-400 uppercase tracking-widest">Great! No active alerts found</p>
             </div>
           ) : (
             activeData.alerts.map((alert) => (
-              <div key={alert.id} className={`p-8 rounded-[2.5rem] relative overflow-hidden transition-all hover:translate-y-[-5px] duration-500 shadow-sm ${alert.type === 'critical' ? 'bg-[#fef2f2]' : alert.type === 'warning' ? 'bg-[#fffbeb]' : 'bg-[#f0f9ff]'}`}>
-                <div className={`absolute top-0 left-0 w-2 h-full ${alert.type === 'critical' ? 'bg-[#ef4444]' : alert.type === 'warning' ? 'bg-[#f59e0b]' : 'bg-[#0ea5e9]'}`}></div>
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 relative z-10">
-                  <div className="flex items-start gap-8">
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white shrink-0 ${alert.type === 'critical' ? 'bg-[#ef4444]' : alert.type === 'warning' ? 'bg-[#f59e0b]' : 'bg-[#0ea5e9]'}`}>
+              <div key={alert.id} className={`p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] relative overflow-hidden transition-all hover:translate-y-[-5px] duration-500 shadow-sm ${alert.type === 'critical' ? 'bg-[#fef2f2]' : alert.type === 'warning' ? 'bg-[#fffbeb]' : 'bg-[#f0f9ff]'}`}>
+                <div className={`absolute top-0 left-0 w-1.5 md:w-2 h-full ${alert.type === 'critical' ? 'bg-[#ef4444]' : alert.type === 'warning' ? 'bg-[#f59e0b]' : 'bg-[#0ea5e9]'}`}></div>
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 md:gap-8 relative z-10">
+                  <div className="flex flex-col sm:flex-row items-start gap-5 md:gap-8">
+                    <div className={`w-12 h-12 md:w-14 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center text-white shrink-0 ${alert.type === 'critical' ? 'bg-[#ef4444]' : alert.type === 'warning' ? 'bg-[#f59e0b]' : 'bg-[#0ea5e9]'}`}>
                        {getAlertIcon(alert.title)}
                     </div>
                     <div>
-                      <div className="flex items-center gap-4 mb-3">
-                        <h4 className="text-xl font-extrabold text-[#1e294b] tracking-tight">{alert.title}</h4>
-                        <span className={`px-4 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${alert.type === 'critical' ? 'bg-[#ef4444] text-white' : alert.type === 'warning' ? 'bg-[#f59e0b] text-white' : 'bg-[#0ea5e9] text-white'}`}>
+                      <div className="flex flex-wrap items-center gap-3 md:gap-4 mb-2 md:mb-3">
+                        <h4 className="text-lg md:text-xl font-extrabold text-[#1e294b] tracking-tight">{alert.title}</h4>
+                        <span className={`px-3 py-1 rounded-lg text-[8px] md:text-[9px] font-black uppercase tracking-widest ${alert.type === 'critical' ? 'bg-[#ef4444] text-white' : alert.type === 'warning' ? 'bg-[#f59e0b] text-white' : 'bg-[#0ea5e9] text-white'}`}>
                           {alert.status}
                         </span>
                       </div>
-                      <p className="text-slate-500 font-bold text-sm tracking-tight leading-relaxed">{alert.desc}</p>
+                      <p className="text-slate-500 font-bold text-xs md:text-sm tracking-tight leading-relaxed">{alert.desc}</p>
                     </div>
                   </div>
                   <button 
                     onClick={() => navigate(`/risks/${alert.id}`)}
-                    className="px-8 py-3 bg-[#1e294b] text-white text-[11px] font-black rounded-2xl uppercase tracking-widest hover:bg-[#1e3a8a] transition-all shrink-0 shadow-lg shadow-blue-900/10"
+                    className="w-full lg:w-auto px-8 py-3 bg-[#1e294b] text-white text-[10px] md:text-[11px] font-black rounded-xl md:rounded-2xl uppercase tracking-widest hover:bg-[#1e3a8a] transition-all shrink-0 shadow-lg shadow-blue-900/10"
                   >
                     View Details
                   </button>

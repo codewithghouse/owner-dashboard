@@ -54,43 +54,43 @@ export default function AcademicsOverview() {
 
         {/* Main Card */}
         <div className="bg-white rounded-[2rem] border border-slate-100 shadow-xl overflow-hidden">
-          <div className="p-8 lg:p-12">
+          <div className="p-6 md:p-10 lg:p-12">
 
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-10">
-              <div className="flex items-center gap-8">
-                <div className="w-20 h-20 rounded-2xl bg-[#1e3a8a] flex items-center justify-center text-white shadow-lg border-4 border-white">
-                  <BookOpen className="w-10 h-10" />
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-10">
+              <div className="flex items-center gap-4 md:gap-8">
+                <div className="w-14 h-14 md:w-20 md:h-20 rounded-2xl bg-[#1e3a8a] flex items-center justify-center text-white shadow-lg border-2 md:border-4 border-white shrink-0">
+                  <BookOpen className="w-7 h-7 md:w-10 md:h-10" />
                 </div>
-                <div>
-                  <h2 className="text-3xl lg:text-4xl font-bold text-[#1e294b] tracking-tight uppercase">
+                <div className="min-w-0">
+                  <h2 className="text-xl md:text-3xl lg:text-4xl font-black text-[#1e294b] tracking-tight uppercase truncate">
                     {subject.name}
                   </h2>
-                  <p className="text-slate-500 font-bold text-sm tracking-widest mt-1 uppercase opacity-70">
-                    Subject Performance Analysis • {subject.teachers} Teachers • {subject.students.toLocaleString()} Students
+                  <p className="text-slate-500 font-bold text-[10px] md:text-sm tracking-widest mt-1 uppercase opacity-70 truncate">
+                    {subject.teachers} Teachers • {subject.students.toLocaleString()} Students
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
-                <span className={`text-white text-[11px] font-black px-8 py-2.5 rounded-full shadow-lg h-10 flex items-center uppercase tracking-widest ${statusColor}`}>
+              <div className="flex items-center justify-between lg:justify-end gap-3 w-full lg:w-auto">
+                <span className={`text-white text-[10px] font-black px-5 md:px-8 py-2 md:py-2.5 rounded-full shadow-lg h-9 md:h-10 flex items-center uppercase tracking-widest ${statusColor}`}>
                   {subject.status}
                 </span>
                 <button
                   onClick={() => navigate("/academics")}
-                  className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:bg-slate-100 transition-all border border-slate-100"
+                  className="p-2 md:p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:bg-slate-100 transition-all border border-slate-100"
                 >
-                  <X className="w-6 h-6" />
+                  <X className="w-5 h-5 md:w-6 md:h-6" />
                 </button>
               </div>
             </div>
 
             {/* Tabs */}
-            <div className="flex items-center gap-3 mb-10">
+            <div className="flex items-center gap-2 md:gap-3 mb-10 overflow-x-auto pb-2 no-scrollbar">
               {["Performance", "Topics", "Resources"].map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`px-10 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${
+                  className={`whitespace-nowrap px-6 md:px-10 py-2.5 md:py-3 rounded-xl md:rounded-2xl text-[10px] md:text-[11px] font-black uppercase tracking-widest transition-all ${
                     activeTab === tab
                       ? "bg-[#1e3a8a] text-white shadow-xl"
                       : "bg-slate-50 text-slate-400 hover:bg-slate-100"
@@ -102,23 +102,23 @@ export default function AcademicsOverview() {
             </div>
 
             {/* Metric Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-12">
               {[
                 { label: "Average Score",       ...subject.metrics.avgScore,      type: "green"  },
                 { label: "Pass Rate",           ...subject.metrics.passRate,      type: "green"  },
                 { label: "Top Performers",      ...subject.metrics.topPerformers, type: "green"  },
                 { label: "Areas Needing Focus", ...subject.metrics.focusAreas,    type: "yellow" },
               ].map((stat, i) => (
-                <div key={i} className={`p-8 rounded-[1.5rem] border ${
+                <div key={i} className={`p-5 md:p-8 rounded-2xl md:rounded-[1.5rem] border ${
                   stat.type === "green" ? "bg-[#f0fdf4] border-emerald-100/50" : "bg-[#fffbeb] border-amber-100/50"
                 }`}>
-                  <p className={`text-[11px] font-black uppercase tracking-tight mb-4 ${
+                  <p className={`text-[9px] md:text-[11px] font-black uppercase tracking-tight mb-3 md:mb-4 ${
                     stat.type === "green" ? "text-[#059669]/60" : "text-[#d97706]/60"
                   }`}>{stat.label}</p>
-                  <h3 className={`text-4xl font-black tracking-tighter mb-2 ${
+                  <h3 className={`text-2xl md:text-4xl font-black tracking-tighter mb-1 md:mb-2 ${
                     stat.type === "green" ? "text-[#059669]" : "text-[#d97706]"
                   }`}>{stat.value}</h3>
-                  <p className={`text-[11px] font-black uppercase tracking-tight ${
+                  <p className={`text-[9px] md:text-[11px] font-black uppercase tracking-tight ${
                     stat.type === "green" ? "text-[#059669]/80" : "text-[#d97706]/80"
                   }`}>{stat.note}</p>
                 </div>
@@ -187,24 +187,24 @@ export default function AcademicsOverview() {
 
         {/* Weak Areas */}
         {subject.weakAreas.length > 0 && (
-          <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-10 lg:p-14">
-            <h3 className="text-xl font-extrabold text-[#111827] mb-12 uppercase tracking-wide">
+          <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-6 md:p-10 lg:p-14">
+            <h3 className="text-lg md:text-xl font-extrabold text-[#111827] mb-8 md:mb-12 uppercase tracking-wide">
               Weak Areas & Recommendations
             </h3>
-            <div className="space-y-8">
+            <div className="space-y-6 md:space-y-8">
               {subject.weakAreas.map((area, idx) => (
-                <div key={idx} className={`p-10 rounded-[2.5rem] relative overflow-hidden transition-all hover:translate-y-[-5px] duration-500 shadow-sm ${
+                <div key={idx} className={`p-6 md:p-10 rounded-2xl md:rounded-[2.5rem] relative overflow-hidden transition-all hover:translate-y-[-5px] duration-500 shadow-sm ${
                   area.status === "Critical" ? "bg-[#fef2f2]" : "bg-[#fffbeb]"
                 }`}>
-                  <div className={`absolute top-0 left-0 w-2 h-full ${area.status === "Critical" ? "bg-red-500" : "bg-amber-400"}`} />
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 relative z-10">
+                  <div className={`absolute top-0 left-0 w-1.5 md:w-2 h-full ${area.status === "Critical" ? "bg-red-500" : "bg-amber-400"}`} />
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 relative z-10">
                     <div>
-                      <h4 className="text-2xl font-black text-[#1e294b] tracking-tight">{area.topic}</h4>
-                      <p className="text-slate-400 font-bold text-sm mt-1">
-                        Average score: {area.avgScore} • {area.affected}
+                      <h4 className="text-xl md:text-2xl font-black text-[#1e294b] tracking-tight">{area.topic}</h4>
+                      <p className="text-slate-400 font-bold text-[10px] md:text-sm mt-1 uppercase tracking-tight">
+                         Avg: {area.avgScore} &bull; {area.affected}
                       </p>
                     </div>
-                    <span className={`px-6 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                    <span className={`self-start sm:self-center px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${
                       area.status === "Critical"
                         ? "bg-[#ef4444] text-white border-red-200"
                         : "bg-[#eab308] text-white border-amber-200"
@@ -212,9 +212,9 @@ export default function AcademicsOverview() {
                       {area.status}
                     </span>
                   </div>
-                  <div className="relative z-10 flex items-start gap-4">
-                    <span className="text-[#1e294b] font-black text-sm whitespace-nowrap">Recommendation:</span>
-                    <p className="text-slate-600 font-bold text-sm leading-relaxed">{area.recommendation}</p>
+                  <div className="relative z-10 flex flex-col md:flex-row md:items-start gap-2 md:gap-4">
+                    <span className="text-[#1e294b] font-black text-[10px] md:text-sm whitespace-nowrap uppercase tracking-widest">Recommendation:</span>
+                    <p className="text-slate-600 font-bold text-xs md:text-sm leading-relaxed">{area.recommendation}</p>
                   </div>
                 </div>
               ))}
@@ -244,22 +244,22 @@ export default function AcademicsOverview() {
     <div className="space-y-10 max-w-[1600px] mx-auto animate-in fade-in duration-500 pb-10">
 
       {/* Header */}
-      <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-extrabold text-[#111827] tracking-tight">Academics Overview</h1>
-        <p className="text-slate-400 font-medium text-sm">
-          {hasData ? "Branch-wise performance & learning outcomes — live data" : "Grade-wise performance & learning outcomes"}
+      <div className="flex flex-col gap-1 px-1">
+        <h1 className="text-2xl md:text-3xl font-extrabold text-[#111827] tracking-tight">Academics Overview</h1>
+        <p className="text-slate-400 font-bold text-[10px] md:text-sm uppercase tracking-tight">
+          {hasData ? "Branch-wise performance & learning outcomes" : "Grade-wise performance & learning outcomes"}
         </p>
       </div>
 
       {/* Branch Dropdown */}
-      <div className="flex items-center gap-3">
-        <label className="text-xs font-bold text-slate-400 uppercase tracking-wide whitespace-nowrap">
-          View Branch
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-1">
+        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
+          Filter by Branch:
         </label>
         {overviewLoading ? (
-          <div className="h-10 w-48 rounded-xl bg-slate-100 animate-pulse" />
+          <div className="h-10 w-full sm:w-48 rounded-xl bg-slate-100 animate-pulse" />
         ) : (
-          <div className="relative">
+          <div className="relative w-full sm:w-64">
             <span
               className="absolute left-3 top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full pointer-events-none"
               style={{
@@ -273,7 +273,7 @@ export default function AcademicsOverview() {
               value={selectedBranchId}
               onChange={e => setSelectedBranchId(e.target.value)}
               disabled={branches.length === 0}
-              className="pl-8 pr-10 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-[#1e294b] shadow-sm appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#1e3272]/20 focus:border-[#1e3272] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full pl-8 pr-10 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-black text-[#1e294b] shadow-sm appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#1e3272]/20 focus:border-[#1e3272] transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-tight"
             >
               <option value="all">All Branches</option>
               {branches.map(b => (
@@ -305,19 +305,19 @@ export default function AcademicsOverview() {
       )}
 
       {/* ── Stats Cards ─────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {overviewLoading
-          ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-40" />)
+          ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 md:h-40" />)
           : [
               { label: "Overall Pass Rate",   ...activeData!.stats.overallPassRate, green: true  },
               { label: "Average Score",       ...activeData!.stats.averageScore,    green: true  },
               { label: "Distinction Rate",    ...activeData!.stats.distinctionRate, green: true  },
               { label: "Total Students",      ...activeData!.stats.totalStudents,   green: false },
             ].map((stat, i) => (
-              <div key={i} className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-all">
-                <p className="text-slate-400 text-xs font-bold uppercase tracking-tight mb-4">{stat.label}</p>
-                <h3 className="text-4xl font-extrabold text-[#111827] tracking-tighter mb-2">{stat.value}</h3>
-                <p className={`text-[11px] font-bold ${stat.green ? "text-emerald-500" : "text-blue-500"}`}>
+              <div key={i} className="bg-white p-6 md:p-8 rounded-2xl md:rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-all">
+                <p className="text-slate-400 text-[10px] md:text-xs font-black uppercase tracking-widest mb-3 md:mb-4">{stat.label}</p>
+                <h3 className="text-3xl md:text-4xl font-black text-[#111827] tracking-tighter mb-1 md:mb-2">{stat.value}</h3>
+                <p className={`text-[10px] md:text-[11px] font-black uppercase ${stat.green ? "text-emerald-500" : "text-blue-500"}`}>
                   {stat.change}
                 </p>
               </div>
@@ -328,23 +328,22 @@ export default function AcademicsOverview() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* Grade-wise Performance Matrix */}
-        <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm overflow-hidden">
-          <h3 className="text-lg font-bold text-[#111827] mb-2">Grade-wise Performance Matrix</h3>
-          <p className="text-xs text-slate-400 font-medium mb-6">Click a cell to drill into the subject</p>
+        <div className="bg-white rounded-2xl md:rounded-[2.5rem] border border-slate-100 p-6 md:p-8 shadow-sm overflow-hidden">
+          <h3 className="text-base md:text-lg font-black text-[#111827] mb-2 uppercase tracking-wide">Performance Matrix</h3>
+          <p className="text-[10px] md:text-xs text-slate-400 font-bold mb-6 uppercase tracking-tight">Grade-wise subject performance</p>
           {overviewLoading ? (
             <Skeleton className="h-64" />
           ) : !hasData ? (
             <div className="h-64 flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-xl gap-2">
-              <p className="text-sm text-slate-400 font-semibold">No exam results found in Firebase yet</p>
-              <p className="text-xs text-slate-300">Results will appear here once teachers submit scores</p>
+              <p className="text-sm text-slate-400 font-semibold">No results found yet</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto pb-4 no-scrollbar">
               <div className="min-w-[460px]">
                 {/* Grade column headers */}
                 <div className="flex gap-1 mb-1 ml-14">
                   {gradeColumns.map(g => (
-                    <div key={g} className="flex-1 h-8 flex items-center justify-center text-[10px] font-bold text-slate-400 uppercase">
+                    <div key={g} className="flex-1 h-8 flex items-center justify-center text-[9px] font-black text-slate-400 uppercase tracking-widest">
                       {g}
                     </div>
                   ))}
@@ -352,7 +351,7 @@ export default function AcademicsOverview() {
                 {/* Subject rows */}
                 {activeData!.gradeMatrix.map(row => (
                   <div key={row.subject as string} className="flex gap-1 mb-1 items-center">
-                    <div className="w-14 shrink-0 text-right pr-2 text-[11px] font-bold text-slate-500 truncate">
+                    <div className="w-14 shrink-0 text-right pr-2 text-[10px] font-black text-slate-500 truncate uppercase tracking-tighter">
                       {(row.subject as string).slice(0, 7)}
                     </div>
                     {gradeColumns.map(g => {
@@ -360,10 +359,9 @@ export default function AcademicsOverview() {
                       return (
                         <div
                           key={g}
-                          className="flex-1 h-12 flex items-center justify-center text-[10px] font-bold cursor-pointer hover:scale-105 transition-all rounded-sm shadow-sm"
+                          className="flex-1 h-10 md:h-12 flex items-center justify-center text-[10px] font-black cursor-pointer hover:scale-105 transition-all rounded-lg shadow-sm"
                           style={{ backgroundColor: getMatrixColor(val), color: "#1e293b" }}
                           onClick={() => navigate(`/academics/${(row.subject as string).toLowerCase()}`)}
-                          title={`${row.subject} - ${g}: ${val}%`}
                         >
                           {val > 0 ? val : "—"}
                         </div>
@@ -371,12 +369,6 @@ export default function AcademicsOverview() {
                     })}
                   </div>
                 ))}
-                {/* Legend */}
-                <div className="mt-6 flex items-center gap-2 justify-center text-[10px] font-bold text-slate-400">
-                  <span>60</span>
-                  <div className="w-40 h-2.5 rounded-full bg-gradient-to-r from-red-200 via-orange-200 via-yellow-200 to-lime-300" />
-                  <span>100</span>
-                </div>
               </div>
             </div>
           )}

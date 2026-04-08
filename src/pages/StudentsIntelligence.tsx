@@ -454,12 +454,12 @@ export default function StudentsIntelligence() {
     <div className="space-y-8 animate-in fade-in duration-500 pb-10">
 
       {/* ── Header ──────────────────────────────────── */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-[#1e294b] tracking-tight">Students Intelligence</h1>
-          <p className="text-slate-500 font-medium">Enrollment, performance &amp; behavior analytics</p>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-[#1e294b] tracking-tight">Students Intelligence</h1>
+          <p className="text-slate-500 text-xs md:text-sm font-medium">Enrollment, performance &amp; behavior analytics</p>
         </div>
-        <button className="self-start flex items-center gap-2 bg-[#1e3a8a] text-white font-bold h-11 rounded-xl px-6 shadow-lg shadow-blue-900/15 hover:bg-[#1e4fc0] transition-all">
+        <button className="flex items-center justify-center gap-2 bg-[#1e3a8a] text-white font-bold h-10 md:h-11 rounded-xl px-6 shadow-lg shadow-blue-900/15 hover:bg-[#1e4fc0] transition-all text-xs md:text-sm">
           <Plus className="w-4 h-4" /> Add Student
         </button>
       </div>
@@ -471,17 +471,17 @@ export default function StudentsIntelligence() {
       ) : (
         <>
           {/* ── Stat Cards ────────────────────────────── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             {[
               { label:"Total Enrollment",   value: totalEnrollment.toLocaleString(), sub:`+124 this term`,        color:"text-green-600" },
               { label:"Average Attendance", value:`${avgAttendance}%`,               sub:"+0.5% vs last month",   color:"text-green-600" },
               { label:"At-Risk Students",   value: atRisk.toString(),                sub:`${totalEnrollment>0?((atRisk/totalEnrollment)*100).toFixed(1):0}% of total`, color:"text-red-500" },
               { label:"High Performers",    value: highPerformers.toString(),         sub:`${totalEnrollment>0?((highPerformers/totalEnrollment)*100).toFixed(1):0}% of total`, color:"text-green-600" },
             ].map(s=>(
-              <div key={s.label} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
-                <p className="text-slate-400 text-[11px] font-bold uppercase tracking-widest mb-2">{s.label}</p>
-                <h3 className="text-4xl font-extrabold text-[#1e294b] tracking-tight mb-1">{s.value}</h3>
-                <p className={`text-[11px] font-bold ${s.color}`}>{s.sub}</p>
+              <div key={s.label} className="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
+                <p className="text-slate-400 text-[10px] md:text-[11px] font-bold uppercase tracking-widest mb-1 md:mb-2">{s.label}</p>
+                <h3 className="text-3xl md:text-4xl font-extrabold text-[#1e294b] tracking-tight mb-1">{s.value}</h3>
+                <p className={`text-[10px] md:text-[11px] font-bold ${s.color}`}>{s.sub}</p>
               </div>
             ))}
           </div>
@@ -490,9 +490,9 @@ export default function StudentsIntelligence() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
             {/* Grade Distribution */}
-            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-              <h3 className="text-base font-bold text-[#1e294b] mb-4">Grade Distribution</h3>
-              <div className="h-[260px]">
+            <div className="bg-white rounded-2xl border border-slate-100 p-5 md:p-6 shadow-sm">
+              <h3 className="text-sm md:text-base font-bold text-[#1e294b] mb-4">Grade Distribution</h3>
+              <div className="h-[220px] md:h-[260px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -517,9 +517,9 @@ export default function StudentsIntelligence() {
             </div>
 
             {/* Enrollment Trend */}
-            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-              <h3 className="text-base font-bold text-[#1e294b] mb-4">Enrollment Trend</h3>
-              <div className="h-[260px]">
+            <div className="bg-white rounded-2xl border border-slate-100 p-5 md:p-6 shadow-sm">
+              <h3 className="text-sm md:text-base font-bold text-[#1e294b] mb-4">Enrollment Trend</h3>
+              <div className="h-[220px] md:h-[260px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={enrollTrend} margin={{top:10,right:10,left:-20,bottom:0}}>
                     <defs>
@@ -540,9 +540,9 @@ export default function StudentsIntelligence() {
             </div>
 
             {/* Performance by Branch */}
-            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-              <h3 className="text-base font-bold text-[#1e294b] mb-4">Performance by Branch</h3>
-              <div className="h-[260px]">
+            <div className="bg-white rounded-2xl border border-slate-100 p-5 md:p-6 shadow-sm">
+              <h3 className="text-sm md:text-base font-bold text-[#1e294b] mb-4">Performance by Branch</h3>
+              <div className="h-[220px] md:h-[260px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={perfByBranch.length ? perfByBranch : [{branch:"No Data",value:0}]}
@@ -568,65 +568,67 @@ export default function StudentsIntelligence() {
           </div>
 
           {/* ── Attendance Heatmap ────────────────────── */}
-          <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm overflow-x-auto">
-            <div className="flex flex-wrap items-center justify-between gap-4 mb-6 min-w-[700px]">
-              <h3 className="text-base font-bold text-[#1e294b]">Attendance Heatmap</h3>
-              <div className="flex items-center gap-4">
+          <div className="bg-white rounded-2xl border border-slate-100 p-5 md:p-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <h3 className="text-sm md:text-base font-bold text-[#1e294b]">Attendance Heatmap</h3>
+              <div className="flex flex-wrap items-center gap-3 sm:gap-6">
                 {/* Branch selector */}
                 <select
                   value={heatBranch}
                   onChange={e => setHeatBranch(e.target.value)}
-                  className="border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-600 bg-slate-50 outline-none focus:ring-2 focus:ring-[#1e3a8a]/10"
+                  className="border border-slate-200 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-600 bg-slate-50 outline-none w-full sm:w-auto"
                 >
                   {branchList.map(b => <option key={b} value={b}>{b === "All" ? "All Branches" : b}</option>)}
                 </select>
                 {/* Legend */}
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-3 sm:gap-4">
                   {[["bg-green-600","95%+"],["bg-amber-500","85-94%"],["bg-red-500","<85%"]].map(([c,l])=>(
                     <div key={l} className="flex items-center gap-1.5">
-                      <div className={`w-2.5 h-2.5 rounded-full ${c}`}/>
-                      <span className="text-xs font-bold text-slate-600">{l}</span>
+                      <div className={`w-2 h-2 rounded-full ${c}`}/>
+                      <span className="text-[10px] font-bold text-slate-600">{l}</span>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
 
-            <div className="min-w-[700px]">
-              {/* Grade headers */}
-              <div className="grid gap-2 mb-2" style={{gridTemplateColumns:`160px repeat(${Math.max(heatmapGrades.length,1)},1fr)`}}>
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Branch</div>
-                {heatmapGrades.map(g=>(
-                  <div key={g} className="text-center text-[10px] font-bold text-slate-400 uppercase tracking-wide">{g}</div>
-                ))}
-              </div>
-              {/* Rows */}
-              {heatmapData.length === 0 ? (
-                <div className="text-center py-8 text-sm text-slate-400 font-semibold">No attendance data yet</div>
-              ) : (
-                heatmapData.map(row=>(
-                  <div key={row.branch} className="grid gap-2 mb-2" style={{gridTemplateColumns:`160px repeat(${Math.max(heatmapGrades.length,1)},1fr)`}}>
-                    <div className="flex items-center">
-                      <span className="text-[11px] font-bold text-slate-500 tracking-tight truncate pr-2">{row.branch}</span>
-                    </div>
-                    {row.cells.map((val,i)=>(
-                      <div key={i} className={`h-11 rounded-xl flex items-center justify-center font-bold text-sm transition-transform hover:scale-105 ${
-                        val>0 ? getHeatColor(val) : "bg-slate-100 text-slate-400"
-                      }`}>
-                        {val>0 ? `${val}%` : "—"}
+            <div className="overflow-x-auto pb-4">
+              <div className="min-w-[600px]">
+                {/* Grade headers */}
+                <div className="grid gap-2 mb-2" style={{gridTemplateColumns:`140px repeat(${Math.max(heatmapGrades.length,1)},1fr)`}}>
+                  <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Branch</div>
+                  {heatmapGrades.map(g=>(
+                    <div key={g} className="text-center text-[9px] font-bold text-slate-400 uppercase tracking-wide">{g}</div>
+                  ))}
+                </div>
+                {/* Rows */}
+                {heatmapData.length === 0 ? (
+                  <div className="text-center py-8 text-xs text-slate-400 font-semibold">No attendance data yet</div>
+                ) : (
+                  heatmapData.map(row=>(
+                    <div key={row.branch} className="grid gap-2 mb-2" style={{gridTemplateColumns:`140px repeat(${Math.max(heatmapGrades.length,1)},1fr)`}}>
+                      <div className="flex items-center">
+                        <span className="text-[10px] font-bold text-slate-500 tracking-tight truncate pr-2">{row.branch}</span>
                       </div>
-                    ))}
-                  </div>
-                ))
-              )}
+                      {row.cells.map((val,i)=>(
+                        <div key={i} className={`h-10 rounded-lg flex items-center justify-center font-bold text-xs transition-transform hover:scale-105 ${
+                          val>0 ? getHeatColor(val) : "bg-slate-100 text-slate-400"
+                        }`}>
+                          {val>0 ? `${val}%` : "—"}
+                        </div>
+                      ))}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
 
           {/* ── Student Table ─────────────────────────── */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
             {/* Table header + search */}
-            <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <div className="relative flex-1 max-w-md">
+            <div className="p-4 md:px-6 md:py-4 border-b border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
                 <input
                   value={search}
@@ -636,26 +638,31 @@ export default function StudentsIntelligence() {
                 />
               </div>
               {/* Branch filter dropdown */}
-              <select
-                value={tableBranch}
-                onChange={e=>{setTableBranch(e.target.value);setPage(1);}}
-                className="border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-600 bg-slate-50 outline-none focus:ring-2 focus:ring-[#1e3a8a]/10"
-              >
-                {branchList.map(b=><option key={b} value={b}>{b === "All" ? "All Branches" : b}</option>)}
-              </select>
-              <button className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-50">
-                <Filter className="w-4 h-4"/> Filters
-              </button>
+              <div className="flex items-center gap-2">
+                <select
+                  value={tableBranch}
+                  onChange={e=>{setTableBranch(e.target.value);setPage(1);}}
+                  className="flex-1 sm:w-40 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-600 bg-slate-50 outline-none"
+                >
+                  {branchList.map(b=><option key={b} value={b}>{b === "All" ? "All Branches" : b}</option>)}
+                </select>
+                <button className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50">
+                  <Filter className="w-3.5 h-3.5"/> Filters
+                </button>
+              </div>
             </div>
 
             {/* Columns */}
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[800px]">
+              <table className="w-full min-w-[700px]">
                 <thead>
-                  <tr className="border-b border-slate-100">
-                    {["Student","Grade","Branch","Attendance","Academic Score","Risk Status","Actions"].map(h=>(
-                      <th key={h} className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">{h}</th>
-                    ))}
+                  <tr className="border-b border-slate-100 bg-slate-50/30">
+                    <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Student</th>
+                    <th className="hidden sm:table-cell px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Grade</th>
+                    <th className="hidden md:table-cell px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Branch</th>
+                    <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Attendance</th>
+                    <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Score</th>
+                    <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -671,32 +678,32 @@ export default function StudentsIntelligence() {
                           <tr key={s._eid}
                             className={`border-b border-slate-50 hover:bg-slate-50/50 transition-all ${selected?._eid===s._eid?"bg-blue-50/30":""}`}
                           >
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-3">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-extrabold shrink-0 ${getAvatarColor(s.score)}`}>
-                                  {getInitials(s.name)}
-                                </div>
-                                <div>
-                                  <p className="text-sm font-bold text-[#1e294b]">{s.name}</p>
-                                  <p className="text-[11px] text-slate-400 font-semibold">ID: {s.id.length>12?s.id.slice(0,12):s.id}</p>
-                                </div>
-                              </div>
+                            <td className="px-5 py-3">
+                               <div className="flex items-center gap-3">
+                                 <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-[10px] font-black shrink-0 ${getAvatarColor(s.score)}`}>
+                                   {getInitials(s.name)}
+                                 </div>
+                                 <div className="min-w-0">
+                                   <p className="text-xs font-bold text-[#1e294b] truncate">{s.name}</p>
+                                   <p className="text-[10px] text-slate-400 font-bold truncate">ID: {s.id.length>8?s.id.slice(0,8):s.id}</p>
+                                 </div>
+                               </div>
                             </td>
-                            <td className="px-6 py-4 text-sm font-semibold text-slate-600">{s.grade}</td>
-                            <td className="px-6 py-4 text-sm font-semibold text-slate-600">{s.branch}</td>
-                            <td className="px-6 py-4 text-sm font-bold text-[#1e294b]">
+                            <td className="hidden sm:table-cell px-5 py-3 text-xs font-bold text-slate-500">{s.grade}</td>
+                            <td className="hidden md:table-cell px-5 py-3 text-xs font-bold text-slate-500">{s.branch}</td>
+                            <td className="px-5 py-3 text-xs font-extrabold text-[#1e294b]">
                               {s.attendance>0?`${s.attendance}%`:"—"}
                             </td>
-                            <td className="px-6 py-4 text-sm font-bold text-[#1e294b]">
-                              {s.score>0?`${s.score}/100`:"—"}
+                            <td className="px-5 py-3">
+                               <div className="flex flex-col">
+                                 <span className="text-xs font-extrabold text-[#1e294b]">{s.score>0?`${s.score}%`:"—"}</span>
+                                 <span className={`text-[9px] font-black uppercase ${risk.color}`}>{risk.label}</span>
+                               </div>
                             </td>
-                            <td className="px-6 py-4">
-                              <span className={`text-sm font-bold ${risk.color}`}>{risk.label}</span>
-                            </td>
-                            <td className="px-6 py-4">
+                            <td className="px-5 py-3">
                               <button
                                 onClick={()=>setSelected(selected?._eid===s._eid ? null : s)}
-                                className="text-sm font-bold text-[#1e3a8a] hover:underline"
+                                className="text-xs font-black text-[#1e3a8a] bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors"
                               >
                                 {selected?._eid===s._eid ? "Close" : "View"}
                               </button>
@@ -707,34 +714,33 @@ export default function StudentsIntelligence() {
                     </>
                   ))}
                   {filtered.length===0 && (
-                    <tr><td colSpan={7} className="py-16 text-center text-sm text-slate-400 font-semibold">No students found</td></tr>
+                    <tr><td colSpan={6} className="py-16 text-center text-xs text-slate-400 font-bold uppercase tracking-widest">No scholars found</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
 
             {/* Pagination */}
-            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
-              <p className="text-xs font-semibold text-slate-400">
-                Showing {Math.min((page-1)*PAGE_SIZE+1, filtered.length)}–{Math.min(page*PAGE_SIZE, filtered.length)} of {filtered.length} students
+            <div className="p-4 md:px-6 md:py-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                Showing {Math.min((page-1)*PAGE_SIZE+1, filtered.length)}–{Math.min(page*PAGE_SIZE, filtered.length)} of {filtered.length}
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 md:gap-2">
                 <button
                   disabled={page===1}
                   onClick={()=>setPage(p=>p-1)}
-                  className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-50 disabled:opacity-40"
-                >Previous</button>
-                {Array.from({length:Math.min(totalPages,4)},(_,i)=>i+1).map(n=>(
+                  className="px-2 md:px-3 py-1.5 border border-slate-200 rounded-lg text-[10px] font-black text-slate-400 hover:bg-slate-50 disabled:opacity-30"
+                >Prev</button>
+                {Array.from({length:Math.min(totalPages,3)},(_,i)=>i+1).map(n=>(
                   <button key={n} onClick={()=>setPage(n)}
-                    className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${page===n?"bg-[#1e3a8a] text-white":"border border-slate-200 text-slate-500 hover:bg-slate-50"}`}>
+                    className={`w-7 h-7 md:w-8 md:h-8 rounded-lg text-[10px] font-black transition-all ${page===n?"bg-[#1e3a8a] text-white shadow-md":"border border-slate-200 text-slate-400 hover:bg-slate-50"}`}>
                     {n}
                   </button>
                 ))}
-                {totalPages>4&&<span className="text-slate-400 text-xs">...</span>}
                 <button
                   disabled={page===totalPages}
                   onClick={()=>setPage(p=>p+1)}
-                  className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-50 disabled:opacity-40"
+                  className="px-2 md:px-3 py-1.5 border border-slate-200 rounded-lg text-[10px] font-black text-slate-400 hover:bg-slate-50 disabled:opacity-30"
                 >Next</button>
               </div>
             </div>
@@ -747,23 +753,23 @@ export default function StudentsIntelligence() {
             return (
               <div className="bg-white rounded-2xl border border-slate-100 shadow-lg overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
                 {/* Detail header */}
-                <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+                <div className="p-5 md:px-6 md:py-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-5">
                   <div className="flex items-center gap-4">
-                    <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white font-extrabold text-lg ${getAvatarColor(selected.score)}`}>
+                    <div className={`w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center text-white font-black text-base md:text-lg shrink-0 ${getAvatarColor(selected.score)}`}>
                       {getInitials(selected.name)}
                     </div>
-                    <div>
-                      <h2 className="text-lg font-extrabold text-[#1e294b]">{selected.name}</h2>
-                      <p className="text-xs text-slate-400 font-semibold">
-                        {selected.grade} &bull; {selected.branch} &bull; ID: {selected.id}
+                    <div className="min-w-0">
+                      <h2 className="text-base md:text-lg font-black text-[#1e294b] truncate">{selected.name}</h2>
+                      <p className="text-[10px] md:text-xs text-slate-400 font-bold uppercase tracking-tight truncate">
+                        {selected.grade} &bull; {selected.branch}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className={`text-xs font-extrabold px-4 py-1.5 rounded-full text-white ${getAvatarColor(selected.score)}`}>
-                      {risk.label === "High" ? "High Risk" : risk.label === "Medium" ? "Medium Risk" : "Low Risk"}
+                  <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto">
+                    <span className={`text-[10px] font-black px-3 py-1.5 rounded-lg text-white ${getAvatarColor(selected.score)} uppercase tracking-widest`}>
+                      {risk.label} Risk
                     </span>
-                    <button className="bg-[#1e3a8a] text-white text-xs font-bold px-5 py-2.5 rounded-xl hover:bg-[#1e4fc0] transition-all">
+                    <button className="flex-1 md:flex-none bg-[#1e3a8a] text-white text-[10px] font-black px-4 py-2 rounded-xl shadow-md">
                       Contact Parent
                     </button>
                     <button onClick={()=>setSelected(null)} className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-400">

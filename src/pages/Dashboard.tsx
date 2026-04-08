@@ -35,12 +35,13 @@ export default function Dashboard() {
   /* ── section state ──────────────────────────────── */
   const [branches,     setBranches]     = useState<any[]>([]);
   const [riskData,     setRiskData]     = useState([
-    { name: "Low Risk", value: 70, color: "#22c55e" },
-    { name: "Moderate", value: 18, color: "#f59e0b" },
-    { name: "Critical", value: 12, color: "#ef4444" },
+    { name: "Low Risk", value: 0, color: "#22c55e" },
+    { name: "Moderate", value: 0, color: "#f59e0b" },
+    { name: "Critical", value: 0, color: "#ef4444" },
   ]);
   const [revenueTrend, setRevenueTrend] = useState<any[]>([]);
   const [alerts,       setAlerts]       = useState<any[]>([]);
+  const [selectedAlertBranch, setSelectedAlertBranch] = useState<string>("all");
   const [loading,      setLoading]      = useState(true);
 
   /* ── data fetch ─────────────────────────────────── */
@@ -49,23 +50,28 @@ export default function Dashboard() {
 
     const fetchAll = async () => {
       try {
-        /* 1. All schools (branches) — exclude owner doc */
-        const schoolsSnap = await getDocs(collection(db, "schools"));
-        const schoolDocs  = schoolsSnap.docs
-          .filter(d => d.data().role !== "owner" && d.id !== auth.currentUser?.uid)
-          .map(d => ({ id: d.id, ...d.data() as any }));
+        /* 1. All schools (branches) for current owner */
+        const uid = auth.currentUser?.uid;
+        if (!uid) return;
+        
+        // Fetch branches from the actual branches subcollection
+        const schoolsSnap = await getDocs(collection(db, "schools", uid, "branches"));
+        const schoolDocs  = schoolsSnap.docs.map(d => ({ 
+          id: d.data().branchId || d.data().schoolId || d.id, 
+          ...d.data() as any 
+        }));
 
         /* 2. Per-branch stats */
         const branchData = await Promise.all(
           schoolDocs.map(async (school) => {
             const sid = school.id;
 
-            /* student count */
-            const enrollSnap  = await getDocs(query(collection(db, "enrollments"), where("schoolId","==",sid)));
+            /* student count — use branchId for owner's branches */
+            const enrollSnap  = await getDocs(query(collection(db, "enrollments"), where("branchId","==",sid)));
             const studentCount = enrollSnap.size;
 
             /* avg marks */
-            const scoresSnap  = await getDocs(query(collection(db, "test_scores"), where("schoolId","==",sid)));
+            const scoresSnap  = await getDocs(query(collection(db, "test_scores"), where("branchId","==",sid)));
             const allPct      = scoresSnap.docs
               .map(d => parseFloat(d.data().percentage ?? d.data().score ?? ""))
               .filter(n => !isNaN(n));
@@ -74,7 +80,7 @@ export default function Dashboard() {
               : 0;
 
             /* avg attendance */
-            const attSnap     = await getDocs(query(collection(db, "attendance"), where("schoolId","==",sid)));
+            const attSnap     = await getDocs(query(collection(db, "attendance"), where("branchId","==",sid)));
             const presentCnt  = attSnap.docs.filter(d => (d.data().status||"").toLowerCase()==="present").length;
             const avgAtt      = attSnap.size ? Math.round((presentCnt / attSnap.size) * 100) : 0;
 
@@ -85,7 +91,7 @@ export default function Dashboard() {
 
             return {
               id:       sid,
-              name:     school.schoolName || school.name || "School",
+              name:     school.name || school.schoolName || "School",
               students: studentCount,
               ahi:      schoolAHI,
               avgMarks,
@@ -106,8 +112,8 @@ export default function Dashboard() {
           : 0;
         setAhi(overallAHI);
 
-        /* 4. Risk distribution from ALL test_scores */
-        const allScoresSnap = await getDocs(collection(db, "test_scores"));
+        /* 4. Risk distribution for this owner */
+        const allScoresSnap = await getDocs(query(collection(db, "test_scores"), where("schoolId", "==", uid)));
         const studentMap    = new Map<string, number[]>();
         allScoresSnap.docs.forEach(d => {
           const data = d.data();
@@ -132,8 +138,8 @@ export default function Dashboard() {
           { name: "Critical", value: Math.round((crit / total)*100), color: "#ef4444" },
         ]);
 
-        /* 5. Fee collection rate */
-        const feesSnap = await getDocs(collection(db, "fees"));
+        /* 5. Fee collection rate for this owner */
+        const feesSnap = await getDocs(query(collection(db, "fees"), where("schoolId", "==", uid)));
         const totalFee = feesSnap.size;
         const paidFee  = feesSnap.docs.filter(d => (d.data().status||"").toLowerCase()==="paid").length;
         setFeeRate(totalFee > 0 ? Math.round((paidFee / totalFee)*1000)/10 : 0);
@@ -193,21 +199,20 @@ export default function Dashboard() {
   /* ── derived values for center of donut ────────────── */
   const lowPct = riskData.find(r=>r.name==="Low Risk")?.value ?? 0;
 
-  /* ── fallback alerts when no Firestore data ─────────── */
-  const displayAlerts = alerts.length > 0 ? alerts : [
-    { id:"f1", message:"Attendance drop in Grade 8 - North Branch", severity:"critical", createdAt: null, _fallback:true },
-    { id:"f2", message:"Fee defaulters exceeding 30 days",          severity:"warning",  createdAt: null, _fallback:true },
-    { id:"f3", message:"Teacher performance variance detected",      severity:"warning",  createdAt: null, _fallback:true },
-  ];
-  const displayAlertsCount = activeAlerts || displayAlerts.filter(a=>!a._fallback).length || 3;
+  const displayAlertsCount = activeAlerts;
+
+  const filteredAlerts = alerts.filter(alert => {
+    if (selectedAlertBranch === "all") return true;
+    return alert.branchId === selectedAlertBranch || alert.schoolId === selectedAlertBranch;
+  });
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700 pb-10">
 
       {/* ── Header ───────────────────────────────────────── */}
-      <div>
-        <h1 className="text-3xl font-extrabold text-[#1e294b] tracking-tight">Executive Dashboard</h1>
-        <p className="text-slate-500 font-medium mt-1">Real-time overview of all school operations</p>
+      <div className="flex flex-col gap-1">
+        <h1 className="text-2xl md:text-3xl font-extrabold text-[#1e294b] tracking-tight">Executive Dashboard</h1>
+        <p className="text-slate-500 text-xs md:text-sm font-medium">Real-time overview of all school operations</p>
       </div>
 
       {/* ── Stat Cards ───────────────────────────────────── */}
@@ -215,7 +220,7 @@ export default function Dashboard() {
         {[
           {
             title:  "Academic Health Index",
-            value:  loading ? "—" : ahi > 0 ? ahi.toString() : "87.4",
+            value:  loading ? "—" : ahi.toString(),
             badge:  "+2.3%",
             label:  "vs last month",
             icon:   Activity,
@@ -235,7 +240,7 @@ export default function Dashboard() {
           },
           {
             title:  "Fee Collection Rate",
-            value:  loading ? "—" : feeRate > 0 ? `${feeRate}%` : "94.2%",
+            value:  loading ? "—" : `${feeRate}%`,
             badge:  "+1.8%",
             label:  "vs last term",
             icon:   Percent,
@@ -254,7 +259,7 @@ export default function Dashboard() {
             up:     false,
           },
         ].map((s) => (
-          <div key={s.title} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300">
+          <div key={s.title} className="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300">
             <div className="flex items-start justify-between mb-4">
               <span className="text-slate-500 text-sm font-semibold tracking-tight">{s.title}</span>
               <div className={`p-2 rounded-lg ${s.bg}`}>
@@ -281,8 +286,8 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
         {/* Branch Overview */}
-        <div className="lg:col-span-4 bg-white rounded-3xl border border-slate-100 p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-[#1e294b] mb-8">Branch Overview</h3>
+        <div className="lg:col-span-4 bg-white rounded-3xl border border-slate-100 p-6 md:p-8 shadow-sm">
+          <h3 className="text-base md:text-lg font-bold text-[#1e294b] mb-6 md:mb-8">Branch Overview</h3>
           {loading ? (
             <div className="flex items-center justify-center h-40">
               <Loader2 className="w-6 h-6 animate-spin text-slate-300" />
@@ -321,8 +326,8 @@ export default function Dashboard() {
         </div>
 
         {/* Risk Distribution */}
-        <div className="lg:col-span-4 bg-white rounded-3xl border border-slate-100 p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-[#1e294b] mb-6">Risk Distribution</h3>
+        <div className="lg:col-span-4 bg-white rounded-3xl border border-slate-100 p-6 md:p-8 shadow-sm">
+          <h3 className="text-base md:text-lg font-bold text-[#1e294b] mb-6">Risk Distribution</h3>
           <div className="h-[220px] relative flex items-center justify-center">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -363,8 +368,8 @@ export default function Dashboard() {
         </div>
 
         {/* Revenue Trend */}
-        <div className="lg:col-span-4 bg-white rounded-3xl border border-slate-100 p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-[#1e294b] mb-6">Revenue Trend</h3>
+        <div className="lg:col-span-4 bg-white rounded-3xl border border-slate-100 p-6 md:p-8 shadow-sm">
+          <h3 className="text-base md:text-lg font-bold text-[#1e294b] mb-6">Revenue Trend</h3>
           <div className="h-[220px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart
@@ -408,58 +413,81 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* Critical Alerts */}
-        <div className="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-bold text-[#1e294b]">Critical Alerts</h3>
-            <button
-              onClick={() => navigate("/risks")}
-              className="text-xs font-bold text-[#1e3a8a] hover:underline flex items-center gap-1"
-            >
-              View All
-            </button>
+        <div className="bg-white rounded-3xl border border-slate-100 p-6 md:p-8 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <h3 className="text-base md:text-lg font-bold text-[#1e294b]">Critical Alerts</h3>
+            <div className="flex items-center justify-between gap-3">
+              <select
+                value={selectedAlertBranch}
+                onChange={(e) => setSelectedAlertBranch(e.target.value)}
+                className="text-xs font-bold text-slate-500 bg-slate-50 border border-slate-100 rounded-lg px-2 py-1 outline-none focus:border-blue-500 transition-colors"
+                style={{ cursor: 'pointer' }}
+              >
+                <option value="all">All Branches</option>
+                {branches.map(b => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => navigate("/risks")}
+                className="text-xs font-bold text-[#1e3a8a] hover:underline flex items-center gap-1"
+              >
+                View All
+              </button>
+            </div>
           </div>
           <div className="space-y-3">
-            {displayAlerts.slice(0,5).map((alert) => {
-              const isCritical = (alert.severity||"warning") === "critical";
-              return (
-                <div
-                  key={alert.id}
-                  onClick={() => navigate("/risks")}
-                  className={`relative flex items-center gap-4 px-5 py-4 rounded-2xl cursor-pointer hover:scale-[1.01] transition-all overflow-hidden ${
-                    isCritical ? "bg-red-50" : "bg-amber-50/70"
-                  }`}
-                >
-                  {/* Rounded pill left accent */}
-                  <div className={`absolute left-0 top-3 bottom-3 w-[5px] rounded-r-full ${
-                    isCritical ? "bg-red-500" : "bg-amber-400"
-                  }`} />
-
-                  <div className={`w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center shrink-0 ${
-                    isCritical ? "border border-red-100" : "border border-amber-100"
-                  }`}>
-                    <AlertCircle className={`w-4 h-4 ${isCritical ? "text-red-500" : "text-amber-500"}`} />
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-[#1e294b] leading-snug">
-                      {alert.message || alert.description || alert.title || "Alert"}
-                    </p>
-                    <p className="text-[11px] text-slate-400 font-semibold mt-0.5">
-                      {alert._fallback
-                        ? (alert.id === "f1" ? "2 hours ago" : alert.id === "f2" ? "5 hours ago" : "1 day ago")
-                        : timeAgo(alert.createdAt)}
-                    </p>
-                  </div>
+            {filteredAlerts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-6 text-center">
+                <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center mb-2">
+                  <AlertCircle className="w-5 h-5 text-slate-300" />
                 </div>
-              );
-            })}
+                <p className="text-sm font-semibold text-slate-400">No critical alerts for this branch</p>
+                <p className="text-xs text-slate-300 mt-0.5">Everything looks good!</p>
+              </div>
+            ) : (
+              filteredAlerts.slice(0,5).map((alert) => {
+                const isCritical = (alert.severity||"warning") === "critical";
+                return (
+                  <div
+                    key={alert.id}
+                    onClick={() => navigate("/risks")}
+                    className={`relative flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 rounded-2xl cursor-pointer hover:scale-[1.01] transition-all overflow-hidden ${
+                      isCritical ? "bg-red-50" : "bg-amber-50/70"
+                    }`}
+                  >
+                    {/* Rounded pill left accent */}
+                    <div className={`absolute left-0 top-3 bottom-3 w-[5px] rounded-r-full ${
+                      isCritical ? "bg-red-500" : "bg-amber-400"
+                    }`} />
+
+                    <div className={`w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center shrink-0 ${
+                      isCritical ? "border border-red-100" : "border border-amber-100"
+                    }`}>
+                      <AlertCircle className={`w-4 h-4 ${isCritical ? "text-red-500" : "text-amber-500"}`} />
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-[#1e294b] leading-snug">
+                        {alert.message || alert.description || alert.title || "Alert"}
+                      </p>
+                      <p className="text-[11px] text-slate-400 font-semibold mt-0.5">
+                        {alert._fallback
+                          ? (alert.id === "f1" ? "2 hours ago" : alert.id === "f2" ? "5 hours ago" : "1 day ago")
+                          : timeAgo(alert.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
 
         {/* Quick Actions */}
-        <div className="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-[#1e294b] mb-6">Quick Actions</h3>
-          <div className="grid grid-cols-2 gap-4">
+        <div className="bg-white rounded-3xl border border-slate-100 p-6 md:p-8 shadow-sm">
+          <h3 className="text-base md:text-lg font-bold text-[#1e294b] mb-6">Quick Actions</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <button
               onClick={() => navigate("/reports")}
               className="flex items-center gap-4 bg-[#1e3a8a] text-white p-5 rounded-2xl shadow-lg shadow-blue-900/20 hover:bg-[#1e4fc0] transition-all group"

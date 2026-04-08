@@ -193,28 +193,28 @@ export default function ReportsCenter() {
         <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
           <div className="p-8 lg:p-10">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
-              <div>
-                <h2 className="text-2xl font-bold text-[#111827] tracking-tight mb-2">{reportTitle}</h2>
-                <p className="text-slate-400 text-sm font-medium">Generated on {(reportData as any).generatedOn} • Report ID: {(reportData as any).id}</p>
+            <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6 mb-8">
+              <div className="min-w-0">
+                <h2 className="text-xl md:text-2xl font-black text-[#111827] tracking-tight mb-2 truncate uppercase">{reportTitle}</h2>
+                <p className="text-slate-400 text-[10px] md:text-sm font-bold uppercase tracking-tight opacity-70 truncate">Generated on {(reportData as any).generatedOn}</p>
               </div>
-              <div className="flex items-center gap-3">
-                <Button variant="outline" onClick={printReport} className="h-10 px-5 rounded-xl border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 flex items-center gap-2">
+              <div className="flex items-center gap-2 md:gap-3 w-full lg:w-auto">
+                <Button variant="outline" onClick={printReport} className="flex-1 lg:flex-none h-10 px-4 rounded-xl border-slate-200 text-[10px] md:text-xs font-black text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-2 uppercase tracking-widest">
                   <Printer className="w-4 h-4" /> Print
                 </Button>
-                <Button onClick={() => handleExport("pdf")} className="h-10 px-5 rounded-xl bg-[#1e294b] text-white text-xs font-bold hover:bg-[#1e3a8a] shadow-lg flex items-center gap-2">
+                <Button onClick={() => handleExport("pdf")} className="flex-1 lg:flex-none h-10 px-4 rounded-xl bg-[#1e294b] text-white text-[10px] md:text-xs font-black hover:bg-[#1e3a8a] shadow-lg flex items-center justify-center gap-2 uppercase tracking-widest">
                   <Download className="w-4 h-4" /> Export
                 </Button>
               </div>
             </div>
 
             {/* Tabs */}
-            <div className="flex items-center gap-3 mb-10">
+            <div className="flex items-center gap-2 md:gap-3 mb-10 overflow-x-auto pb-2 no-scrollbar">
               {(["Preview", "Schedule", "Share", "Settings"] as const).map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                  className={`whitespace-nowrap px-6 md:px-8 py-2 md:py-2.5 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest transition-all ${
                     activeTab === tab ? "bg-[#1e3a8a] text-white shadow-sm" : "bg-white text-slate-500 hover:bg-slate-50 border border-slate-100"
                   }`}
                 >
@@ -227,11 +227,11 @@ export default function ReportsCenter() {
             {activeTab === "Preview" && (
               <div className="animate-in fade-in duration-500">
                 {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-12">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5 mb-12">
                   {payload.stats.map((stat, i) => (
-                    <div key={i} className="bg-[#f8fafc] border border-slate-100 p-6 rounded-[1.2rem] text-center transition-all hover:bg-white hover:shadow-lg">
-                      <p className="text-slate-400 text-[11px] font-bold uppercase tracking-tight mb-3">{stat.label}</p>
-                      <h3 className={`text-3xl font-black tracking-tighter ${getStatColor(reportData._type, i)}`}>{stat.value}</h3>
+                    <div key={i} className="bg-[#f8fafc] border border-slate-100 p-5 md:p-6 rounded-xl md:rounded-[1.2rem] text-center transition-all hover:bg-white hover:shadow-lg">
+                      <p className="text-slate-400 text-[9px] md:text-[11px] font-black uppercase tracking-widest mb-3">{stat.label}</p>
+                      <h3 className={`text-2xl md:text-3xl font-black tracking-tighter ${getStatColor(reportData._type, i)}`}>{stat.value}</h3>
                     </div>
                   ))}
                 </div>
@@ -309,18 +309,18 @@ export default function ReportsCenter() {
         </div>
 
         {/* Export Options */}
-        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-10">
-          <h3 className="text-xl font-bold text-[#111827] mb-10">Export Options</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-6 md:p-10">
+          <h3 className="text-lg md:text-xl font-black text-[#111827] mb-8 md:mb-10 uppercase tracking-widest">Export Options</h3>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             {[
-              { label: "PDF", icon: <FileText className="w-8 h-8" />, col: "text-[#ef4444]", format: "pdf" as const },
-              { label: "Excel", icon: <FileSpreadsheet className="w-8 h-8" />, col: "text-[#22c55e]", format: "excel" as const },
-              { label: "CSV", icon: <FileText className="w-8 h-8" />, col: "text-[#3b82f6]", format: "csv" as const },
-              { label: "Email", icon: <Mail className="w-8 h-8" />, col: "text-[#1e3a8a]", format: "email" as const },
+              { label: "PDF", icon: <FileText className="w-6 h-6 md:w-8 md:h-8" />, col: "text-[#ef4444]", format: "pdf" as const },
+              { label: "Excel", icon: <FileSpreadsheet className="w-6 h-6 md:w-8 md:h-8" />, col: "text-[#22c55e]", format: "excel" as const },
+              { label: "CSV", icon: <FileText className="w-6 h-6 md:w-8 md:h-8" />, col: "text-[#3b82f6]", format: "csv" as const },
+              { label: "Email", icon: <Mail className="w-6 h-6 md:w-8 md:h-8" />, col: "text-[#1e3a8a]", format: "email" as const },
             ].map((opt, i) => (
-              <button key={i} onClick={() => handleExport(opt.format)} className="bg-[#f8fafc] border border-slate-100 p-8 rounded-[1.5rem] flex flex-col items-center gap-4 transition-all hover:bg-white hover:shadow-lg hover:border-slate-200 cursor-pointer group">
+              <button key={i} onClick={() => handleExport(opt.format)} className="bg-[#f8fafc] border border-slate-100 p-6 md:p-8 rounded-xl md:rounded-[1.5rem] flex flex-col items-center gap-3 md:gap-4 transition-all hover:bg-white hover:shadow-lg hover:border-slate-200 cursor-pointer group">
                 <div className={`${opt.col} group-hover:scale-110 transition-transform`}>{opt.icon}</div>
-                <span className="text-sm font-bold text-slate-600">{opt.label}</span>
+                <span className="text-[10px] md:text-sm font-black text-slate-600 uppercase tracking-widest">{opt.label}</span>
               </button>
             ))}
           </div>
@@ -338,28 +338,28 @@ export default function ReportsCenter() {
   return (
     <div className="space-y-10 max-w-[1600px] mx-auto animate-in fade-in duration-500 pb-10">
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
         <div>
-          <h1 className="text-3xl font-extrabold text-[#111827] tracking-tight">Reports Center</h1>
-          <p className="text-slate-400 font-medium text-sm">Generate, schedule & download reports</p>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-[#111827] tracking-tight">Reports Center</h1>
+          <p className="text-slate-400 font-bold text-[10px] md:text-sm uppercase tracking-tight">Generate, schedule & download reports</p>
         </div>
-        <Button className="bg-[#1e294b] hover:bg-[#1e3a8a] text-white font-bold h-12 rounded-xl px-8 shadow-lg shadow-blue-900/10 flex items-center gap-2">
-          <Plus className="w-4 h-4" /> Create Custom Report
+        <Button className="w-full sm:w-auto bg-[#1e294b] hover:bg-[#1e3a8a] text-white font-black text-[10px] md:text-xs uppercase tracking-widest h-11 md:h-12 rounded-xl px-8 shadow-lg shadow-blue-900/10 flex items-center justify-center gap-2">
+          <Plus className="w-4 h-4" /> Create Report
         </Button>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {[
           { label: "Total Reports", value: stats?.totalReports?.toString() || "12", note: `${stats?.totalCategories || 3} categories` },
           { label: "Scheduled", value: stats?.scheduled?.toString() || "0", note: "Auto-generated", noteCol: "text-emerald-500" },
           { label: "Recent Downloads", value: stats?.recentDownloads?.toString() || "0", note: "Last 7 days" },
           { label: "Favorites", value: stats?.favorites?.toString() || "0", note: "Quick access" },
         ].map((stat, i) => (
-          <div key={i} className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm transition-all hover:shadow-md">
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-tight mb-4">{stat.label}</p>
-            <h3 className="text-4xl font-extrabold text-[#111827] tracking-tighter mb-2">{stat.value}</h3>
-            <p className={`text-[11px] font-bold ${stat.noteCol || "text-slate-400"}`}>{stat.note}</p>
+          <div key={i} className="bg-white p-6 md:p-8 rounded-2xl md:rounded-[2rem] border border-slate-100 shadow-sm transition-all hover:shadow-md">
+            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-3 md:mb-4">{stat.label}</p>
+            <h3 className="text-3xl md:text-4xl font-black text-[#111827] tracking-tighter mb-1 md:mb-2">{stat.value}</h3>
+            <p className={`text-[10px] font-bold uppercase tracking-tight ${stat.noteCol || "text-slate-400 opacity-70"}`}>{stat.note}</p>
           </div>
         ))}
       </div>
@@ -434,30 +434,32 @@ export default function ReportsCenter() {
       </div>
 
       {/* Scheduled Reports Table */}
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-        <div className="p-10 border-b border-slate-50">
-          <h3 className="text-xl font-bold text-[#111827]">Scheduled Reports</h3>
+      <div className="bg-white rounded-2xl md:rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+        <div className="p-6 md:p-10 border-b border-slate-50">
+          <h3 className="text-base md:text-xl font-black text-[#111827] uppercase tracking-widest">Scheduled Reports</h3>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left min-w-[900px]">
+        <div className="overflow-x-auto pb-4">
+          <table className="w-full text-left min-w-[700px]">
             <thead>
               <tr className="bg-slate-50/50">
-                {["Report Name", "Frequency", "Next Run", "Recipients", "Status"].map(h => (
-                  <th key={h} className="py-6 px-10 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">{h}</th>
-                ))}
+                <th className="py-5 px-6 md:px-10 text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Report Name</th>
+                <th className="py-5 px-6 md:px-10 text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Frequency</th>
+                <th className="py-5 px-6 md:px-10 text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest hidden md:table-cell">Next Run</th>
+                <th className="py-5 px-6 md:px-10 text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest hidden sm:table-cell">Users</th>
+                <th className="py-5 px-6 md:px-10 text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {scheduled.map((job, i) => (
                 <tr key={i} className="hover:bg-slate-50/30 transition-colors group cursor-pointer">
-                  <td className="py-7 px-10">
-                    <p className="font-bold text-[#111827] text-[15px] tracking-tight group-hover:text-blue-600 transition-colors">{job.name}</p>
+                  <td className="py-6 px-6 md:px-10">
+                    <p className="font-black text-[#111827] text-xs md:text-sm tracking-tight group-hover:text-blue-600 transition-colors truncate">{job.name}</p>
                   </td>
-                  <td className="py-7 px-10 text-slate-500 font-medium text-sm">{job.frequency}</td>
-                  <td className="py-7 px-10 text-slate-500 font-medium text-sm">{job.nextRun}</td>
-                  <td className="py-7 px-10 text-slate-500 font-medium text-sm">{job.recipients} users</td>
-                  <td className="py-7 px-10">
-                    <span className={`text-[13px] font-black ${job.status === "Active" ? "text-[#111827]" : "text-slate-400"}`}>{job.status}</span>
+                  <td className="py-6 px-6 md:px-10 text-slate-500 font-bold text-[10px] md:text-xs uppercase tracking-tight">{job.frequency}</td>
+                  <td className="py-6 px-6 md:px-10 text-slate-500 font-bold text-[10px] md:text-xs hidden md:table-cell uppercase tracking-tight">{job.nextRun}</td>
+                  <td className="py-6 px-6 md:px-10 text-slate-500 font-bold text-[10px] md:text-xs hidden sm:table-cell uppercase tracking-tight">{job.recipients} users</td>
+                  <td className="py-6 px-6 md:px-10">
+                    <span className={`text-[10px] md:text-xs font-black uppercase tracking-widest ${job.status === "Active" ? "text-blue-600" : "text-slate-400"}`}>{job.status}</span>
                   </td>
                 </tr>
               ))}

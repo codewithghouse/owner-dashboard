@@ -396,31 +396,33 @@ export default function TeacherPerformance() {
       <div className="space-y-6 animate-in fade-in duration-500 pb-10">
 
         {/* Header card */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 md:p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
             <div className="flex items-center gap-4">
-              <div className={`w-16 h-16 rounded-2xl ${selectedTeacher._color} flex items-center justify-center text-white font-extrabold text-xl shadow-md`}>
+              <div className={`w-12 h-12 md:w-16 md:h-16 rounded-xl ${selectedTeacher._color} flex items-center justify-center text-white font-extrabold text-lg md:text-xl shadow-md shrink-0`}>
                 {initials(selectedTeacher.name)}
               </div>
-              <div>
-                <h2 className="text-2xl font-extrabold text-[#1e294b]">{selectedTeacher.name}</h2>
-                <p className="text-sm text-slate-400 font-semibold mt-0.5">
-                  {selectedTeacher.subject || "—"} &bull; {selectedTeacher.branchName} &bull; ID: {selectedTeacher.id.slice(0, 10)}
+              <div className="min-w-0">
+                <h2 className="text-xl md:text-2xl font-extrabold text-[#1e294b] truncate">{selectedTeacher.name}</h2>
+                <p className="text-[10px] md:text-sm text-slate-400 font-bold md:font-semibold mt-0.5 truncate uppercase tracking-tight">
+                  {selectedTeacher.subject || "—"} &bull; {selectedTeacher.branchName}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <span className={`text-xs font-extrabold px-4 py-1.5 rounded-full border ${sl.bg} ${sl.color}`}>
-                {sl.label}
-              </span>
-              <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${selectedTeacher.status === "Active" ? "bg-green-50 text-green-600 border border-green-100" : "bg-slate-100 text-slate-500"}`}>
-                {selectedTeacher.status || "—"}
-              </span>
+            <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto">
+              <div className="flex items-center gap-2">
+                <span className={`text-[10px] font-black px-3 py-1.5 rounded-lg border ${sl.bg} ${sl.color} uppercase tracking-tight`}>
+                  {sl.label}
+                </span>
+                <span className={`text-[10px] font-bold px-3 py-1.5 rounded-lg ${selectedTeacher.status === "Active" ? "bg-green-50 text-green-600 border border-green-100" : "bg-slate-100 text-slate-500"} uppercase tracking-tight`}>
+                  {selectedTeacher.status || "—"}
+                </span>
+              </div>
               <button
                 onClick={() => navigate("/teachers")}
-                className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-400 border border-slate-100 transition-all"
+                className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-400 border border-slate-100 transition-all ml-auto"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -433,7 +435,7 @@ export default function TeacherPerformance() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {[
                 {
                   label: "Effectiveness Score",
@@ -465,12 +467,12 @@ export default function TeacherPerformance() {
                 },
               ].map(s => (
                 <div key={s.label} className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{s.label}</p>
+                  <div className="flex items-center justify-between mb-3 text-slate-400">
+                    <p className="text-[10px] md:text-[11px] font-bold uppercase tracking-widest">{s.label}</p>
                     <s.icon className={`w-4 h-4 ${s.color}`} />
                   </div>
-                  <p className="text-3xl font-extrabold text-[#1e294b] mb-1">{s.value}</p>
-                  <p className={`text-xs font-semibold ${s.color}`}>{s.note}</p>
+                  <p className="text-3xl md:text-3xl font-extrabold text-[#1e294b] mb-1">{s.value}</p>
+                  <p className={`text-[10px] font-bold ${s.color}`}>{s.note}</p>
                 </div>
               ))}
             </div>
@@ -565,17 +567,17 @@ export default function TeacherPerformance() {
     <div className="space-y-8 animate-in fade-in duration-500 pb-10">
 
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-[#1e294b] tracking-tight">Teacher Performance</h1>
-          <p className="text-slate-500 font-medium">Effectiveness metrics &amp; evaluation analytics</p>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-[#1e294b] tracking-tight">Teacher Performance</h1>
+          <p className="text-slate-500 text-xs md:text-sm font-medium">Effectiveness metrics &amp; evaluation analytics</p>
         </div>
         {/* Branch filter */}
-        <div className="relative self-start">
+        <div className="relative self-stretch sm:self-start">
           <select
             value={branchFilter}
             onChange={e => setBranchFilter(e.target.value)}
-            className="appearance-none border border-slate-200 rounded-xl pl-4 pr-10 py-2.5 text-sm font-bold text-slate-600 bg-white outline-none focus:ring-2 focus:ring-[#1e3a8a]/10 shadow-sm"
+            className="w-full sm:w-auto appearance-none border border-slate-200 rounded-xl pl-4 pr-10 py-2.5 text-xs font-bold text-slate-600 bg-white outline-none focus:ring-2 focus:ring-[#1e3a8a]/10 shadow-sm"
           >
             {branchList.map(b => (
               <option key={b} value={b}>{b === "All" ? "All Branches" : b}</option>
@@ -586,17 +588,17 @@ export default function TeacherPerformance() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {[
           { label: "Total Teachers",             value: totalTeachers.toString(),      note: `In ${branchFilter === "All" ? "all branches" : branchFilter}`, color: "text-blue-600"    },
           { label: "Avg Effectiveness Score",    value: `${avgEffectiveness}%`,        note: "Across all exams",                                            color: "text-emerald-600" },
           { label: "Top Performers",             value: topPerformers.toString(),      note: `${totalTeachers > 0 ? ((topPerformers/totalTeachers)*100).toFixed(1) : 0}% of staff`,    color: "text-emerald-600" },
           { label: "Needs Improvement",          value: needsImprovement.toString(),   note: `${totalTeachers > 0 ? ((needsImprovement/totalTeachers)*100).toFixed(1) : 0}% of staff`, color: "text-amber-600"   },
         ].map(s => (
-          <div key={s.label} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
-            <p className="text-slate-400 text-[11px] font-bold uppercase tracking-widest mb-2">{s.label}</p>
-            <h3 className="text-4xl font-extrabold text-[#1e294b] tracking-tight mb-1">{s.value}</h3>
-            <p className={`text-[11px] font-bold ${s.color}`}>{s.note}</p>
+          <div key={s.label} className="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
+            <p className="text-slate-400 text-[10px] md:text-[11px] font-bold uppercase tracking-widest mb-1 md:mb-2">{s.label}</p>
+            <h3 className="text-3xl md:text-4xl font-extrabold text-[#1e294b] tracking-tight mb-1">{s.value}</h3>
+            <p className={`text-[10px] md:text-[11px] font-bold ${s.color}`}>{s.note}</p>
           </div>
         ))}
       </div>
