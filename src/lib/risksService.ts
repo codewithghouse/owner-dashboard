@@ -629,10 +629,15 @@ export async function fetchAlertDetail(alertId: string): Promise<AlertDetailData
 }
 
 // ── Resolve / Acknowledge alert (writes to Firestore) ─────────────────────────
-export async function resolveAlert(alertId: string, action: "resolved" | "acknowledged"): Promise<void> {
+export async function resolveAlert(
+  alertId: string,
+  action: "resolved" | "acknowledged" | "assigned",
+  assignedTo?: string,
+): Promise<void> {
   const uid = auth.currentUser?.uid;
   if (!uid) return;
   await addDoc(collection(db, "alert_resolutions"), {
     alertId, action, resolvedBy: uid, resolvedAt: serverTimestamp(),
+    ...(assignedTo ? { assignedTo } : {}),
   });
 }

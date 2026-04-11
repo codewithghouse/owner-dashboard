@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft, GraduationCap, Calendar, MapPin, CheckCircle2, Circle, Loader2,
-  ChevronRight, Clock,
+  ChevronRight, Clock, UserCheck, X,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -16,9 +16,11 @@ import { toast } from "sonner";
 export default function AlertDetailPage() {
   const { id }     = useParams<{ id: string }>();
   const navigate   = useNavigate();
-  const [data, setData]       = useState<AlertDetailData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [acting, setActing]   = useState<string | null>(null);
+  const [data, setData]           = useState<AlertDetailData | null>(null);
+  const [loading, setLoading]     = useState(true);
+  const [acting, setActing]       = useState<string | null>(null);
+  const [showAssign, setShowAssign] = useState(false);
+  const [assigneeName, setAssigneeName] = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -46,6 +48,22 @@ export default function AlertDetailPage() {
       if (action === "resolved") navigate("/risks");
     } catch {
       toast.error("Action failed. Please try again.");
+    } finally {
+      setActing(null);
+    }
+  };
+
+  const handleAssign = async () => {
+    if (!id || !assigneeName.trim()) return;
+    setActing("assigned");
+    try {
+      await resolveAlert(id, "assigned", assigneeName.trim());
+      addAuditLog("alert_assigned", `Alert assigned to ${assigneeName.trim()}: ${data?.title || id}`, data?.branchName);
+      toast.success(`Alert assigned to ${assigneeName.trim()}.`);
+      setShowAssign(false);
+      setAssigneeName("");
+    } catch {
+      toast.error("Assignment failed. Please try again.");
     } finally {
       setActing(null);
     }
@@ -144,9 +162,10 @@ export default function AlertDetailPage() {
             </Button>
             <Button
               disabled={!!acting}
+              onClick={() => setShowAssign(true)}
               className="h-11 px-6 rounded-xl bg-[#1e3a8a] text-white text-xs font-bold hover:bg-blue-900 shadow-lg shadow-blue-900/10"
             >
-              Assign
+              {acting === "assigned" ? <Loader2 className="w-4 h-4 animate-spin" /> : <><UserCheck className="w-4 h-4 mr-1.5" />Assign</>}
             </Button>
             <Button
               disabled={!!acting}
@@ -303,6 +322,48 @@ export default function AlertDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Assign Modal ─────────────────────────────────────────────────────── */}
+      {showAssign && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-base font-bold text-[#1e294b]">Assign Alert</h3>
+              <button onClick={() => setShowAssign(false)} className="p-1.5 rounded-lg hover:bg-slate-100">
+                <X className="w-4 h-4 text-slate-400" />
+              </button>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">
+              Enter the name of the principal or staff member to assign this alert to.
+            </p>
+            <input
+              type="text"
+              value={assigneeName}
+              onChange={e => setAssigneeName(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleAssign()}
+              placeholder="e.g. Priya Sharma"
+              autoFocus
+              className="w-full h-11 px-4 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1e3a8a]/30 mb-4"
+            />
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowAssign(false)}
+                className="flex-1 h-10 rounded-xl text-xs font-bold"
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={!assigneeName.trim() || acting === "assigned"}
+                onClick={handleAssign}
+                className="flex-1 h-10 rounded-xl bg-[#1e3a8a] text-white text-xs font-bold hover:bg-blue-900"
+              >
+                {acting === "assigned" ? <Loader2 className="w-4 h-4 animate-spin" /> : "Assign"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
