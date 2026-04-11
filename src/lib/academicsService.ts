@@ -526,17 +526,19 @@ export async function fetchSubjectDetail(subjectId: string): Promise<SubjectDeta
   processAll(scoresSnap.docs  as any[]);
 
   const pcts: number[] = [];
-  const studentIds     = new Set<string>();
-  const teacherIds     = new Set<string>();
-  const topicMap: Record<string, number[]> = {};
-  const branchPctMap: Record<string, number[]> = {};
+  const studentIds       = new Set<string>();
+  const teacherIds       = new Set<string>();
+  const topicMap: Record<string, number[]>                        = {};
+  const branchPctMap: Record<string, number[]>                    = {};
+  // grade → branchName → scores
+  const gradeBranchMap: Record<string, Record<string, number[]>> = {};
 
   matchingDocs.forEach(r => {
     const pct = getScore(r);
     if (pct === null || pct < 0 || pct > 100) return;
     pcts.push(pct);
-    if (r.studentId)  studentIds.add(r.studentId);
-    if (r.teacherId)  teacherIds.add(r.teacherId);
+    if (r.studentId) studentIds.add(r.studentId);
+    if (r.teacherId) teacherIds.add(r.teacherId);
 
     // Topic grouping
     const topic = (r.topic || r.testTitle || r.examName || "General").slice(0, 20);
@@ -544,11 +546,23 @@ export async function fetchSubjectDetail(subjectId: string): Promise<SubjectDeta
     topicMap[topic].push(pct);
 
     // Branch grouping
-    const tInfo  = teacherMap.get(r.teacherId) || { schoolId: "" };
-    const sId    = r.schoolId || tInfo.schoolId;
-    const bName  = branchDocs.find(b => b.id === sId)?.name || "Other";
-    if (!branchPctMap[bName]) branchPctMap[bName] = [];
-    branchPctMap[bName].push(pct);
+    const tInfo = teacherMap.get(r.teacherId) || { schoolId: "" };
+    const sId   = r.schoolId || tInfo.schoolId;
+    const bName = branchDocs.find(b => b.id === sId)?.name || null;
+    if (bName) {
+      if (!branchPctMap[bName]) branchPctMap[bName] = [];
+      branchPctMap[bName].push(pct);
+
+      // Grade × Branch grouping
+      const gradeRaw = r.grade || r.className || "";
+      const gradeMatch = (gradeRaw + "").match(/\b(\d{1,2})\b/);
+      if (gradeMatch) {
+        const grade = `G${gradeMatch[1]}`;
+        if (!gradeBranchMap[grade]) gradeBranchMap[grade] = {};
+        if (!gradeBranchMap[grade][bName]) gradeBranchMap[grade][bName] = [];
+        gradeBranchMap[grade][bName].push(pct);
+      }
+    }
   });
 
   const n        = pcts.length || 1;
@@ -561,13 +575,29 @@ export async function fetchSubjectDetail(subjectId: string): Promise<SubjectDeta
     .sort((a, b) => b.score - a.score)
     .slice(0, 6);
 
-  const classComparison: { grade: string; [k: string]: string | number }[] =
-    Object.entries(branchPctMap).map(([bName, vals]) => {
-      const row: { grade: string; [k: string]: string | number } = { grade: bName.split(" ")[0] };
-      branchDocs.forEach(b => { row[b.name] = 0; });
-      row[bName] = avgArr(vals);
+  // ── classComparison: grade × branch matrix ────────────────────────────────
+  const gradeKeys = Object.keys(gradeBranchMap)
+    .sort((a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1)));
+
+  let classComparison: { grade: string; [k: string]: string | number }[];
+
+  if (gradeKeys.length > 0) {
+    // Preferred: one row per grade, one bar per branch
+    classComparison = gradeKeys.slice(0, 8).map(grade => {
+      const row: { grade: string; [k: string]: string | number } = { grade };
+      branchDocs.forEach(b => {
+        row[b.name] = avgArr(gradeBranchMap[grade][b.name] || []);
+      });
       return row;
     });
+  } else {
+    // Fallback: one row showing each branch's overall score for this subject
+    const row: { grade: string; [k: string]: string | number } = { grade: "Overall" };
+    branchDocs.forEach(b => {
+      row[b.name] = avgArr(branchPctMap[b.name] || []);
+    });
+    classComparison = [row];
+  }
 
   const weakAreas = topics
     .filter(t => t.score < 75)

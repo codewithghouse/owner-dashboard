@@ -419,8 +419,14 @@ export default function TeacherPerformance() {
                 </span>
               </div>
               <button
+                onClick={() => navigate(`/teachers/profile/${id}`)}
+                className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1e3a8a] text-white text-[10px] font-black uppercase tracking-widest hover:bg-[#1e294b] transition-all ml-auto"
+              >
+                View Full Profile
+              </button>
+              <button
                 onClick={() => navigate("/teachers")}
-                className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-400 border border-slate-100 transition-all ml-auto"
+                className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-400 border border-slate-100 transition-all"
               >
                 <X className="w-5 h-5" />
               </button>

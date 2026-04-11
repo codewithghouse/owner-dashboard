@@ -4,6 +4,47 @@
  * to keep your API Key secure.
  */
 
+/**
+ * Sends a critical-alert notification email to the school owner.
+ * Called from risksService when criticalCount > 0 and
+ * the owner has criticalAlerts notifications enabled.
+ */
+export const sendCriticalAlertEmail = async ({
+  to,
+  ownerName,
+  schoolName,
+  criticalCount,
+  warningCount,
+  branchName,
+}: {
+  to: string;
+  ownerName: string;
+  schoolName: string;
+  criticalCount: number;
+  warningCount: number;
+  branchName?: string;
+}) => {
+  try {
+    const response = await fetch("/api/send-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        to,
+        type: "critical_alert",
+        ownerName,
+        schoolName,
+        criticalCount,
+        warningCount,
+        branchName: branchName || "Multiple branches",
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    return { success: response.ok, data };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+};
+
 export const sendInvitationEmail = async ({
   to,
   name,

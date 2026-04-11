@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   UserPlus, Users, CheckCircle2, Clock, Mail, MoreVertical,
   Building2, Search, X, Send, Shield, RefreshCcw, Ban,
   ChevronRight, AlertTriangle, Phone, MapPin, Calendar,
-  Plus, Edit3, Trash2, Globe, Hash, Loader2
+  Plus, Edit3, Trash2, Globe, Hash, Loader2, Download,
+  FileSpreadsheet, CheckCheck, RotateCcw, AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,12 +16,16 @@ import {
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { sendInvitationEmail } from "@/lib/resend";
 import { toast } from "sonner";
+import { addAuditLog } from "@/lib/auditService";
 import * as XLSX from 'xlsx';
 
 // Converts a display name to a consistent slug-based ID
 // "South India" → "south_india", "Hyderabad Campus" → "hyderabad_campus"
 const toSlug = (name: string) =>
   name.toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+
+// Rate-limit helper — prevents Resend/SMTP throttle errors on bulk sends
+const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
 // Constant options remains same
 const branchColorOptions = [
@@ -36,10 +41,20 @@ export default function PrincipalManagement() {
   const [selectedPrincipal, setSelectedPrincipal] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [inviteForm, setInviteForm] = useState({ name: '', email: '', branch: '', branchId: '', branchColor: '#1e3a8a' });
-  const [bulkFile, setBulkFile] = useState<File | null>(null);
+  const [bulkFile, setBulkFile]         = useState<File | null>(null);
+  const [bulkRows, setBulkRows]         = useState<{ name: string; email: string; branch: string }[]>([]);
+  const [bulkStatus, setBulkStatus]     = useState<Record<number, "pending" | "sending" | "sent" | "failed">>({});
+  const [bulkRunning, setBulkRunning]   = useState(false);
+  const [bulkDone, setBulkDone]         = useState(false);
+  const bulkFileRef                     = useRef<HTMLInputElement>(null);
   const [branchForm, setBranchForm] = useState({ name: '', location: '', color: '#3b82f6' });
   const [showActionMenu, setShowActionMenu] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Edit branch modal
+  const [showEditBranchModal, setShowEditBranchModal] = useState(false);
+  const [editBranchData, setEditBranchData] = useState<any>(null);
+  // Manage branch panel
+  const [manageBranch, setManageBranch] = useState<any>(null);
   
   // Real Source Data
   const [branches, setBranches] = useState<any[]>([]);
@@ -82,19 +97,20 @@ export default function PrincipalManagement() {
     if (!branchForm.name || !branchForm.location || !auth.currentUser) return;
     setLoading(true);
     try {
-      await addDoc(collection(db, "schools", auth.currentUser.uid, "branches"), {
+      const docRef = await addDoc(collection(db, "schools", auth.currentUser.uid, "branches"), {
         ...branchForm,
-        branchId: toSlug(branchForm.name),
         students: 0,
         teachers: 0,
         status: 'Active',
-        ahi: 0, // Initial Academic Health Index
+        ahi: 0,
         feeCollection: 0,
         passRate: 0,
         attendance: 0,
         established: new Date().getFullYear().toString(),
         createdAt: serverTimestamp()
       });
+      // Set branchId = docRef.id for consistent canonical resolution across all services
+      await updateDoc(docRef, { branchId: docRef.id });
       toast.success("Branch added successfully!");
       setShowAddBranchModal(false);
       setBranchForm({ name: '', location: '', color: '#3b82f6' });
@@ -139,6 +155,7 @@ export default function PrincipalManagement() {
       });
 
       if (emailRes.success) {
+        addAuditLog("principal_invited", `${inviteForm.name} invited as principal`, `Branch: ${inviteForm.branch}`);
         toast.success(emailRes.message || `Invitation sent to ${inviteForm.email}!`);
         setShowInviteModal(false);
         setInviteForm({ name: '', email: '', branch: '', branchId: '', branchColor: '#1e3a8a' });
@@ -155,82 +172,164 @@ export default function PrincipalManagement() {
     }
   };
 
-  const handleBulkInvite = async () => {
-    if (!bulkFile || !auth.currentUser) {
-      toast.error("Please select an Excel file first.");
-      return;
-    }
-    setLoading(true);
+  /* ── Download Excel template ──────────────────────────────────────── */
+  const handleDownloadTemplate = () => {
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["name", "email", "branch"],
+      ["Dr. Sarah Ahmed",   "sarah@school.com",  branches[0]?.name || "Main Branch"],
+      ["Mr. Ravi Kumar",    "ravi@school.com",   branches[1]?.name || "South Branch"],
+    ]);
+    ws["!cols"] = [{ wch: 22 }, { wch: 26 }, { wch: 22 }];
+    XLSX.utils.book_append_sheet(wb, ws, "Principals");
+    XLSX.writeFile(wb, "principal_invite_template.xlsx");
+  };
+
+  /* ── Parse file & show preview ─────────────────────────────────────── */
+  const handleBulkFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setBulkFile(file);
+    setBulkRows([]);
+    setBulkStatus({});
+    setBulkDone(false);
+    if (!file) return;
     try {
-      // 1. Upload file to Storage
-      const fileRef = ref(storage, `bulk-invites/${auth.currentUser.uid}_${Date.now()}_${bulkFile.name}`);
-      await uploadBytes(fileRef, bulkFile);
-      const fileUrl = await getDownloadURL(fileRef);
-
-      // 2. Parse and Process Excel File
-      const data = await bulkFile.arrayBuffer();
-      const workbook = XLSX.read(data, { type: 'array' });
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
-      const rows: any[] = XLSX.utils.sheet_to_json(sheet);
-
-      if (rows.length === 0) {
-        throw new Error("The Excel file is empty.");
-      }
-
-      let successCount = 0;
-      let failCount = 0;
-
-      for (const row of rows) {
-        const { name, email, branch } = row;
-        if (!name || !email || !branch) {
-          failCount++;
-          continue;
-        }
-
-        try {
-          const branchMatch = branches.find(b => b.name.toLowerCase() === branch.toLowerCase());
-          
-          await addDoc(collection(db, "principals"), {
-            name,
-            email: email.toLowerCase(),
-            branch: branchMatch?.name || branch,
-            branchId: branchMatch?.branchId || toSlug(branch),
-            role: "principal",
-            schoolId: auth.currentUser!.uid,
-            schoolName: schoolInfo?.schoolName || "Our School",
-            status: 'Invited',
-            avatar: name.substring(0, 2).toUpperCase(),
-            joinDate: new Date().toLocaleDateString(),
-            lastActive: 'Never',
-            studentsManaged: 0,
-            teachersManaged: 0,
-            createdAt: serverTimestamp(),
-            sourceFile: fileUrl
-          });
-
-          await sendInvitationEmail({
-            to: email,
-            name,
-            branch: branchMatch?.name || branch,
-            schoolName: schoolInfo?.schoolName || "Our School"
-          });
-          
-          successCount++;
-        } catch (err) {
-          failCount++;
-          console.error(`Failed to invite ${email}:`, err);
-        }
-      }
-
-      toast.success(`Bulk processing complete! ${successCount} invited, ${failCount} skipped.`);
-      setShowBulkModal(false);
-      setBulkFile(null);
-    } catch (err: any) {
-      toast.error("Bulk upload failed: " + err.message);
-    } finally {
-      setLoading(false);
+      const data = await file.arrayBuffer();
+      const wb   = XLSX.read(data, { type: "array" });
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const raw: any[] = XLSX.utils.sheet_to_json(ws);
+      const parsed = raw
+        .filter(r => r.name && r.email && r.branch)
+        .map(r => ({ name: String(r.name).trim(), email: String(r.email).trim().toLowerCase(), branch: String(r.branch).trim() }));
+      setBulkRows(parsed);
+      const initStatus: Record<number, "pending"> = {};
+      parsed.forEach((_, i) => { initStatus[i] = "pending"; });
+      setBulkStatus(initStatus);
+    } catch {
+      toast.error("Could not parse the file. Make sure it's a valid Excel (.xlsx) file.");
     }
+  };
+
+  /* ── Run bulk invite with per-row status ───────────────────────────── */
+  const handleBulkInvite = async () => {
+    if (!bulkRows.length || !auth.currentUser) return;
+    setBulkRunning(true);
+
+    // Upload file reference to storage
+    let fileUrl = "";
+    if (bulkFile) {
+      try {
+        const fileRef = ref(storage, `bulk-invites/${auth.currentUser.uid}_${Date.now()}_${bulkFile.name}`);
+        await uploadBytes(fileRef, bulkFile);
+        fileUrl = await getDownloadURL(fileRef);
+      } catch { /* storage upload optional */ }
+    }
+
+    let successCount = 0;
+    let failCount    = 0;
+
+    for (let i = 0; i < bulkRows.length; i++) {
+      const { name, email, branch } = bulkRows[i];
+      setBulkStatus(prev => ({ ...prev, [i]: "sending" }));
+
+      try {
+        const branchMatch = branches.find(b => b.name.toLowerCase() === branch.toLowerCase());
+
+        await addDoc(collection(db, "principals"), {
+          name,
+          email,
+          branch: branchMatch?.name || branch,
+          branchId: branchMatch?.branchId || toSlug(branch),
+          role: "principal",
+          schoolId: auth.currentUser!.uid,
+          schoolName: schoolInfo?.schoolName || "Our School",
+          status: "Invited",
+          avatar: name.substring(0, 2).toUpperCase(),
+          joinDate: new Date().toLocaleDateString(),
+          lastActive: "Never",
+          studentsManaged: 0,
+          teachersManaged: 0,
+          createdAt: serverTimestamp(),
+          ...(fileUrl ? { sourceFile: fileUrl } : {}),
+        });
+
+        await sendInvitationEmail({
+          to: email,
+          name,
+          branch: branchMatch?.name || branch,
+          schoolName: schoolInfo?.schoolName || "Our School",
+        });
+
+        setBulkStatus(prev => ({ ...prev, [i]: "sent" }));
+        successCount++;
+      } catch (err) {
+        console.error(`Failed to invite ${email}:`, err);
+        setBulkStatus(prev => ({ ...prev, [i]: "failed" }));
+        failCount++;
+      }
+
+      // 350ms pause between sends — prevents Resend rate-limit errors on bulk CSV uploads
+      if (i < bulkRows.length - 1) await sleep(350);
+    }
+
+    setBulkRunning(false);
+    setBulkDone(true);
+    toast.success(`Done! ${successCount} invited${failCount > 0 ? `, ${failCount} failed` : ""}.`);
+  };
+
+  /* ── Retry failed rows ─────────────────────────────────────────────── */
+  const handleRetryFailed = async () => {
+    if (!auth.currentUser) return;
+    setBulkRunning(true);
+    setBulkDone(false);
+    let retryCount = 0;
+
+    for (let i = 0; i < bulkRows.length; i++) {
+      if (bulkStatus[i] !== "failed") continue;
+      const { name, email, branch } = bulkRows[i];
+      setBulkStatus(prev => ({ ...prev, [i]: "sending" }));
+
+      try {
+        const branchMatch = branches.find(b => b.name.toLowerCase() === branch.toLowerCase());
+        await addDoc(collection(db, "principals"), {
+          name, email,
+          branch: branchMatch?.name || branch,
+          branchId: branchMatch?.branchId || toSlug(branch),
+          role: "principal",
+          schoolId: auth.currentUser!.uid,
+          schoolName: schoolInfo?.schoolName || "Our School",
+          status: "Invited",
+          avatar: name.substring(0, 2).toUpperCase(),
+          joinDate: new Date().toLocaleDateString(),
+          lastActive: "Never",
+          studentsManaged: 0, teachersManaged: 0,
+          createdAt: serverTimestamp(),
+        });
+        await sendInvitationEmail({ to: email, name, branch: branchMatch?.name || branch, schoolName: schoolInfo?.schoolName || "Our School" });
+        setBulkStatus(prev => ({ ...prev, [i]: "sent" }));
+        retryCount++;
+      } catch {
+        setBulkStatus(prev => ({ ...prev, [i]: "failed" }));
+      }
+
+      // 350ms pause between retries — same rate-limit protection
+      if (i < bulkRows.length - 1) await sleep(350);
+    }
+
+    setBulkRunning(false);
+    setBulkDone(true);
+    toast.success(`Retry complete! ${retryCount} re-invited.`);
+  };
+
+  /* ── Reset bulk modal ──────────────────────────────────────────────── */
+  const resetBulkModal = () => {
+    setShowBulkModal(false);
+    setBulkFile(null);
+    setBulkRows([]);
+    setBulkStatus({});
+    setBulkRunning(false);
+    setBulkDone(false);
+    if (bulkFileRef.current) bulkFileRef.current.value = "";
   };
 
   const handleDeleteBranch = async (id: string) => {
@@ -243,10 +342,34 @@ export default function PrincipalManagement() {
     }
   };
 
+  const handleUpdateBranch = async () => {
+    if (!editBranchData || !auth.currentUser) return;
+    if (!editBranchData.name.trim() || !editBranchData.location.trim()) {
+      toast.error("Name and location are required.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await updateDoc(
+        doc(db, "schools", auth.currentUser.uid, "branches", editBranchData.id),
+        { name: editBranchData.name.trim(), location: editBranchData.location.trim(), color: editBranchData.color }
+      );
+      addAuditLog("branch_edited", `Branch updated: ${editBranchData.name}`, editBranchData.location).catch(() => {});
+      toast.success("Branch updated!");
+      setShowEditBranchModal(false);
+      setEditBranchData(null);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDeletePrincipal = async (id: string) => {
     if (!auth.currentUser || !window.confirm("Are you sure you want to delete this principal? Access will be revoked.")) return;
     try {
       await deleteDoc(doc(db, "principals", id));
+      addAuditLog("principal_removed", `Principal removed from school network`, `Principal ID: ${id}`);
       toast.success("Principal removed successfully");
       if (selectedPrincipal?.id === id) setSelectedPrincipal(null);
     } catch (err: any) {
@@ -394,15 +517,15 @@ export default function PrincipalManagement() {
                     {/* Stats */}
                     <div className="grid grid-cols-3 gap-3 mb-6">
                       <div className="bg-[#f8fafc] border border-slate-50 p-4 rounded-xl text-center">
-                        <p className="text-xl font-black text-[#111827] tracking-tighter">{branch.students.toLocaleString()}</p>
+                        <p className="text-xl font-black text-[#111827] tracking-tighter">{(branch.students ?? 0).toLocaleString()}</p>
                         <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">Students</p>
                       </div>
                       <div className="bg-[#f8fafc] border border-slate-50 p-4 rounded-xl text-center">
-                        <p className="text-xl font-black text-[#111827] tracking-tighter">{branch.teachers}</p>
+                        <p className="text-xl font-black text-[#111827] tracking-tighter">{branch.teachers ?? 0}</p>
                         <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">Teachers</p>
                       </div>
                       <div className="bg-[#f8fafc] border border-slate-50 p-4 rounded-xl text-center">
-                        <p className="text-xl font-black text-[#111827] tracking-tighter">{branch.established}</p>
+                        <p className="text-xl font-black text-[#111827] tracking-tighter">{branch.established ?? new Date().getFullYear()}</p>
                         <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">Est.</p>
                       </div>
                     </div>
@@ -435,7 +558,7 @@ export default function PrincipalManagement() {
                             </div>
                           </div>
                           <button
-                            onClick={() => setShowInviteModal(true)}
+                            onClick={() => handleReassignPrincipal(branch.name, branch.color)}
                             className="px-4 py-1.5 rounded-lg bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 transition-colors"
                           >
                             Assign
@@ -446,10 +569,14 @@ export default function PrincipalManagement() {
 
                     {/* Branch Actions */}
                     <div className="flex items-center gap-2 mt-5">
-                      <button className="flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border border-slate-100 bg-[#f8fafc] hover:bg-white hover:shadow-md transition-all text-xs font-bold text-slate-500">
+                      <button
+                        onClick={() => { setEditBranchData({ ...branch }); setShowEditBranchModal(true); }}
+                        className="flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border border-slate-100 bg-[#f8fafc] hover:bg-white hover:shadow-md transition-all text-xs font-bold text-slate-500">
                         <Edit3 className="w-3.5 h-3.5" /> Edit
                       </button>
-                      <button className="flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border border-slate-100 bg-[#f8fafc] hover:bg-white hover:shadow-md transition-all text-xs font-bold text-slate-500">
+                      <button
+                        onClick={() => setManageBranch(manageBranch?.id === branch.id ? null : branch)}
+                        className="flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border border-slate-100 bg-[#f8fafc] hover:bg-white hover:shadow-md transition-all text-xs font-bold text-slate-500">
                         <Users className="w-3.5 h-3.5" /> Manage
                       </button>
                       <button 
@@ -467,6 +594,67 @@ export default function PrincipalManagement() {
                 </div>
               );
             })}
+
+            {/* ── Manage Panel (shown below grid when a branch is selected) ── */}
+            {manageBranch && (
+              <div className="md:col-span-2 lg:col-span-3 bg-white rounded-[2rem] border border-[#1e3a8a]/20 shadow-lg p-6 animate-in slide-in-from-top-2 duration-200">
+                <div className="flex items-center justify-between mb-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white shrink-0" style={{ backgroundColor: manageBranch.color }}>
+                      <Building2 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-[#1e294b]">{manageBranch.name}</p>
+                      <p className="text-xs text-slate-400">{manageBranch.location}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setManageBranch(null)} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors">
+                    <X className="w-4 h-4 text-slate-400" />
+                  </button>
+                </div>
+                {/* Principals assigned to this branch */}
+                {(() => {
+                  const branchPrincipals = principals.filter(p => p.branch === manageBranch.name);
+                  return branchPrincipals.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 gap-2">
+                      <AlertTriangle className="w-7 h-7 text-rose-300" />
+                      <p className="text-sm font-bold text-slate-400">No principals assigned to this branch yet.</p>
+                      <button
+                        onClick={() => handleReassignPrincipal(manageBranch.name, manageBranch.color)}
+                        className="mt-1 px-4 py-2 rounded-xl bg-[#1e3a8a] text-white text-xs font-black hover:bg-[#1e40af] transition-colors"
+                      >
+                        Invite Principal
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {branchPrincipals.map(p => {
+                        const sc = getStatusConfig(p.status);
+                        return (
+                          <div key={p.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-[10px] font-black shrink-0" style={{ backgroundColor: manageBranch.color }}>
+                              {p.avatar || p.name?.slice(0,2).toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-bold text-[#1e294b] truncate">{p.name}</p>
+                              <p className="text-xs text-slate-400 truncate">{p.email}</p>
+                            </div>
+                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${sc.bg} ${sc.text} border ${sc.border}`}>{p.status}</span>
+                            <button
+                              onClick={() => handleDeletePrincipal(p.id)}
+                              className="p-1.5 rounded-lg hover:bg-rose-50 transition-colors"
+                              title="Remove principal"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
 
             {/* Add New Branch Card */}
             <button
@@ -602,6 +790,73 @@ export default function PrincipalManagement() {
       )}
 
       {/* ==================== ADD BRANCH MODAL ==================== */}
+      {/* ── Edit Branch Modal ─────────────────────────────────────────────── */}
+      {showEditBranchModal && editBranchData && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-300 overflow-hidden">
+            <div className="p-8 border-b border-slate-50 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: editBranchData.color }}>
+                  <Edit3 className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-[#111827]">Edit Branch</h3>
+                  <p className="text-slate-400 text-xs font-medium">Update branch details</p>
+                </div>
+              </div>
+              <button onClick={() => { setShowEditBranchModal(false); setEditBranchData(null); }} className="p-2 rounded-xl hover:bg-slate-50 text-slate-400 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-8 space-y-6">
+              <div>
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Branch Name</label>
+                <Input
+                  value={editBranchData.name}
+                  onChange={e => setEditBranchData({ ...editBranchData, name: e.target.value })}
+                  className="h-14 bg-[#f8fafc] border-slate-100 rounded-2xl text-sm font-medium"
+                  placeholder="e.g. West Branch"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Location / City</label>
+                <Input
+                  value={editBranchData.location}
+                  onChange={e => setEditBranchData({ ...editBranchData, location: e.target.value })}
+                  className="h-14 bg-[#f8fafc] border-slate-100 rounded-2xl text-sm font-medium"
+                  placeholder="e.g. Hyderabad"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Branch Color</label>
+                <div className="flex flex-wrap gap-3">
+                  {branchColorOptions.map(color => (
+                    <button
+                      key={color}
+                      onClick={() => setEditBranchData({ ...editBranchData, color })}
+                      className={`w-10 h-10 rounded-xl transition-all ${editBranchData.color === color ? 'ring-4 ring-offset-2 ring-blue-200 scale-110' : 'hover:scale-105'}`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="p-8 border-t border-slate-50 flex items-center justify-between gap-4">
+              <Button variant="outline" onClick={() => { setShowEditBranchModal(false); setEditBranchData(null); }} className="h-12 px-6 rounded-xl border-slate-200 text-sm font-bold">
+                Cancel
+              </Button>
+              <Button
+                disabled={loading}
+                onClick={handleUpdateBranch}
+                className="h-12 px-8 rounded-xl bg-[#1e3a8a] text-white text-sm font-bold hover:bg-[#1e40af] shadow-lg flex items-center gap-2"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCheck className="w-4 h-4" />} Save Changes
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showAddBranchModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
           <div className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-300 overflow-hidden">
@@ -770,66 +1025,202 @@ export default function PrincipalManagement() {
 
       {/* ==================== BULK INVITE MODAL ==================== */}
       {showBulkModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-300 overflow-hidden">
-            <div className="p-8 border-b border-slate-50 flex items-center justify-between">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl animate-in zoom-in-95 duration-300 overflow-hidden max-h-[92vh] flex flex-col">
+
+            {/* Modal Header */}
+            <div className="p-8 border-b border-slate-50 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg">
-                  <Hash className="w-6 h-6" />
+                  <FileSpreadsheet className="w-6 h-6" />
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-[#111827]">Bulk Principal Invite</h3>
-                  <p className="text-slate-400 text-xs font-medium">Upload Excel file to invite multiple principals</p>
+                  <p className="text-slate-400 text-xs font-medium">
+                    {bulkRows.length > 0
+                      ? `${bulkRows.length} principal${bulkRows.length > 1 ? "s" : ""} ready to invite`
+                      : "Upload an Excel file to invite multiple principals at once"}
+                  </p>
                 </div>
               </div>
-              <button onClick={() => { setShowBulkModal(false); setBulkFile(null); }} className="p-2 rounded-xl hover:bg-slate-50 text-slate-400 transition-colors">
+              <button type="button" onClick={resetBulkModal} className="p-2 rounded-xl hover:bg-slate-50 text-slate-400 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-8 space-y-8">
-              <div className="bg-indigo-50/50 border-2 border-dashed border-indigo-200 rounded-[2rem] p-10 flex flex-col items-center justify-center gap-4 text-center group cursor-pointer relative hover:border-indigo-400 transition-all">
-                <input 
-                  type="file" 
-                  accept=".xlsx, .xls"
-                  onChange={(e) => setBulkFile(e.target.files?.[0] || null)}
-                  className="absolute inset-0 opacity-0 cursor-pointer" 
-                />
-                <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center text-indigo-600 shadow-sm group-hover:scale-110 transition-transform">
-                  <Plus className="w-7 h-7" />
-                </div>
-                <div>
-                  <p className="text-base font-bold text-indigo-900">{bulkFile ? bulkFile.name : "Select Excel File"}</p>
-                  <p className="text-xs font-medium text-indigo-500 mt-1">{bulkFile ? `${(bulkFile.size / 1024).toFixed(1)} KB` : "Excel sheet with name, email, and branch"}</p>
-                </div>
-              </div>
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-8 space-y-6">
 
-              <div className="space-y-4">
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Instructions</h4>
-                <div className="bg-slate-50 rounded-2xl p-6 space-y-3">
-                  <div className="flex items-start gap-3 text-xs font-medium text-slate-600">
-                    <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-black shrink-0 mt-0.5">1</div>
-                    <p>Excel should have headers: <span className="font-bold text-[#111827]">name, email, branch</span></p>
+              {/* Step 1 — Download Template + Upload */}
+              {!bulkRows.length && (
+                <>
+                  {/* Download template */}
+                  <div className="flex items-center justify-between bg-indigo-50 border border-indigo-100 rounded-2xl px-6 py-4">
+                    <div>
+                      <p className="text-sm font-bold text-indigo-900">Download Excel Template</p>
+                      <p className="text-xs font-medium text-indigo-500 mt-0.5">Pre-filled with correct column headers: name, email, branch</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleDownloadTemplate}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-colors shrink-0"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Template
+                    </button>
                   </div>
-                  <div className="flex items-start gap-3 text-xs font-medium text-slate-600">
-                    <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-black shrink-0 mt-0.5">2</div>
-                    <p>Branch names should strictly match your existing branches.</p>
+
+                  {/* File drop zone */}
+                  <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] p-12 flex flex-col items-center justify-center gap-4 text-center cursor-pointer relative hover:border-indigo-400 hover:bg-indigo-50/30 transition-all group">
+                    <input
+                      ref={bulkFileRef}
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={handleBulkFileChange}
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                    />
+                    <div className="w-16 h-16 rounded-2xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 shadow-sm group-hover:text-indigo-600 group-hover:border-indigo-100 group-hover:scale-110 transition-all">
+                      <FileSpreadsheet className="w-8 h-8" />
+                    </div>
+                    <div>
+                      <p className="text-base font-bold text-slate-700">Click or drag & drop Excel file</p>
+                      <p className="text-xs font-medium text-slate-400 mt-1">.xlsx or .xls — columns: name, email, branch</p>
+                    </div>
                   </div>
+
+                  {/* Available branches hint */}
+                  {branches.length > 0 && (
+                    <div className="bg-amber-50 border border-amber-100 rounded-2xl px-6 py-4">
+                      <p className="text-xs font-black text-amber-700 uppercase tracking-widest mb-2">Your Branches</p>
+                      <div className="flex flex-wrap gap-2">
+                        {branches.map(b => (
+                          <span key={b.id} className="px-3 py-1 rounded-lg bg-white border border-amber-200 text-xs font-bold text-amber-800">
+                            {b.name}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="text-[10px] font-medium text-amber-500 mt-2">Branch names in Excel must exactly match the names above.</p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Step 2 — Preview + Progress */}
+              {bulkRows.length > 0 && (
+                <div className="space-y-5">
+                  {/* Summary strip */}
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { label: "Total",   value: bulkRows.length, color: "bg-slate-50 text-slate-700 border-slate-100"   },
+                      { label: "Sent",    value: Object.values(bulkStatus).filter(s => s === "sent").length,   color: "bg-green-50 text-green-700 border-green-100"  },
+                      { label: "Failed",  value: Object.values(bulkStatus).filter(s => s === "failed").length, color: "bg-rose-50 text-rose-700 border-rose-100"     },
+                    ].map(c => (
+                      <div key={c.label} className={`${c.color} border rounded-2xl px-4 py-3 text-center`}>
+                        <p className="text-2xl font-black">{c.value}</p>
+                        <p className="text-[10px] font-black uppercase tracking-widest mt-0.5">{c.label}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Progress bar */}
+                  {(bulkRunning || bulkDone) && (() => {
+                    const done   = Object.values(bulkStatus).filter(s => s === "sent" || s === "failed").length;
+                    const pct    = Math.round((done / bulkRows.length) * 100);
+                    return (
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs font-bold text-slate-500">
+                          <span>{bulkDone ? "Complete" : "Processing…"}</span>
+                          <span>{pct}%</span>
+                        </div>
+                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-indigo-600 rounded-full transition-all duration-500"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Per-row table */}
+                  <div className="rounded-2xl border border-slate-100 overflow-hidden">
+                    <div className="grid grid-cols-[auto_1fr_1fr_80px] gap-0 text-[10px] font-black uppercase tracking-widest text-slate-400 bg-slate-50 px-5 py-3 border-b border-slate-100">
+                      <span className="w-8">#</span>
+                      <span>Name</span>
+                      <span>Email</span>
+                      <span className="text-right">Status</span>
+                    </div>
+                    <div className="divide-y divide-slate-50 max-h-64 overflow-y-auto">
+                      {bulkRows.map((row, i) => {
+                        const st = bulkStatus[i] || "pending";
+                        return (
+                          <div key={i} className="grid grid-cols-[auto_1fr_1fr_80px] gap-0 items-center px-5 py-3 hover:bg-slate-50/50 transition-colors">
+                            <span className="w-8 text-xs font-bold text-slate-300">{i + 1}</span>
+                            <div>
+                              <p className="text-sm font-bold text-[#111827] truncate">{row.name}</p>
+                              <p className="text-[10px] text-slate-400 font-medium truncate">{row.branch}</p>
+                            </div>
+                            <p className="text-xs text-slate-500 font-medium truncate pr-3">{row.email}</p>
+                            <div className="flex justify-end">
+                              {st === "pending"  && <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-400 text-[9px] font-black uppercase tracking-widest">Pending</span>}
+                              {st === "sending"  && <span className="px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-600 text-[9px] font-black uppercase tracking-widest flex items-center gap-1"><Loader2 className="w-2.5 h-2.5 animate-spin" />Sending</span>}
+                              {st === "sent"     && <span className="px-2.5 py-1 rounded-lg bg-green-100 text-green-600 text-[9px] font-black uppercase tracking-widest flex items-center gap-1"><CheckCheck className="w-3 h-3" />Sent</span>}
+                              {st === "failed"   && <span className="px-2.5 py-1 rounded-lg bg-rose-100 text-rose-500 text-[9px] font-black uppercase tracking-widest flex items-center gap-1"><AlertCircle className="w-3 h-3" />Failed</span>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Change file link */}
+                  {!bulkRunning && !bulkDone && (
+                    <button
+                      type="button"
+                      onClick={() => { setBulkFile(null); setBulkRows([]); setBulkStatus({}); if (bulkFileRef.current) bulkFileRef.current.value = ""; }}
+                      className="text-xs font-bold text-indigo-500 hover:text-indigo-700 transition-colors"
+                    >
+                      ← Choose a different file
+                    </button>
+                  )}
                 </div>
-              </div>
+              )}
             </div>
 
-            <div className="p-8 border-t border-slate-50 flex items-center justify-between gap-4">
-              <Button variant="outline" onClick={() => { setShowBulkModal(false); setBulkFile(null); }} className="h-12 px-6 rounded-xl border-slate-200 text-sm font-bold">
-                Cancel
+            {/* Modal Footer */}
+            <div className="p-8 border-t border-slate-50 flex items-center justify-between gap-4 shrink-0">
+              <Button type="button" variant="outline" onClick={resetBulkModal} className="h-12 px-6 rounded-xl border-slate-200 text-sm font-bold">
+                {bulkDone ? "Close" : "Cancel"}
               </Button>
-              <Button
-                disabled={loading || !bulkFile}
-                onClick={handleBulkInvite}
-                className="h-12 px-8 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 shadow-lg flex items-center gap-2"
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Start Bulk Migration
-              </Button>
+
+              <div className="flex items-center gap-3">
+                {/* Retry failed */}
+                {bulkDone && Object.values(bulkStatus).some(s => s === "failed") && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleRetryFailed}
+                    disabled={bulkRunning}
+                    className="h-12 px-6 rounded-xl border-rose-200 text-rose-600 text-sm font-bold hover:bg-rose-50 flex items-center gap-2"
+                  >
+                    <RotateCcw className="w-4 h-4" /> Retry Failed
+                  </Button>
+                )}
+
+                {/* Start invite */}
+                {!bulkDone && (
+                  <Button
+                    type="button"
+                    disabled={bulkRunning || bulkRows.length === 0}
+                    onClick={handleBulkInvite}
+                    className="h-12 px-8 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 shadow-lg flex items-center gap-2"
+                  >
+                    {bulkRunning
+                      ? <><Loader2 className="w-4 h-4 animate-spin" /> Inviting…</>
+                      : <><Send className="w-4 h-4" /> Send {bulkRows.length} Invite{bulkRows.length > 1 ? "s" : ""}</>
+                    }
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </div>

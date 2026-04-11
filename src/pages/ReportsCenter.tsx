@@ -3,8 +3,13 @@ import {
   FileText, Download, Star, Plus, Printer, Mail, FileSpreadsheet,
   ChevronRight, GraduationCap, Presentation, DollarSign, Loader2,
   Users, TrendingUp, TrendingDown, AlertTriangle, BookOpen,
-  ArrowLeft, CheckCircle, Clock, BarChart3,
+  ArrowLeft, CheckCircle, Clock, BarChart3, Bell, Calendar, RefreshCw,
+  Building2,
 } from "lucide-react";
+import { generateBoardReportPDF } from "@/lib/boardReportService";
+import { doc, getDoc } from "firebase/firestore";
+import { db, auth } from "@/lib/firebase";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   AreaChart, Area, LineChart, Line, PieChart, Pie, Cell, Legend,
@@ -90,6 +95,53 @@ function buildExportPayload(report: AnyReportData, title: string) {
     tableRows = report.byBranch.map(b => [b.branch, `${b.pct}%`]);
   }
 
+  if (report._type === "workload") {
+    stats.push(
+      { label: "Total Teachers",     value: report.totalTeachers.toString() },
+      { label: "Avg Classes/Teacher", value: report.avgClassesPerTeacher.toString() },
+      { label: "Avg Subjects",        value: report.avgSubjectsPerTeacher.toString() },
+      { label: "Overloaded",          value: report.overloadedTeachers.toString() },
+    );
+    tableHeaders = ["Teacher", "Branch", "Classes", "Subjects"];
+    tableRows = report.topByWorkload.map(t => [t.name, t.branch, t.classes.toString(), t.subjects.toString()]);
+  } else if (report._type === "feedback") {
+    stats.push(
+      { label: "Total Feedback",  value: report.totalFeedback.toString() },
+      { label: "Positive",        value: report.positiveCount.toString() },
+      { label: "Neutral",         value: report.neutralCount.toString() },
+      { label: "Negative",        value: report.negativeCount.toString() },
+    );
+    tableHeaders = ["Branch", "Count", "Avg Rating"];
+    tableRows = report.byBranch.map(b => [b.branch, b.count.toString(), b.avgRating > 0 ? `${b.avgRating}/5` : "—"]);
+  } else if (report._type === "training-needs") {
+    stats.push(
+      { label: "Need Training",   value: report.totalNeedingTraining.toString() },
+      { label: "Critical (<50%)", value: report.criticalCount.toString() },
+      { label: "Moderate (50–65%)", value: report.moderateCount.toString() },
+      { label: "Subjects Affected", value: report.bySubject.length.toString() },
+    );
+    tableHeaders = ["Teacher", "Subject", "Score", "Branch"];
+    tableRows = report.teachersAtRisk.map(t => [t.name, t.subject, `${t.score}%`, t.branch]);
+  } else if (report._type === "outstanding") {
+    stats.push(
+      { label: "Total Defaulters",    value: report.totalDefaulters.toString() },
+      { label: "30+ Days Overdue",    value: report.above30Days.toString() },
+      { label: "60+ Days Overdue",    value: report.above60Days.toString() },
+      { label: "Amount Outstanding",  value: `$${report.amountOutstanding.toLocaleString()}` },
+    );
+    tableHeaders = ["Branch", "Defaulters", "Amount"];
+    tableRows = report.byBranch.map(b => [b.branch, b.count.toString(), `$${b.amount.toLocaleString()}`]);
+  } else if (report._type === "expense") {
+    stats.push(
+      { label: "Total Expenses",    value: `$${report.totalExpenses.toLocaleString()}` },
+      { label: "Largest Category",  value: report.largestCategory },
+      { label: "Categories",        value: report.byCategory.length.toString() },
+      { label: "Top Category %",    value: `${report.byCategory[0]?.pct || 0}%` },
+    );
+    tableHeaders = ["Category", "Amount", "% of Total"];
+    tableRows = report.byCategory.map(c => [c.category, `$${c.amount.toLocaleString()}`, `${c.pct}%`]);
+  }
+
   return { ...base, stats, tableHeaders, tableRows };
 }
 
@@ -114,6 +166,25 @@ export default function ReportsCenter() {
   const [loading, setLoading] = useState(true);
   const [reportLoading, setReportLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"Preview" | "Schedule" | "Share" | "Settings">("Preview");
+
+  // Schedule tab state
+  const [schedFreq,    setSchedFreq]    = useState<"Weekly" | "Monthly" | "Quarterly">("Monthly");
+  const [schedEmail,   setSchedEmail]   = useState("");
+  const [scheduling,   setScheduling]   = useState(false);
+  const [schedDone,    setSchedDone]    = useState(false);
+
+  // Settings tab state
+  const [stgBranch,    setStgBranch]    = useState(true);
+  const [stgHistory,   setStgHistory]   = useState(true);
+  const [stgAutoRefresh, setStgAutoRefresh] = useState(false);
+
+  // Board Report
+  const [boardQuarter,  setBoardQuarter]  = useState(() => {
+    const now = new Date();
+    const q   = Math.ceil((now.getMonth() + 1) / 3);
+    return `Q${q} ${now.getFullYear()}`;
+  });
+  const [boardGenerating, setBoardGenerating] = useState(false);
 
   // Load dashboard
   useEffect(() => {
@@ -151,6 +222,42 @@ export default function ReportsCenter() {
       exportEmail(payload).then(r => toast[r.success ? "success" : "error"](r.message));
     }
   }, [reportData, selectedSlug]);
+
+  // Schedule handler — saves to Firestore scheduled_reports collection
+  const handleSchedule = useCallback(async () => {
+    if (!selectedSlug || !schedEmail.trim()) {
+      toast.error("Enter a recipient email first.");
+      return;
+    }
+    const reg = REPORT_REGISTRY[selectedSlug];
+    setScheduling(true);
+    try {
+      const FREQ_MAP = {
+        Weekly:    { label: "Every Monday",   nextRun: (() => { const d = new Date(); d.setDate(d.getDate() + ((1 + 7 - d.getDay()) % 7 || 7)); return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); })() },
+        Monthly:   { label: "1st of Month",   nextRun: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) },
+        Quarterly: { label: "Quarterly",      nextRun: (() => { const qm = Math.ceil((new Date().getMonth() + 1) / 3) * 3; return new Date(new Date().getFullYear(), qm, 0).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); })() },
+      };
+      await addDoc(collection(db, "scheduled_reports"), {
+        name:        `${reg?.label || "Report"} — ${schedFreq}`,
+        reportSlug:  selectedSlug,
+        frequency:   FREQ_MAP[schedFreq].label,
+        nextRun:     FREQ_MAP[schedFreq].nextRun,
+        email:       schedEmail.trim().toLowerCase(),
+        recipients:  1,
+        status:      "Active",
+        ownerUid:    auth.currentUser?.uid || "",
+        createdAt:   serverTimestamp(),
+      });
+      setSchedDone(true);
+      toast.success(`Scheduled ${schedFreq.toLowerCase()}! Will send to ${schedEmail}`);
+      // Refresh dashboard counts
+      fetchReportsDashboard().then(setDashboard).catch(() => {});
+    } catch (e) {
+      console.error("Schedule error:", e);
+      toast.error("Failed to save schedule. Try again.");
+    }
+    setScheduling(false);
+  }, [selectedSlug, schedFreq, schedEmail]);
 
   // ── Loading ─────────────────────────────────────────────────────────────────
   if (loading) {
@@ -190,7 +297,7 @@ export default function ReportsCenter() {
         </div>
 
         {/* Main Report Card */}
-        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm">
           <div className="p-8 lg:p-10">
             {/* Header */}
             <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6 mb-8">
@@ -209,12 +316,13 @@ export default function ReportsCenter() {
             </div>
 
             {/* Tabs */}
-            <div className="flex items-center gap-2 md:gap-3 mb-10 overflow-x-auto pb-2 no-scrollbar">
+            <div className="flex items-center gap-2 md:gap-3 mb-10 overflow-x-auto pb-1">
               {(["Preview", "Schedule", "Share", "Settings"] as const).map(tab => (
                 <button
                   key={tab}
+                  type="button"
                   onClick={() => setActiveTab(tab)}
-                  className={`whitespace-nowrap px-6 md:px-8 py-2 md:py-2.5 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest transition-all ${
+                  className={`whitespace-nowrap px-6 md:px-8 py-2.5 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
                     activeTab === tab ? "bg-[#1e3a8a] text-white shadow-sm" : "bg-white text-slate-500 hover:bg-slate-50 border border-slate-100"
                   }`}
                 >
@@ -248,21 +356,78 @@ export default function ReportsCenter() {
             )}
 
             {activeTab === "Schedule" && (
-              <div className="animate-in fade-in duration-500">
-                <div className="bg-[#f8fafc] border border-slate-100 p-8 rounded-[1.5rem]">
-                  <h4 className="text-base font-bold text-[#111827] mb-6">Schedule This Report</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {["Weekly", "Monthly", "Quarterly"].map(freq => (
-                      <button key={freq} className="p-6 rounded-[1.2rem] border border-slate-200 bg-white hover:border-[#1e3a8a] hover:shadow-lg transition-all text-left group">
-                        <div className="flex items-center gap-3 mb-3">
-                          <Clock className="w-5 h-5 text-slate-400 group-hover:text-[#1e3a8a]" />
-                          <span className="font-bold text-[#111827]">{freq}</span>
-                        </div>
-                        <p className="text-xs text-slate-400">{freq === "Weekly" ? "Every Monday at 8:00 AM" : freq === "Monthly" ? "1st of each month" : "End of each quarter"}</p>
-                      </button>
-                    ))}
+              <div className="animate-in fade-in duration-500 space-y-6">
+                {schedDone ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-4">
+                    <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center">
+                      <CheckCircle className="w-8 h-8 text-emerald-500" />
+                    </div>
+                    <p className="text-base font-black text-[#111827]">Report Scheduled!</p>
+                    <p className="text-sm text-slate-400">Will send <strong>{schedFreq.toLowerCase()}</strong> to <strong>{schedEmail}</strong></p>
+                    <button
+                      type="button"
+                      onClick={() => { setSchedDone(false); setSchedEmail(""); }}
+                      className="text-xs font-black text-[#1e3a8a] uppercase tracking-widest hover:underline mt-2 cursor-pointer"
+                    >
+                      Schedule Another
+                    </button>
                   </div>
-                </div>
+                ) : (
+                  <>
+                    {/* Frequency picker */}
+                    <div className="bg-[#f8fafc] border border-slate-100 p-6 rounded-[1.5rem]">
+                      <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Frequency</p>
+                      <div className="grid grid-cols-3 gap-3">
+                        {(["Weekly", "Monthly", "Quarterly"] as const).map(freq => (
+                          <button
+                            key={freq}
+                            type="button"
+                            onClick={() => setSchedFreq(freq)}
+                            className={`p-4 rounded-xl border-2 transition-all text-left cursor-pointer ${
+                              schedFreq === freq
+                                ? "border-[#1e3a8a] bg-blue-50"
+                                : "border-slate-200 bg-white hover:border-slate-300"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              <Clock className={`w-4 h-4 ${schedFreq === freq ? "text-[#1e3a8a]" : "text-slate-400"}`} />
+                              <span className={`font-black text-sm ${schedFreq === freq ? "text-[#1e3a8a]" : "text-[#111827]"}`}>{freq}</span>
+                            </div>
+                            <p className="text-[10px] text-slate-400 font-medium">
+                              {freq === "Weekly" ? "Every Monday" : freq === "Monthly" ? "1st of month" : "End of quarter"}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Recipient email */}
+                    <div className="bg-[#f8fafc] border border-slate-100 p-6 rounded-[1.5rem]">
+                      <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Send To (Email)</p>
+                      <div className="flex gap-3">
+                        <input
+                          type="email"
+                          value={schedEmail}
+                          onChange={e => setSchedEmail(e.target.value)}
+                          placeholder="principal@school.com"
+                          className="flex-1 h-11 px-4 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-[#111827] outline-none focus:border-[#1e3a8a] transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSchedule}
+                          disabled={scheduling || !schedEmail.trim()}
+                          className="flex items-center gap-2 px-6 h-11 rounded-xl bg-[#1e3a8a] text-white text-xs font-black uppercase tracking-widest hover:bg-[#1e294b] transition-all disabled:opacity-50 cursor-pointer"
+                        >
+                          {scheduling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calendar className="w-4 h-4" />}
+                          {scheduling ? "Saving..." : "Schedule"}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-2">
+                        Report will be auto-generated and emailed on schedule
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
@@ -271,13 +436,60 @@ export default function ReportsCenter() {
                 <div className="bg-[#f8fafc] border border-slate-100 p-8 rounded-[1.5rem]">
                   <h4 className="text-base font-bold text-[#111827] mb-6">Share Report</h4>
                   <div className="flex flex-col gap-4">
-                    <button onClick={() => handleExport("email")} className="p-5 rounded-xl border border-slate-200 bg-white hover:border-[#1e3a8a] hover:shadow-lg transition-all flex items-center gap-4">
+
+                    {/* Download PDF then share — most reliable */}
+                    <button
+                      type="button"
+                      onClick={() => { handleExport("pdf"); toast.success("PDF downloaded — attach it to your email"); }}
+                      className="p-5 rounded-xl border border-slate-200 bg-white hover:border-[#1e3a8a] hover:shadow-lg transition-all flex items-center gap-4 cursor-pointer"
+                    >
                       <Mail className="w-5 h-5 text-[#1e3a8a]" />
-                      <div className="text-left"><p className="font-bold text-[#111827] text-sm">Send via Email</p><p className="text-xs text-slate-400">Share report link or PDF attachment</p></div>
+                      <div className="text-left">
+                        <p className="font-bold text-[#111827] text-sm">Download PDF to Share</p>
+                        <p className="text-xs text-slate-400">Export PDF → attach to email or WhatsApp</p>
+                      </div>
                     </button>
-                    <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/reports?view=${selectedSlug}`); toast.success("Link copied!"); }} className="p-5 rounded-xl border border-slate-200 bg-white hover:border-[#1e3a8a] hover:shadow-lg transition-all flex items-center gap-4">
-                      <FileText className="w-5 h-5 text-[#22c55e]" />
-                      <div className="text-left"><p className="font-bold text-[#111827] text-sm">Copy Report Link</p><p className="text-xs text-slate-400">Shareable URL for this report</p></div>
+
+                    {/* Open mailto directly — no async, no popup block */}
+                    <a
+                      href={(() => {
+                        const reg = selectedSlug ? REPORT_REGISTRY[selectedSlug] : null;
+                        const title = reg?.label || "Report";
+                        const subject = encodeURIComponent(`[EduIntellect] ${title} Report`);
+                        const body = encodeURIComponent(
+                          `Hi,\n\nPlease find the ${title} report from EduIntellect Dashboard.\n\nGenerated on: ${new Date().toLocaleDateString()}\nReport: ${window.location.origin}/reports\n\nRegards`
+                        );
+                        return `mailto:?subject=${subject}&body=${body}`;
+                      })()}
+                      className="p-5 rounded-xl border border-slate-200 bg-white hover:border-[#1e3a8a] hover:shadow-lg transition-all flex items-center gap-4 cursor-pointer no-underline"
+                    >
+                      <FileText className="w-5 h-5 text-emerald-500" />
+                      <div className="text-left">
+                        <p className="font-bold text-[#111827] text-sm">Open Email Client</p>
+                        <p className="text-xs text-slate-400">Opens your mail app with report details pre-filled</p>
+                      </div>
+                    </a>
+
+                    {/* Copy link with robust fallback */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const url = `${window.location.origin}/reports?view=${selectedSlug}`;
+                        if (navigator.clipboard?.writeText) {
+                          navigator.clipboard.writeText(url)
+                            .then(() => toast.success("Link copied!"))
+                            .catch(() => { prompt("Copy this link:", url); });
+                        } else {
+                          prompt("Copy this link:", url);
+                        }
+                      }}
+                      className="p-5 rounded-xl border border-slate-200 bg-white hover:border-[#1e3a8a] hover:shadow-lg transition-all flex items-center gap-4 cursor-pointer"
+                    >
+                      <BookOpen className="w-5 h-5 text-amber-500" />
+                      <div className="text-left">
+                        <p className="font-bold text-[#111827] text-sm">Copy Report Link</p>
+                        <p className="text-xs text-slate-400">Shareable URL for this report</p>
+                      </div>
                     </button>
                   </div>
                 </div>
@@ -288,20 +500,51 @@ export default function ReportsCenter() {
               <div className="animate-in fade-in duration-500">
                 <div className="bg-[#f8fafc] border border-slate-100 p-8 rounded-[1.5rem]">
                   <h4 className="text-base font-bold text-[#111827] mb-6">Report Settings</h4>
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {[
-                      { label: "Include branch breakdown", desc: "Show data separated by branch" },
-                      { label: "Include historical comparison", desc: "Compare with previous period" },
-                      { label: "Auto-refresh data", desc: "Refresh data every 60 seconds" },
-                    ].map((setting, i) => (
-                      <div key={i} className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-white">
-                        <div><p className="font-bold text-sm text-[#111827]">{setting.label}</p><p className="text-xs text-slate-400">{setting.desc}</p></div>
-                        <div className="w-10 h-6 rounded-full bg-[#1e3a8a] relative cursor-pointer">
-                          <div className="absolute right-0.5 top-0.5 w-5 h-5 rounded-full bg-white shadow" />
+                      {
+                        label: "Include branch breakdown",
+                        desc: "Show data separated by each branch",
+                        icon: BarChart3,
+                        val: stgBranch,
+                        set: setStgBranch,
+                      },
+                      {
+                        label: "Include historical comparison",
+                        desc: "Compare current data with previous period",
+                        icon: TrendingUp,
+                        val: stgHistory,
+                        set: setStgHistory,
+                      },
+                      {
+                        label: "Auto-refresh data",
+                        desc: "Reload report data every 60 seconds",
+                        icon: RefreshCw,
+                        val: stgAutoRefresh,
+                        set: setStgAutoRefresh,
+                      },
+                    ].map((setting) => (
+                      <div key={setting.label} className="flex items-center justify-between p-5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-all">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${setting.val ? "bg-blue-50" : "bg-slate-50"}`}>
+                            <setting.icon className={`w-4 h-4 ${setting.val ? "text-[#1e3a8a]" : "text-slate-400"}`} />
+                          </div>
+                          <div>
+                            <p className="font-bold text-sm text-[#111827]">{setting.label}</p>
+                            <p className="text-xs text-slate-400 mt-0.5">{setting.desc}</p>
+                          </div>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => setting.set(!setting.val)}
+                          className={`w-11 h-6 rounded-full relative transition-all duration-300 shrink-0 cursor-pointer ${setting.val ? "bg-[#1e3a8a]" : "bg-slate-200"}`}
+                        >
+                          <div className={`w-5 h-5 rounded-full bg-white absolute top-0.5 shadow transition-all duration-300 ${setting.val ? "translate-x-5" : "translate-x-0.5"}`} />
+                        </button>
                       </div>
                     ))}
                   </div>
+                  <p className="text-[10px] text-slate-400 mt-4 text-center">Settings apply to preview only — not to exported files</p>
                 </div>
               </div>
             )}
@@ -467,6 +710,85 @@ export default function ReportsCenter() {
           </table>
         </div>
       </div>
+
+      {/* ── Board Report Section ─────────────────────────────────────────── */}
+      <div className="bg-gradient-to-br from-[#1e3a8a] to-[#2563eb] rounded-[2rem] p-8 text-white shadow-xl shadow-blue-900/20">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
+              <Building2 className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-lg font-black">One-Click Board Report</h3>
+                <span className="text-[9px] font-black uppercase tracking-widest bg-white/20 text-white px-2 py-0.5 rounded-full">PDF</span>
+              </div>
+              <p className="text-blue-100 text-sm font-medium">
+                Auto-generates a professional 12-page PDF with executive summary, branch heatmap,
+                fee waterfall, risk analysis &amp; action items — ready for your trustees.
+              </p>
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                {["Executive Summary", "Branch Performance", "Risk Analysis", "Fee Collection", "Recommendations"].map(s => (
+                  <span key={s} className="text-[10px] font-bold bg-white/10 text-blue-100 px-2.5 py-1 rounded-full">{s}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col items-start md:items-end gap-3 shrink-0">
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-bold text-blue-200">Quarter:</label>
+              <select
+                value={boardQuarter}
+                onChange={e => setBoardQuarter(e.target.value)}
+                className="bg-white/10 border border-white/20 text-white text-xs font-bold rounded-lg px-3 py-1.5 outline-none"
+              >
+                {(() => {
+                  const opts: string[] = [];
+                  const now = new Date();
+                  for (let y = now.getFullYear(); y >= now.getFullYear() - 1; y--) {
+                    for (let q = 4; q >= 1; q--) {
+                      if (y === now.getFullYear() && q > Math.ceil((now.getMonth() + 1) / 3)) continue;
+                      opts.push(`Q${q} ${y}`);
+                    }
+                  }
+                  return opts.map(o => <option key={o} value={o} className="text-slate-900">{o}</option>);
+                })()}
+              </select>
+            </div>
+            <button
+              disabled={boardGenerating}
+              onClick={async () => {
+                setBoardGenerating(true);
+                try {
+                  // Get school name from Firestore
+                  const uid = auth.currentUser?.uid;
+                  let schoolName = "My School";
+                  let ownerName  = "";
+                  if (uid) {
+                    const snap = await getDoc(doc(db, "schools", uid));
+                    schoolName  = snap.data()?.schoolName || schoolName;
+                    ownerName   = snap.data()?.ownerName  || "";
+                  }
+                  await generateBoardReportPDF({ schoolName, quarter: boardQuarter, ownerName });
+                  toast.success("Board Report downloaded!");
+                } catch (e: any) {
+                  toast.error("Report failed: " + e.message);
+                }
+                setBoardGenerating(false);
+              }}
+              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white text-[#1e3a8a] text-xs font-black hover:bg-blue-50 transition-all disabled:opacity-50 shadow-lg"
+            >
+              {boardGenerating ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              {boardGenerating ? "Generating PDF…" : `Download ${boardQuarter} Report`}
+            </button>
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 }
@@ -784,6 +1106,259 @@ function renderCharts(data: AnyReportData): JSX.Element {
                   </Pie>
                   <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} />
                 </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Workload Analysis ───────────────────────────────────────────────────────
+  if (data._type === "workload") {
+    const hasDist = data.workloadDist.some(d => d.count > 0);
+    const hasTop  = data.topByWorkload.length > 0;
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-12">
+        <div>
+          <h3 className="text-base font-bold text-[#111827] mb-8">Workload Distribution</h3>
+          {!hasDist ? <EmptyChart message="No class assignment data" /> : (
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.workloadDist} margin={{ left: -10, right: 10 }}>
+                  <XAxis dataKey="range" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} />
+                  <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} />
+                  <Bar dataKey="count" name="Teachers" fill="#1e3a8a" radius={[4,4,0,0]} barSize={36} label={{ position: "top", fill: "#64748b", fontSize: 10, fontWeight: "bold" }} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+        <div>
+          <h3 className="text-base font-bold text-[#111827] mb-8">Top Workload — Teachers</h3>
+          {!hasTop ? <EmptyChart message="No teacher data" /> : (
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.topByWorkload.slice(0, 6)} layout="vertical" margin={{ left: 60, right: 20 }}>
+                  <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10 }} />
+                  <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#64748b", fontSize: 10, fontWeight: "bold" }} width={60} />
+                  <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} />
+                  <Bar dataKey="classes" name="Classes" fill="#1e3a8a" radius={[0,4,4,0]} barSize={14} />
+                  <Bar dataKey="subjects" name="Subjects" fill="#3b82f6" radius={[0,4,4,0]} barSize={14} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Feedback Summary ────────────────────────────────────────────────────────
+  if (data._type === "feedback") {
+    const sentimentData = [
+      { name: "Positive", value: data.positiveCount, fill: "#22c55e" },
+      { name: "Neutral",  value: data.neutralCount,  fill: "#f59e0b" },
+      { name: "Negative", value: data.negativeCount, fill: "#ef4444" },
+    ].filter(d => d.value > 0);
+    const hasBranch  = data.byBranch.some(b => b.count > 0);
+    const hasRecent  = data.recentItems.length > 0;
+    return (
+      <div className="space-y-10 mb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+          <div>
+            <h3 className="text-base font-bold text-[#111827] mb-8">Sentiment Breakdown</h3>
+            {sentimentData.length === 0 ? <EmptyChart message="No rated feedback" /> : (
+              <div className="h-[260px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={sentimentData} cx="50%" cy="50%" outerRadius={90} dataKey="value" label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`} labelLine={false}>
+                      {sentimentData.map((e, i) => <Cell key={i} fill={e.fill} />)}
+                    </Pie>
+                    <Tooltip contentStyle={{ borderRadius: "12px", border: "none" }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-[#111827] mb-8">Feedback by Branch</h3>
+            {!hasBranch ? <EmptyChart message="No branch feedback data" /> : (
+              <div className="h-[260px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.byBranch} margin={{ left: -10, right: 10 }}>
+                    <XAxis dataKey="branch" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} dy={10} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} />
+                    <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} />
+                    <Bar dataKey="count" name="Feedback Count" fill="#1e3a8a" radius={[4,4,0,0]} barSize={32} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+        </div>
+        {hasRecent && (
+          <div>
+            <h3 className="text-base font-bold text-[#111827] mb-4">Recent Feedback</h3>
+            <div className="space-y-3">
+              {data.recentItems.map((item, i) => (
+                <div key={i} className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                  <div className="w-8 h-8 rounded-full bg-[#1e3a8a] text-white flex items-center justify-center text-xs font-black shrink-0">
+                    {item.author.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-black text-[#111827]">{item.author}</span>
+                      <span className="text-[10px] px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full font-bold">{item.type}</span>
+                      <span className="text-[10px] text-slate-400 ml-auto">{item.date}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 leading-relaxed truncate">{item.message || "—"}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Training Needs ──────────────────────────────────────────────────────────
+  if (data._type === "training-needs") {
+    const hasSubj  = data.bySubject.length > 0;
+    const hasRisk  = data.teachersAtRisk.length > 0;
+    return (
+      <div className="space-y-10 mb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+          <div>
+            <h3 className="text-base font-bold text-[#111827] mb-8">Weak Subjects (Avg Score)</h3>
+            {!hasSubj ? <EmptyChart message="No subject performance data" /> : (
+              <div className="h-[280px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.bySubject} margin={{ left: -10, right: 10 }}>
+                    <XAxis dataKey="subject" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} dy={10} />
+                    <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} />
+                    <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} formatter={(v: number) => [`${v}%`, "Avg Score"]} />
+                    <Bar dataKey="avgScore" name="Avg Score" fill="#ef4444" radius={[4,4,0,0]} barSize={32} label={{ position: "top", fill: "#64748b", fontSize: 10, fontWeight: "bold", formatter: (v: number) => `${v}%` }} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-[#111827] mb-4">Teachers Needing Support</h3>
+            {!hasRisk ? (
+              <div className="h-[280px] flex items-center justify-center border border-dashed border-slate-200 rounded-xl">
+                <p className="text-sm text-emerald-500 font-bold">All teachers performing well!</p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[280px] overflow-y-auto pr-1">
+                {data.teachersAtRisk.map((t, i) => (
+                  <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <div>
+                      <p className="text-sm font-black text-[#111827]">{t.name}</p>
+                      <p className="text-[10px] text-slate-400">{t.subject} • {t.branch}</p>
+                    </div>
+                    <span className={`text-xs font-black px-3 py-1 rounded-lg ${t.score < 50 ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600"}`}>
+                      {t.score}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Outstanding Fees ────────────────────────────────────────────────────────
+  if (data._type === "outstanding") {
+    const agingData = [
+      { label: "30+ Days", count: data.above30Days, amount: data.amount30, fill: "#f59e0b" },
+      { label: "60+ Days", count: data.above60Days, amount: data.amount60, fill: "#ef4444" },
+      { label: "90+ Days", count: data.above90Days, amount: data.amount90, fill: "#7f1d1d" },
+    ].filter(d => d.count > 0);
+    const hasBranch = data.byBranch.length > 0;
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-12">
+        <div>
+          <h3 className="text-base font-bold text-[#111827] mb-8">Aging Analysis</h3>
+          {agingData.length === 0 ? <EmptyChart message="No overdue fees found" /> : (
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={agingData} margin={{ left: -10, right: 10 }}>
+                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} />
+                  <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} formatter={(v: number, name: string) => [name === "count" ? `${v} students` : `$${v.toLocaleString()}`, name === "count" ? "Defaulters" : "Amount"]} />
+                  <Bar dataKey="count" name="count" radius={[4,4,0,0]} barSize={40} label={{ position: "top", fill: "#64748b", fontSize: 10, fontWeight: "bold" }}>
+                    {agingData.map((e, i) => <Cell key={i} fill={e.fill} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+        <div>
+          <h3 className="text-base font-bold text-[#111827] mb-8">Outstanding by Branch</h3>
+          {!hasBranch ? <EmptyChart message="No outstanding data by branch" /> : (
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.byBranch} margin={{ left: -10, right: 10 }}>
+                  <XAxis dataKey="branch" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
+                  <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} formatter={(v: number) => [`$${v.toLocaleString()}`, "Outstanding"]} />
+                  <Bar dataKey="amount" name="amount" fill="#ef4444" radius={[4,4,0,0]} barSize={32} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Expense Analysis ────────────────────────────────────────────────────────
+  if (data._type === "expense") {
+    const hasCat   = data.byCategory.length > 0;
+    const hasTrend = data.monthlyTrend.some(m => m.amount > 0);
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-12">
+        <div>
+          <h3 className="text-base font-bold text-[#111827] mb-8">Expense by Category</h3>
+          {!hasCat ? <EmptyChart message="No expense data" /> : (
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={data.byCategory} cx="50%" cy="50%" outerRadius={90} dataKey="amount" nameKey="category" label={({ category, pct }) => `${category} ${pct}%`} labelLine={false}>
+                    {data.byCategory.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ borderRadius: "12px", border: "none" }} formatter={(v: number) => [`$${v.toLocaleString()}`, "Amount"]} />
+                  <Legend wrapperStyle={{ fontSize: 11, fontWeight: 700 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+        <div>
+          <h3 className="text-base font-bold text-[#111827] mb-8">Monthly Expense Trend</h3>
+          {!hasTrend ? <EmptyChart message="No monthly expense data" /> : (
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={data.monthlyTrend} margin={{ left: -10, right: 10 }}>
+                  <defs>
+                    <linearGradient id="expGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#ef4444" stopOpacity={0.12} />
+                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: "bold" }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
+                  <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} formatter={(v: number) => [`$${v.toLocaleString()}`, "Expenses"]} />
+                  <Area type="monotone" dataKey="amount" stroke="#ef4444" strokeWidth={3} fill="url(#expGrad)" dot={{ r: 4, fill: "#ef4444", strokeWidth: 2, stroke: "#fff" }} />
+                </AreaChart>
               </ResponsiveContainer>
             </div>
           )}

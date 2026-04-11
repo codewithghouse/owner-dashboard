@@ -135,16 +135,91 @@ export type FeeCollectionData = {
   summary: string;
 };
 
+// ── Workload Analysis Report ─────────────────────────────────────────────────
+
+export type WorkloadReportData = {
+  id: string;
+  generatedOn: string;
+  totalTeachers: number;
+  avgClassesPerTeacher: number;
+  avgSubjectsPerTeacher: number;
+  overloadedTeachers: number;
+  topByWorkload: { name: string; classes: number; subjects: number; branch: string }[];
+  workloadDist: { range: string; count: number }[];
+  summary: string;
+};
+
+// ── Feedback Summary Report ──────────────────────────────────────────────────
+
+export type FeedbackReportData = {
+  id: string;
+  generatedOn: string;
+  totalFeedback: number;
+  positiveCount: number;
+  neutralCount: number;
+  negativeCount: number;
+  byBranch: { branch: string; count: number; avgRating: number }[];
+  recentItems: { author: string; message: string; date: string; type: string }[];
+  summary: string;
+};
+
+// ── Training Needs Report ────────────────────────────────────────────────────
+
+export type TrainingNeedsData = {
+  id: string;
+  generatedOn: string;
+  totalNeedingTraining: number;
+  criticalCount: number;
+  moderateCount: number;
+  bySubject: { subject: string; teacherCount: number; avgScore: number }[];
+  teachersAtRisk: { name: string; subject: string; score: number; branch: string }[];
+  summary: string;
+};
+
+// ── Outstanding Fees Report ──────────────────────────────────────────────────
+
+export type OutstandingReportData = {
+  id: string;
+  generatedOn: string;
+  totalDefaulters: number;
+  above30Days: number;
+  above60Days: number;
+  above90Days: number;
+  amountOutstanding: number;
+  amount30: number;
+  amount60: number;
+  amount90: number;
+  byBranch: { branch: string; count: number; amount: number }[];
+  summary: string;
+};
+
+// ── Expense Analysis Report ──────────────────────────────────────────────────
+
+export type ExpenseReportData = {
+  id: string;
+  generatedOn: string;
+  totalExpenses: number;
+  byCategory: { category: string; amount: number; pct: number }[];
+  monthlyTrend: { month: string; amount: number }[];
+  largestCategory: string;
+  summary: string;
+};
+
 // ── Union type for any report ─────────────────────────────────────────────────
 
 export type AnyReportData =
-  | ({ _type: "enrollment" } & EnrollmentReportData)
-  | ({ _type: "attendance" } & AttendanceReportData)
-  | ({ _type: "performance" } & PerformanceReportData)
-  | ({ _type: "at-risk" } & AtRiskReportData)
-  | ({ _type: "teacher-perf" } & TeacherPerfReportData)
-  | ({ _type: "revenue" } & RevenueSummaryData)
-  | ({ _type: "fee-collection" } & FeeCollectionData);
+  | ({ _type: "enrollment" }     & EnrollmentReportData)
+  | ({ _type: "attendance" }     & AttendanceReportData)
+  | ({ _type: "performance" }    & PerformanceReportData)
+  | ({ _type: "at-risk" }        & AtRiskReportData)
+  | ({ _type: "teacher-perf" }   & TeacherPerfReportData)
+  | ({ _type: "revenue" }        & RevenueSummaryData)
+  | ({ _type: "fee-collection" } & FeeCollectionData)
+  | ({ _type: "workload" }       & WorkloadReportData)
+  | ({ _type: "feedback" }       & FeedbackReportData)
+  | ({ _type: "training-needs" } & TrainingNeedsData)
+  | ({ _type: "outstanding" }    & OutstandingReportData)
+  | ({ _type: "expense" }        & ExpenseReportData);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -739,6 +814,350 @@ export async function fetchFeeCollectionReport(): Promise<FeeCollectionData> {
   } as any;
 }
 
+// ── Workload Analysis ────────────────────────────────────────────────────────
+
+export async function fetchWorkloadReport(): Promise<WorkloadReportData> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error("Not authenticated");
+
+  const [teachersSnap, classesSnap, assignSnap] = await Promise.all([
+    getDocs(collection(db, "teachers")).catch(() => ({ docs: [] as any[] })),
+    getDocs(collection(db, "classes")).catch(() => ({ docs: [] as any[] })),
+    getDocs(collection(db, "teaching_assignments")).catch(() => ({ docs: [] as any[] })),
+  ]);
+
+  // Map teacherId → { classes, subjects, branch, name }
+  const teacherMap = new Map<string, { name: string; branch: string; classes: number; subjectSet: Set<string> }>();
+  (teachersSnap.docs as any[]).forEach(d => {
+    const t = d.data();
+    teacherMap.set(d.id, {
+      name:       t.name || t.teacherName || "Unknown",
+      branch:     t.branch || t.branchName || "—",
+      classes:    0,
+      subjectSet: new Set(),
+    });
+  });
+
+  // Count classes per teacher
+  (classesSnap.docs as any[]).forEach(d => {
+    const c = d.data();
+    const tid = c.teacherId || "";
+    if (teacherMap.has(tid)) teacherMap.get(tid)!.classes++;
+  });
+
+  // Count subjects per teacher via teaching_assignments
+  (assignSnap.docs as any[]).forEach(d => {
+    const a = d.data();
+    const tid = a.teacherId || "";
+    const subj = a.subject || a.subjectId || a.subjectName || "";
+    if (teacherMap.has(tid) && subj) teacherMap.get(tid)!.subjectSet.add(subj);
+  });
+
+  const teachers = Array.from(teacherMap.entries()).map(([, v]) => ({
+    name:     v.name,
+    branch:   v.branch,
+    classes:  v.classes,
+    subjects: v.subjectSet.size,
+  }));
+
+  const totalTeachers = teachers.length;
+  const totalClasses  = teachers.reduce((a, t) => a + t.classes, 0);
+  const totalSubjects = teachers.reduce((a, t) => a + t.subjects, 0);
+  const avgCls = totalTeachers > 0 ? Math.round(totalClasses / totalTeachers) : 0;
+  const avgSubj = totalTeachers > 0 ? +(totalSubjects / totalTeachers).toFixed(1) : 0;
+
+  // Overloaded = more than avgCls + 1
+  const overloadedTeachers = teachers.filter(t => t.classes > avgCls + 1).length;
+
+  const topByWorkload = teachers
+    .sort((a, b) => b.classes - a.classes || b.subjects - a.subjects)
+    .slice(0, 8);
+
+  const workloadDist = [
+    { range: "0 classes",  count: teachers.filter(t => t.classes === 0).length },
+    { range: "1–2 classes", count: teachers.filter(t => t.classes >= 1 && t.classes <= 2).length },
+    { range: "3–4 classes", count: teachers.filter(t => t.classes >= 3 && t.classes <= 4).length },
+    { range: "5+ classes",  count: teachers.filter(t => t.classes >= 5).length },
+  ].filter(d => d.count > 0);
+
+  const summary = `${totalTeachers} teachers analysed. Average workload is ${avgCls} class${avgCls !== 1 ? "es" : ""} and ${avgSubj} subject${avgSubj !== 1 ? "s" : ""} per teacher. ${overloadedTeachers} teacher${overloadedTeachers !== 1 ? "s are" : " is"} overloaded (above average). ${topByWorkload[0] ? `${topByWorkload[0].name} carries the highest load with ${topByWorkload[0].classes} classes.` : ""}`;
+
+  return { _type: "workload", id: genId(), generatedOn: today(), totalTeachers, avgClassesPerTeacher: avgCls, avgSubjectsPerTeacher: avgSubj, overloadedTeachers, topByWorkload, workloadDist, summary } as any;
+}
+
+// ── Feedback Summary ─────────────────────────────────────────────────────────
+
+export async function fetchFeedbackReport(): Promise<FeedbackReportData> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error("Not authenticated");
+
+  invalidateCache(`core:${uid}`);
+  const snap = await loadCoreSnapshot(uid);
+
+  const [notesSnap, commSnap, meetingsSnap] = await Promise.all([
+    getDocs(collection(db, "parent_notes")).catch(() => ({ docs: [] as any[] })),
+    getDocs(collection(db, "communications")).catch(() => ({ docs: [] as any[] })),
+    getDocs(collection(db, "meetings")).catch(() => ({ docs: [] as any[] })),
+  ]);
+
+  const allItems: { author: string; message: string; date: string; type: string; rating?: number; branchId?: string }[] = [];
+
+  const fmtDate = (ts: any): string => {
+    try {
+      const d = ts?.toDate ? ts.toDate() : ts instanceof Date ? ts : null;
+      return d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+    } catch { return "—"; }
+  };
+
+  (notesSnap.docs as any[]).forEach(d => {
+    const n = d.data();
+    allItems.push({ author: n.parentName || n.author || "Parent", message: n.note || n.message || n.content || "", date: fmtDate(n.createdAt || n.date), type: "Note", rating: n.rating, branchId: n.branchId });
+  });
+  (commSnap.docs as any[]).forEach(d => {
+    const c = d.data();
+    allItems.push({ author: c.senderName || c.parentName || "Parent", message: c.message || c.subject || "", date: fmtDate(c.createdAt || c.sentAt), type: "Message", rating: c.rating, branchId: c.branchId });
+  });
+  (meetingsSnap.docs as any[]).forEach(d => {
+    const m = d.data();
+    allItems.push({ author: m.parentName || m.requestedBy || "Parent", message: m.topic || m.purpose || "Meeting request", date: fmtDate(m.createdAt || m.date || m.scheduledAt), type: "Meeting", rating: m.rating, branchId: m.branchId });
+  });
+
+  const totalFeedback = allItems.length;
+  const withRating    = allItems.filter(i => i.rating != null);
+  const positiveCount = withRating.filter(i => (i.rating || 0) >= 4).length;
+  const negativeCount = withRating.filter(i => (i.rating || 0) <= 2).length;
+  const neutralCount  = withRating.length - positiveCount - negativeCount;
+  const unratedPositive = allItems.length - withRating.length;
+
+  // Branch breakdown
+  const byBranch = snap.branches.map(b => {
+    const branchItems = allItems.filter(i => i.branchId === b.id);
+    const rated = branchItems.filter(i => i.rating != null);
+    const avgRating = rated.length > 0 ? +(rated.reduce((a, i) => a + (i.rating || 0), 0) / rated.length).toFixed(1) : 0;
+    return { branch: b.name, count: branchItems.length, avgRating };
+  });
+
+  const recentItems = allItems
+    .filter(i => i.message)
+    .slice(-6)
+    .reverse()
+    .map(i => ({ author: i.author, message: i.message.substring(0, 100), date: i.date, type: i.type }));
+
+  const summary = `${totalFeedback} feedback items collected across all channels (notes, messages, meetings). ${positiveCount + unratedPositive} are positive, ${negativeCount} negative, ${neutralCount} neutral. ${snap.branches.length > 0 ? `${byBranch.sort((a, b) => b.count - a.count)[0]?.branch || ""} received the most feedback.` : ""}`;
+
+  return { _type: "feedback", id: genId(), generatedOn: today(), totalFeedback, positiveCount: positiveCount + unratedPositive, neutralCount, negativeCount, byBranch, recentItems, summary } as any;
+}
+
+// ── Training Needs ───────────────────────────────────────────────────────────
+
+export async function fetchTrainingNeedsReport(): Promise<TrainingNeedsData> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error("Not authenticated");
+
+  const [teachersSnap, scoresSnap, resultsSnap] = await Promise.all([
+    getDocs(collection(db, "teachers")).catch(() => ({ docs: [] as any[] })),
+    getDocs(collection(db, "test_scores")).catch(() => ({ docs: [] as any[] })),
+    getDocs(collection(db, "results")).catch(() => ({ docs: [] as any[] })),
+  ]);
+
+  // Build teacher info map
+  const teacherInfo = new Map<string, { name: string; subject: string; branch: string }>();
+  (teachersSnap.docs as any[]).forEach(d => {
+    const t = d.data();
+    teacherInfo.set(d.id, {
+      name:    t.name || t.teacherName || "Unknown",
+      subject: t.subject || t.subjectName || "General",
+      branch:  t.branch || t.branchName || "—",
+    });
+  });
+
+  // Aggregate scores per teacher
+  const teacherScores = new Map<string, number[]>();
+  const processDoc = (docs: any[]) => {
+    docs.forEach(d => {
+      const r = d.data();
+      const tid = r.teacherId || "";
+      if (!tid) return;
+      const pct = r.percentage ?? r.score ?? null;
+      if (pct == null) return;
+      const n = Number(pct);
+      if (isNaN(n) || n < 0 || n > 100) return;
+      if (!teacherScores.has(tid)) teacherScores.set(tid, []);
+      teacherScores.get(tid)!.push(n);
+    });
+  };
+  processDoc(scoresSnap.docs as any[]);
+  processDoc(resultsSnap.docs as any[]);
+
+  // Teachers needing training: avg score < 65
+  const THRESHOLD = 65;
+  let criticalCount = 0, moderateCount = 0;
+  const teachersAtRisk: { name: string; subject: string; score: number; branch: string }[] = [];
+  const subjectScoreMap = new Map<string, number[]>();
+
+  teacherScores.forEach((scores, tid) => {
+    const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+    const info = teacherInfo.get(tid);
+    if (!info) return;
+    if (avg < THRESHOLD) {
+      if (avg < 50) criticalCount++;
+      else moderateCount++;
+      teachersAtRisk.push({ name: info.name, subject: info.subject, score: avg, branch: info.branch });
+    }
+    if (!subjectScoreMap.has(info.subject)) subjectScoreMap.set(info.subject, []);
+    subjectScoreMap.get(info.subject)!.push(avg);
+  });
+
+  const bySubject = Array.from(subjectScoreMap.entries())
+    .map(([subject, scores]) => ({
+      subject,
+      teacherCount: scores.filter(s => s < THRESHOLD).length,
+      avgScore:     Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
+    }))
+    .filter(s => s.teacherCount > 0)
+    .sort((a, b) => a.avgScore - b.avgScore)
+    .slice(0, 8);
+
+  teachersAtRisk.sort((a, b) => a.score - b.score);
+  const totalNeedingTraining = criticalCount + moderateCount;
+
+  const summary = `${totalNeedingTraining} teacher${totalNeedingTraining !== 1 ? "s" : ""} identified as needing training support (avg score below ${THRESHOLD}%). ${criticalCount} are in critical zone (below 50%) and ${moderateCount} are in moderate zone (50–65%). ${bySubject[0] ? `${bySubject[0].subject} is the most affected subject with an average of ${bySubject[0].avgScore}%.` : "No subject data available."}`;
+
+  return { _type: "training-needs", id: genId(), generatedOn: today(), totalNeedingTraining, criticalCount, moderateCount, bySubject, teachersAtRisk: teachersAtRisk.slice(0, 10), summary } as any;
+}
+
+// ── Outstanding Fees ─────────────────────────────────────────────────────────
+
+export async function fetchOutstandingReport(): Promise<OutstandingReportData> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error("Not authenticated");
+
+  invalidateCache(`core:${uid}`);
+  const snap = await loadCoreSnapshot(uid);
+
+  const feesSnap = await getDocs(collection(db, "fees")).catch(() => ({ docs: [] as any[] }));
+  const now = Date.now();
+  const DAY = 24 * 60 * 60 * 1000;
+
+  let totalDefaulters = 0, above30 = 0, above60 = 0, above90 = 0;
+  let amountOutstanding = 0, amount30 = 0, amount60 = 0, amount90 = 0;
+  const branchCount = new Map<string, { count: number; amount: number }>();
+  snap.branches.forEach(b => branchCount.set(b.id, { count: 0, amount: 0 }));
+
+  (feesSnap.docs as any[]).forEach(d => {
+    const f = d.data();
+    const status = (f.status || "").toLowerCase();
+    if (status === "paid" || status === "completed") return;
+
+    const amount = Number(f.amount || f.totalAmount || f.dueAmount || 0);
+    if (amount <= 0) return;
+
+    // Determine due date
+    let dueTs: number | null = null;
+    if (f.dueDate?.toDate) try { dueTs = f.dueDate.toDate().getTime(); } catch {}
+    else if (f.dueDate && typeof f.dueDate === "string") dueTs = new Date(f.dueDate).getTime();
+    else if (f.createdAt?.toDate) try { dueTs = f.createdAt.toDate().getTime(); } catch {}
+
+    if (!dueTs || isNaN(dueTs)) return;
+    const daysOverdue = Math.floor((now - dueTs) / DAY);
+    if (daysOverdue < 1) return; // not yet overdue
+
+    totalDefaulters++;
+    amountOutstanding += amount;
+
+    if (daysOverdue >= 30) { above30++; amount30 += amount; }
+    if (daysOverdue >= 60) { above60++; amount60 += amount; }
+    if (daysOverdue >= 90) { above90++; amount90 += amount; }
+
+    const bid = f.branchId || "";
+    if (branchCount.has(bid)) {
+      branchCount.get(bid)!.count++;
+      branchCount.get(bid)!.amount += amount;
+    }
+  });
+
+  const byBranch = snap.branches
+    .map(b => ({ branch: b.name, ...branchCount.get(b.id)! }))
+    .filter(b => b.count > 0);
+
+  const summary = `${totalDefaulters} outstanding fee record${totalDefaulters !== 1 ? "s" : ""} totaling $${amountOutstanding.toLocaleString()}. ${above30} overdue by 30+ days ($${amount30.toLocaleString()}), ${above60} overdue by 60+ days ($${amount60.toLocaleString()}), ${above90} overdue by 90+ days ($${amount90.toLocaleString()}). ${byBranch[0] ? `${byBranch.sort((a, b) => b.amount - a.amount)[0]?.branch} has the highest outstanding amount.` : ""}`;
+
+  return { _type: "outstanding", id: genId(), generatedOn: today(), totalDefaulters, above30Days: above30, above60Days: above60, above90Days: above90, amountOutstanding, amount30, amount60, amount90, byBranch, summary } as any;
+}
+
+// ── Expense Analysis ─────────────────────────────────────────────────────────
+
+export async function fetchExpenseReport(): Promise<ExpenseReportData> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error("Not authenticated");
+
+  invalidateCache(`core:${uid}`);
+  const snap = await loadCoreSnapshot(uid);
+
+  // Try expenses collection first, fallback to fee gap analysis
+  const expSnap = await getDocs(collection(db, "expenses")).catch(() => ({ docs: [] as any[] }));
+  const monthMap = new Map<string, number>();
+  snap.months.forEach(m => monthMap.set(m.key, 0));
+  const categoryMap = new Map<string, number>();
+
+  if ((expSnap.docs as any[]).length > 0) {
+    // Real expenses collection exists
+    (expSnap.docs as any[]).forEach(d => {
+      const e = d.data();
+      const amount = Number(e.amount || e.totalAmount || 0);
+      if (amount <= 0) return;
+      const cat = e.category || e.type || e.expenseType || "Other";
+      const normCat = cat.charAt(0).toUpperCase() + cat.slice(1);
+      categoryMap.set(normCat, (categoryMap.get(normCat) || 0) + amount);
+
+      let dateStr = "";
+      if (e.date?.toDate) try { dateStr = e.date.toDate().toLocaleDateString("en-CA"); } catch {}
+      else if (e.createdAt?.toDate) try { dateStr = e.createdAt.toDate().toLocaleDateString("en-CA"); } catch {}
+      const ym = dateStr.slice(0, 7);
+      if (monthMap.has(ym)) monthMap.set(ym, (monthMap.get(ym) || 0) + amount);
+    });
+  } else {
+    // Fallback: derive from fees — uncollected = operational gap
+    const feesSnap = await getDocs(collection(db, "fees")).catch(() => ({ docs: [] as any[] }));
+    let salaryEst = 0, opsEst = 0, infraEst = 0, miscEst = 0;
+    (feesSnap.docs as any[]).forEach(d => {
+      const f = d.data();
+      const total = Number(f.amount || f.totalAmount || 0);
+      salaryEst += total * 0.55;
+      opsEst    += total * 0.20;
+      infraEst  += total * 0.15;
+      miscEst   += total * 0.10;
+      let dateStr = "";
+      if (f.createdAt?.toDate) try { dateStr = f.createdAt.toDate().toLocaleDateString("en-CA"); } catch {}
+      const ym = dateStr.slice(0, 7);
+      if (monthMap.has(ym)) monthMap.set(ym, (monthMap.get(ym) || 0) + total * 0.9);
+    });
+    if (salaryEst > 0) {
+      categoryMap.set("Staff Salaries",    Math.round(salaryEst));
+      categoryMap.set("Operations",        Math.round(opsEst));
+      categoryMap.set("Infrastructure",    Math.round(infraEst));
+      categoryMap.set("Miscellaneous",     Math.round(miscEst));
+    }
+  }
+
+  const totalExpenses = Array.from(categoryMap.values()).reduce((a, b) => a + b, 0);
+  const byCategory = Array.from(categoryMap.entries())
+    .map(([category, amount]) => ({
+      category,
+      amount,
+      pct: totalExpenses > 0 ? Math.round((amount / totalExpenses) * 100) : 0,
+    }))
+    .sort((a, b) => b.amount - a.amount);
+
+  const monthlyTrend = snap.months.map(m => ({ month: m.label, amount: Math.round(monthMap.get(m.key) || 0) }));
+  const largestCategory = byCategory[0]?.category || "—";
+
+  const hasRealData = (expSnap.docs as any[]).length > 0;
+  const summary = `${hasRealData ? "Expense analysis" : "Estimated expense breakdown"} totaling $${totalExpenses.toLocaleString()}. ${largestCategory !== "—" ? `${largestCategory} is the largest expense category at ${byCategory[0]?.pct}% of total.` : ""} ${!hasRealData ? "Note: Add an 'expenses' collection in Firestore for exact tracking." : ""}`;
+
+  return { _type: "expense", id: genId(), generatedOn: today(), totalExpenses, byCategory, monthlyTrend, largestCategory, summary } as any;
+}
+
 // ── Log download to Firestore ─────────────────────────────────────────────────
 
 export async function logReportDownload(reportType: string, format: string): Promise<void> {
@@ -787,14 +1206,14 @@ export const REPORT_REGISTRY: Record<string, {
   "attendance-analysis": { label: "Attendance Analysis", category: "student", fetcher: fetchAttendanceReport as any },
   "performance-report": { label: "Performance Report", category: "student", fetcher: fetchPerformanceReport as any },
   "at-risk-students": { label: "At-Risk Students", category: "student", fetcher: fetchAtRiskReport as any },
-  "performance-evaluation": { label: "Performance Evaluation", category: "teacher", fetcher: fetchTeacherPerfReport as any },
-  "workload-analysis": { label: "Workload Analysis", category: "teacher", fetcher: fetchTeacherPerfReport as any },
-  "feedback-summary": { label: "Feedback Summary", category: "teacher", fetcher: fetchTeacherPerfReport as any },
-  "training-needs": { label: "Training Needs", category: "teacher", fetcher: fetchTeacherPerfReport as any },
-  "revenue-summary": { label: "Revenue Summary", category: "financial", fetcher: fetchRevenueReport as any },
-  "fee-collection": { label: "Fee Collection", category: "financial", fetcher: fetchFeeCollectionReport as any },
-  "outstanding-report": { label: "Outstanding Report", category: "financial", fetcher: fetchFeeCollectionReport as any },
-  "expense-analysis": { label: "Expense Analysis", category: "financial", fetcher: fetchRevenueReport as any },
+  "performance-evaluation": { label: "Performance Evaluation", category: "teacher",   fetcher: fetchTeacherPerfReport as any },
+  "workload-analysis":      { label: "Workload Analysis",      category: "teacher",   fetcher: fetchWorkloadReport as any },
+  "feedback-summary":       { label: "Feedback Summary",       category: "teacher",   fetcher: fetchFeedbackReport as any },
+  "training-needs":         { label: "Training Needs",         category: "teacher",   fetcher: fetchTrainingNeedsReport as any },
+  "revenue-summary":        { label: "Revenue Summary",        category: "financial", fetcher: fetchRevenueReport as any },
+  "fee-collection":         { label: "Fee Collection",         category: "financial", fetcher: fetchFeeCollectionReport as any },
+  "outstanding-report":     { label: "Outstanding Report",     category: "financial", fetcher: fetchOutstandingReport as any },
+  "expense-analysis":       { label: "Expense Analysis",       category: "financial", fetcher: fetchExpenseReport as any },
 };
 
 export const REPORT_CATEGORIES = {

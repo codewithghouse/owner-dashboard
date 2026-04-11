@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { fetchAlertDetail, resolveAlert, AlertDetailData } from "@/lib/risksService";
+import { addAuditLog } from "@/lib/auditService";
 import { toast } from "sonner";
 
 export default function AlertDetailPage() {
@@ -36,6 +37,11 @@ export default function AlertDetailPage() {
     setActing(action);
     try {
       await resolveAlert(id, action);
+      addAuditLog(
+        action === "resolved" ? "alert_resolved" : "alert_acknowledged",
+        `Alert ${action}: ${data?.title || id}`,
+        data?.branchName,
+      );
       toast.success(`Alert ${label} successfully.`);
       if (action === "resolved") navigate("/risks");
     } catch {

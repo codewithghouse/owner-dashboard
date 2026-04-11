@@ -3,17 +3,10 @@
  * PDF (jsPDF) + Excel (SheetJS) + CSV + Email export for Reports Center.
  */
 import { jsPDF } from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { logReportDownload } from "./reportsService";
-
-// Extend jsPDF with autoTable
-declare module "jspdf" {
-  interface jsPDF {
-    autoTable: (options: any) => jsPDF;
-    lastAutoTable: { finalY: number };
-  }
-}
+import { auth } from "./firebase";
 
 type ExportPayload = {
   title: string;
@@ -82,7 +75,7 @@ export function exportPDF(payload: ExportPayload): void {
 
   // Table
   if (payload.tableHeaders && payload.tableRows && payload.tableRows.length > 0) {
-    doc.autoTable({
+    autoTable(doc, {
       startY: y,
       head: [payload.tableHeaders],
       body: payload.tableRows,
@@ -187,27 +180,55 @@ export function exportCSV(payload: ExportPayload): void {
 export async function exportEmail(payload: ExportPayload): Promise<{ success: boolean; message: string }> {
   logReportDownload(payload.title, "email");
 
+  const ownerEmail = auth.currentUser?.email;
+  const emailBody = `${payload.title}\nReport ID: ${payload.reportId}\nGenerated: ${payload.generatedOn}\n\n${payload.summary}`;
+
+  // Fallback helper — uses <a> anchor trick to avoid popup-blocker on mailto
+  const mailtoFallback = () => {
+    const subject = encodeURIComponent(`[EDUINTELLECT] ${payload.title}`);
+    const body = encodeURIComponent(emailBody);
+    const a = document.createElement("a");
+    a.href = `mailto:${ownerEmail ?? ""}?subject=${subject}&body=${body}`;
+    a.click();
+    return { success: true, message: "Email client opened with report content" };
+  };
+
+  if (!ownerEmail) {
+    // Not logged in — fall back to mailto
+    return mailtoFallback();
+  }
+
   try {
     const response = await fetch("/api/send-email", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        subject: `[EDUINTELLECT] ${payload.title} - ${payload.reportId}`,
-        body: `${payload.title}\nReport ID: ${payload.reportId}\nGenerated: ${payload.generatedOn}\n\n${payload.summary}`,
+        type: "report",
+        to: ownerEmail,
+        subject: `[EDUINTELLECT] ${payload.title} – ${payload.reportId}`,
+        body: emailBody,
         reportId: payload.reportId,
       }),
     });
 
     if (response.ok) {
-      return { success: true, message: "Report sent via email successfully" };
+      return { success: true, message: `Report emailed to ${ownerEmail}` };
     }
-    return { success: false, message: "Email API returned an error. Report saved as download instead." };
+
+    // API responded but with error — try to parse message
+    let errMsg = "Email API returned an error.";
+    try {
+      const errData = await response.json();
+      errMsg = errData.message || errData.error || errMsg;
+    } catch { /* ignore parse error */ }
+
+    // Fall back to mailto so user isn't left empty-handed
+    mailtoFallback();
+    return { success: false, message: `${errMsg} Email client opened as fallback.` };
+
   } catch {
-    // Fallback: open mailto
-    const subject = encodeURIComponent(`[EDUINTELLECT] ${payload.title}`);
-    const body = encodeURIComponent(`${payload.title}\nReport ID: ${payload.reportId}\nGenerated: ${payload.generatedOn}\n\n${payload.summary}`);
-    window.open(`mailto:?subject=${subject}&body=${body}`, "_blank");
-    return { success: true, message: "Email client opened with report content" };
+    // Network error (e.g. local dev without vercel dev) — fall back to mailto
+    return mailtoFallback();
   }
 }
 

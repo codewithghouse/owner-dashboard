@@ -1,6 +1,7 @@
 import { db, auth } from "./firebase";
-import { collection, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, getDocs, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore";
 import { invalidateCache } from "./analyticsService";
+import { sendCriticalAlertEmail } from "./resend";
 
 export type RiskStat = {
   label: string;
@@ -34,6 +35,24 @@ export type RisksData = {
 export async function fetchRisksOverview(selectedBranchId: string = "all"): Promise<RisksData> {
   const uid = auth.currentUser?.uid;
   if (!uid) throw new Error("User not authenticated");
+
+  // ── Load school settings: thresholds + notification prefs ────────────────
+  let thresholds = { attendanceCritical: 65, attendanceWarning: 80, feeOverdueDays: 30 };
+  let schoolEmail = "";
+  let schoolOwnerName = "";
+  let schoolName = "";
+  let notifCriticalAlerts = true;
+  try {
+    const schoolSnap = await getDoc(doc(db, "schools", uid));
+    if (schoolSnap.exists()) {
+      const sd = schoolSnap.data();
+      if (sd.thresholds) thresholds = { ...thresholds, ...sd.thresholds };
+      schoolEmail       = sd.email       || "";
+      schoolOwnerName   = sd.ownerName   || "Owner";
+      schoolName        = sd.schoolName  || "School";
+      notifCriticalAlerts = sd.notifications?.criticalAlerts ?? true;
+    }
+  } catch { /* use defaults */ }
 
   invalidateCache(`core:${uid}`);
 
@@ -181,8 +200,8 @@ export async function fetchRisksOverview(selectedBranchId: string = "all"): Prom
       bStats.attTotal   += sAtt.length;
       bStats.attPresent += presentCount;
       if (attPct < 80) bStats.lowAttCount++;
-      if (attPct < 65)  level = 'critical';
-      else if (attPct < 80) level = 'warning';
+      if (attPct < thresholds.attendanceCritical)  level = 'critical';
+      else if (attPct < thresholds.attendanceWarning) level = 'warning';
     }
 
     // Academic risk
@@ -298,16 +317,94 @@ export async function fetchRisksOverview(selectedBranchId: string = "all"): Prom
       branchRisks.push({ name: 'All Clear', value: 0, color: '#22c55e' });
   }
 
-  // Fetch resolved alerts count (last 30 days)
+  // ── Real 4-week trend from actual attendance data ─────────────────────────
+  const todayTrendMs = Date.now();
+  // weeklyStudentAtt[0] = current week, weeklyStudentAtt[3] = 3 weeks ago
+  const weeklyStudentAtt: Map<string, { total: number; present: number }>[] = [
+    new Map(), new Map(), new Map(), new Map(),
+  ];
+
+  (attendanceSnap.docs as any[]).forEach(d => {
+    const a = d.data();
+    const sid = a.studentId as string;
+    if (!sid || !studentMap.has(sid)) return;
+    let dateStr: string = a.date || a.dateStr || "";
+    if (!dateStr && a.createdAt?.toDate) {
+      try { dateStr = a.createdAt.toDate().toLocaleDateString("en-CA"); } catch { /* skip */ }
+    }
+    if (!dateStr) return;
+    const dMs = new Date(dateStr).getTime();
+    if (isNaN(dMs)) return;
+    const diffDays = Math.floor((todayTrendMs - dMs) / (1000 * 60 * 60 * 24));
+    if (diffDays < 0 || diffDays > 27) return; // only last 4 weeks
+    const weekIdx = Math.floor(diffDays / 7); // 0=current, 3=oldest
+    const wMap = weeklyStudentAtt[weekIdx];
+    if (!wMap.has(sid)) wMap.set(sid, { total: 0, present: 0 });
+    const wAtt = wMap.get(sid)!;
+    wAtt.total++;
+    if ((a.status ?? "").toString().toLowerCase() === "present") wAtt.present++;
+  });
+
+  const computeWeekRisks = (wMap: Map<string, { total: number; present: number }>) => {
+    let critical = 0, warning = 0;
+    wMap.forEach(att => {
+      if (att.total < 2) return; // need ≥2 records for a meaningful % in that week
+      const pct = (att.present / att.total) * 100;
+      if (pct < thresholds.attendanceCritical) critical++;
+      else if (pct < thresholds.attendanceWarning) warning++;
+    });
+    return { critical, warning };
+  };
+
+  const trend = [
+    { name: '3 Wks Ago', ...computeWeekRisks(weeklyStudentAtt[3]) },
+    { name: '2 Wks Ago', ...computeWeekRisks(weeklyStudentAtt[2]) },
+    { name: 'Last Wk',   ...computeWeekRisks(weeklyStudentAtt[1]) },
+    { name: 'This Wk',   ...computeWeekRisks(weeklyStudentAtt[0]) },
+  ];
+
+  // ── Fetch resolutions — count resolved + build recently-resolved filter set ─
   let resolvedCount = 0;
+  const recentlyResolved = new Set<string>();
   try {
     const resolutionsSnap = await getDocs(collection(db, "alert_resolutions"));
     const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    resolvedCount = resolutionsSnap.docs.filter(d => {
-      const ts = d.data().resolvedAt?.toMillis?.() || 0;
-      return ts > thirtyDaysAgo;
-    }).length;
+    const oneDayAgo     = Date.now() -      24 * 60 * 60 * 1000;
+    resolutionsSnap.docs.forEach(d => {
+      const data = d.data();
+      const ts = data.resolvedAt?.toMillis?.() || 0;
+      if (ts > thirtyDaysAgo) resolvedCount++;
+      // Filter resolved alerts from active display for 24h window
+      if (data.action === "resolved" && ts > oneDayAgo && data.alertId) {
+        recentlyResolved.add(data.alertId as string);
+      }
+    });
   } catch { /* graceful fail */ }
+
+  // Filter out alerts resolved in the last 24h so they don't re-appear immediately
+  const visibleAlerts = alerts.filter(a => !recentlyResolved.has(a.id));
+  if (visibleAlerts.length === 0) {
+    visibleAlerts.push({
+      id: 'no-alerts',
+      title: 'No Active Alerts',
+      status: 'Healthy',
+      desc: 'All active alerts have been resolved. Great work!',
+      type: 'info'
+    });
+  }
+
+  // ── Fire-and-forget critical alert email (respects notification prefs) ────
+  if (criticalCount > 0 && notifCriticalAlerts && schoolEmail) {
+    const worstBranch = branchRisks[0]?.name;
+    sendCriticalAlertEmail({
+      to:            schoolEmail,
+      ownerName:     schoolOwnerName,
+      schoolName:    schoolName,
+      criticalCount,
+      warningCount,
+      branchName:    worstBranch,
+    }).catch(() => {}); // fire-and-forget, never blocks UI
+  }
 
   const totalAlerts = criticalCount + warningCount;
   const resolutionRate = totalAlerts > 0 ? Math.round((resolvedCount / (resolvedCount + totalAlerts)) * 100) : 0;
@@ -316,7 +413,7 @@ export async function fetchRisksOverview(selectedBranchId: string = "all"): Prom
     stats: [
       {
         label: "Active Alerts",
-        value: alerts.filter(a => a.id !== 'no-alerts').length.toString(),
+        value: visibleAlerts.filter(a => a.id !== 'no-alerts').length.toString(),
         change: totalAlerts > 0 ? `${criticalCount} critical, ${warningCount} warning` : "All clear",
         col: totalAlerts > 0 ? "text-rose-500" : "text-emerald-500"
       },
@@ -330,14 +427,9 @@ export async function fetchRisksOverview(selectedBranchId: string = "all"): Prom
       },
     ],
     distribution,
-    trend: [
-      { name: 'W1', critical: Math.max(0, criticalCount - 2), warning: Math.max(0, warningCount - 1) },
-      { name: 'W2', critical: Math.max(0, criticalCount - 1), warning: Math.max(0, warningCount + 1) },
-      { name: 'W3', critical: criticalCount, warning: warningCount },
-      { name: 'Today', critical: criticalCount, warning: warningCount },
-    ],
+    trend,
     branchRisks,
-    alerts
+    alerts: visibleAlerts
   };
 }
 

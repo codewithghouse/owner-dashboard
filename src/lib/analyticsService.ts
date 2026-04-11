@@ -4,7 +4,11 @@
  * financeFees, and risksService to ensure data consistency.
  */
 import { db, auth } from "./firebase";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, limit as fsLimit } from "firebase/firestore";
+
+// Safety limit — prevents browser hang on large schools.
+// Full cursor-based pagination will replace this in a future release.
+const COLLECTION_FETCH_LIMIT = 500;
 
 // ── in-memory cache ────────────────────────────────────────────────────────────
 type CacheEntry<T> = { data: T; ts: number };
@@ -152,16 +156,17 @@ export async function loadCoreSnapshot(uid: string): Promise<CoreSnapshot> {
   const cached = getCache<CoreSnapshot>(cacheKey);
   if (cached) return cached;
 
+  const lim = fsLimit(COLLECTION_FETCH_LIMIT);
   const [branchesSnap, studentsSnap, attendanceSnap, resultsSnap, testScoresSnap, feesSnap, teachersSnap, enrollmentsSnap] =
     await Promise.all([
       getDocs(collection(db, "schools", uid, "branches")),
-      getDocs(collection(db, "students")).catch(() => ({ docs: [] as any[] })),
-      getDocs(collection(db, "attendance")).catch(() => ({ docs: [] as any[] })),
-      getDocs(collection(db, "results")).catch(() => ({ docs: [] as any[] })),
-      getDocs(collection(db, "test_scores")).catch(() => ({ docs: [] as any[] })),
-      getDocs(collection(db, "fees")).catch(() => ({ docs: [] as any[] })),
-      getDocs(collection(db, "teachers")).catch(() => ({ docs: [] as any[] })),
-      getDocs(collection(db, "enrollments")).catch(() => ({ docs: [] as any[] })),
+      getDocs(query(collection(db, "students"),    lim)).catch(() => ({ docs: [] as any[] })),
+      getDocs(query(collection(db, "attendance"),  lim)).catch(() => ({ docs: [] as any[] })),
+      getDocs(query(collection(db, "results"),     lim)).catch(() => ({ docs: [] as any[] })),
+      getDocs(query(collection(db, "test_scores"), lim)).catch(() => ({ docs: [] as any[] })),
+      getDocs(query(collection(db, "fees"),        lim)).catch(() => ({ docs: [] as any[] })),
+      getDocs(query(collection(db, "teachers"),    lim)).catch(() => ({ docs: [] as any[] })),
+      getDocs(query(collection(db, "enrollments"), lim)).catch(() => ({ docs: [] as any[] })),
     ]);
 
   const months = getLast6Months();
@@ -252,7 +257,19 @@ export async function loadCoreSnapshot(uid: string): Promise<CoreSnapshot> {
   // Last-resort fallback: if no students matched any branch but students exist,
   // assign all to the first branch so dashboard is never empty
   const totalMapped = [...branchStudents.values()].reduce((s, set) => s + set.size, 0);
+  const unmapped = studentsSnap.docs.length - totalMapped;
+  if (unmapped > 0 && totalMapped > 0) {
+    // Some students matched, some didn't — warn about the gap
+    console.warn(
+      `[analyticsService] ${unmapped} of ${studentsSnap.docs.length} students could not be mapped to any branch.` +
+      ` Check that student documents contain a valid branchId/schoolId matching a known branch.`
+    );
+  }
   if (totalMapped === 0 && studentsSnap.docs.length > 0 && branches.length > 0) {
+    console.warn(
+      `[analyticsService] No students could be mapped to any branch — falling back to first branch (${branches[0].name}).` +
+      ` This usually means branchId/schoolId fields don't match any branch document. Check data structure.`
+    );
     const fallbackId = branches[0].id;
     (studentsSnap.docs as any[]).forEach(d => {
       branchStudents.get(fallbackId)!.add(d.id);

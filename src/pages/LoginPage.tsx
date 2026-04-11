@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { GraduationCap, Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
+import { GraduationCap, Mail, Lock, ArrowRight, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { auth, db } from "@/lib/firebase";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { toast } from "sonner";
 
@@ -13,6 +13,33 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail.trim()) return;
+    setResetLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, resetEmail.trim());
+      toast.success("Password reset email sent! Check your inbox.");
+      setForgotOpen(false);
+      setResetEmail("");
+    } catch (error: any) {
+      const code = error?.code ?? "";
+      if (code === "auth/user-not-found" || code === "auth/invalid-email") {
+        toast.error("No account found with this email address.");
+      } else if (code === "auth/too-many-requests") {
+        toast.error("Too many requests. Please wait a few minutes and try again.");
+      } else {
+        toast.error("Failed to send reset email. Please try again.");
+      }
+    } finally {
+      setResetLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,7 +124,13 @@ export default function LoginPage() {
             <div className="space-y-2">
               <div className="flex justify-between items-center ml-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Password</label>
-                <button type="button" className="text-[10px] font-bold text-blue-600 hover:text-blue-700">Forgot?</button>
+                <button
+                  type="button"
+                  onClick={() => { setResetEmail(email); setForgotOpen(true); }}
+                  className="text-[10px] font-bold text-blue-600 hover:text-blue-700 transition-colors"
+                >
+                  Forgot?
+                </button>
               </div>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -125,6 +158,48 @@ export default function LoginPage() {
           Secured by EduIntellect Cloud Architecture
         </p>
       </div>
+
+      {/* ── Forgot Password Modal ────────────────────────────────────────── */}
+      {forgotOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm p-8 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-black text-[#1e294b]">Reset Password</h2>
+              <button
+                onClick={() => { setForgotOpen(false); setResetEmail(""); }}
+                className="p-2 rounded-xl hover:bg-slate-50 transition-colors"
+              >
+                <X className="w-4 h-4 text-slate-400" />
+              </button>
+            </div>
+            <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+              Enter your work email and we'll send a password reset link to your inbox.
+            </p>
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Input
+                  type="email"
+                  required
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  className="h-12 pl-11 rounded-xl bg-slate-50 border-slate-100 focus:bg-white transition-all font-medium text-sm"
+                  placeholder="admin@school.com"
+                />
+              </div>
+              <Button
+                disabled={resetLoading}
+                className="w-full h-12 rounded-xl bg-[#1e294b] hover:bg-[#1e3a8a] text-white font-bold shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+              >
+                {resetLoading
+                  ? <Loader2 className="w-5 h-5 animate-spin" />
+                  : "Send Reset Link"
+                }
+              </Button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
