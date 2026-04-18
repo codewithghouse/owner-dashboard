@@ -495,7 +495,7 @@ export default function SettingsPage() {
               type="text"
               value={settings.schoolName}
               onChange={e => set("schoolName", e.target.value)}
-              placeholder="EduIntellect Academy"
+              placeholder="Edullent Academy"
               className="w-full h-12 px-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-semibold text-[#1e293b] outline-none focus:border-blue-300 focus:bg-white transition-all"
             />
           </Field>

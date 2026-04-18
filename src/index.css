@@ -99,3 +99,108 @@
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   GLOBAL 3D HOVER EFFECT — auto-applies to ALL cards across pages
+   Targets: rounded-lg/xl/2xl/3xl bordered cards, stat cards, ds-cards
+   ═══════════════════════════════════════════════════════════════ */
+
+.bg-white[class*="rounded-"],
+.bg-card[class*="rounded-"],
+[class*="bg-white"][class*="border"][class*="rounded-"],
+div[class*="shadow-sm"][class*="rounded-"],
+.stat-card {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.3s ease,
+              border-color 0.3s ease !important;
+  will-change: transform;
+  position: relative;
+}
+
+.bg-white[class*="rounded-"]:hover,
+.bg-card[class*="rounded-"]:hover,
+[class*="bg-white"][class*="border"][class*="rounded-"]:hover,
+div[class*="shadow-sm"][class*="rounded-"]:hover,
+.stat-card:hover {
+  transform: translateY(-4px) scale(1.008) !important;
+  box-shadow: 0 20px 40px rgba(30, 58, 138, 0.08),
+              0 8px 16px rgba(0, 0, 0, 0.04),
+              0 0 0 1px rgba(59, 91, 219, 0.1) !important;
+  border-color: rgba(59, 91, 219, 0.2) !important;
+}
+
+/* Radial glow shine on hover */
+.bg-white[class*="rounded-"]:hover::after,
+.bg-card[class*="rounded-"]:hover::after,
+div[class*="shadow-sm"][class*="rounded-"]:hover::after,
+.stat-card:hover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(circle at 30% 20%, rgba(59, 91, 219, 0.05) 0%, transparent 60%);
+  z-index: 0;
+}
+
+/* Keep children above the ::after glow */
+.stat-card > *,
+.bg-white[class*="rounded-"] > *,
+.bg-card[class*="rounded-"] > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Clickable card affordance ────────────────────────────────── */
+.clickable-card,
+[role="button"][class*="rounded-"],
+a[class*="rounded-"][class*="border"],
+button[class*="rounded-"][class*="border"] {
+  cursor: pointer;
+}
+.clickable-card:active,
+[role="button"][class*="rounded-"]:active {
+  transform: translateY(-2px) scale(0.99) !important;
+  transition: transform 0.1s ease !important;
+}
+
+/* ── Button lift on hover (accent buttons) ────────────────────── */
+button[class*="bg-primary"],
+button[class*="bg-blue"],
+button[class*="bg-[#1e3a8a]"],
+a[class*="bg-primary"] {
+  transition: transform 0.15s ease, box-shadow 0.2s ease !important;
+}
+button[class*="bg-primary"]:hover,
+button[class*="bg-blue"]:hover,
+button[class*="bg-[#1e3a8a]"]:hover,
+a[class*="bg-primary"]:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 20px rgba(30, 58, 138, 0.25) !important;
+}
+button:active, a:active { transform: scale(0.97) !important; }
+
+/* ── Table row hover ──────────────────────────────────────────── */
+tr[class*="hover"]:hover,
+tbody tr:hover {
+  background: rgba(59, 91, 219, 0.03) !important;
+  transition: background 0.15s ease !important;
+}
+
+/* ── Page fade-in ─────────────────────────────────────────────── */
+@keyframes ownerFadeSlideIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+main > div,
+[class*="animate-in"] {
+  animation: ownerFadeSlideIn 0.4s ease-out;
+}
+
+/* ── Stat number scale on card hover ──────────────────────────── */
+.stat-card:hover [class*="text-2xl"],
+.stat-card:hover [class*="text-3xl"],
+.stat-card:hover [class*="text-4xl"] {
+  transform: scale(1.05);
+  transition: transform 0.25s ease;
+}

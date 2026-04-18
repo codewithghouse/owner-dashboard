@@ -9,6 +9,7 @@
  * Also lets owner generate a parent-shareable link per student.
  */
 import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { db, auth } from "@/lib/firebase";
 import {
   collection, addDoc, serverTimestamp,
@@ -48,6 +49,7 @@ function getInitials(name: string) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function AIPredictorPage() {
+  const navigate = useNavigate();
   const [predictions, setPredictions] = useState<StudentRiskPrediction[]>([]);
   const [loading,     setLoading]     = useState(true);
   const [search,      setSearch]      = useState("");
@@ -245,7 +247,10 @@ export default function AIPredictorPage() {
             return (
               <div
                 key={p.studentId}
-                className={`bg-white rounded-2xl border ${cfg.border} shadow-sm overflow-hidden transition-all`}
+                onClick={() => navigate("/risks")}
+                role="button"
+                tabIndex={0}
+                className={`clickable-card bg-white rounded-2xl border ${cfg.border} shadow-sm overflow-hidden transition-all`}
               >
                 {/* ── Row ──────────────────────────────────────────────── */}
                 <div className="flex items-center gap-4 p-4">
@@ -311,7 +316,7 @@ export default function AIPredictorPage() {
                   {/* Actions */}
                   <div className="flex items-center gap-2 shrink-0">
                     <button
-                      onClick={() => generateParentLink(p)}
+                      onClick={(e) => { e.stopPropagation(); generateParentLink(p); }}
                       title="Copy parent share link"
                       className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
                     >
@@ -321,7 +326,7 @@ export default function AIPredictorPage() {
                       }
                     </button>
                     <button
-                      onClick={() => setExpanded(isExpanded ? null : p.studentId)}
+                      onClick={(e) => { e.stopPropagation(); setExpanded(isExpanded ? null : p.studentId); }}
                       className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
                     >
                       {isExpanded
@@ -396,7 +401,7 @@ export default function AIPredictorPage() {
 
                     {/* Share link button */}
                     <button
-                      onClick={() => generateParentLink(p)}
+                      onClick={(e) => { e.stopPropagation(); generateParentLink(p); }}
                       className="flex items-center gap-2 text-xs font-black text-[#1e3a8a] hover:underline"
                     >
                       <Share2 className="w-3.5 h-3.5" />

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { db, auth } from "@/lib/firebase";
 import { collection, getDocs, query, orderBy, where } from "firebase/firestore";
 import {
@@ -55,6 +56,7 @@ function getHeatColor(v: number) {
 const PAGE_SIZE = 10;
 
 export default function StudentsIntelligence() {
+  const navigate = useNavigate();
   /* ── raw data ───────────────────────────────────── */
   const [students,   setStudents]   = useState<any[]>([]);
   const [schools,    setSchools]    = useState<Map<string,string>>(new Map());
@@ -473,12 +475,18 @@ export default function StudentsIntelligence() {
           {/* ── Stat Cards ────────────────────────────── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             {[
-              { label:"Total Enrollment",   value: totalEnrollment.toLocaleString(), sub:`+124 this term`,        color:"text-green-600" },
-              { label:"Average Attendance", value:`${avgAttendance}%`,               sub:"+0.5% vs last month",   color:"text-green-600" },
-              { label:"At-Risk Students",   value: atRisk.toString(),                sub:`${totalEnrollment>0?((atRisk/totalEnrollment)*100).toFixed(1):0}% of total`, color:"text-red-500" },
-              { label:"High Performers",    value: highPerformers.toString(),         sub:`${totalEnrollment>0?((highPerformers/totalEnrollment)*100).toFixed(1):0}% of total`, color:"text-green-600" },
+              { label:"Total Enrollment",   value: totalEnrollment.toLocaleString(), sub:`+124 this term`,        color:"text-green-600", route: "/students" },
+              { label:"Average Attendance", value:`${avgAttendance}%`,               sub:"+0.5% vs last month",   color:"text-green-600", route: "/students" },
+              { label:"At-Risk Students",   value: atRisk.toString(),                sub:`${totalEnrollment>0?((atRisk/totalEnrollment)*100).toFixed(1):0}% of total`, color:"text-red-500", route: "/risks" },
+              { label:"High Performers",    value: highPerformers.toString(),         sub:`${totalEnrollment>0?((highPerformers/totalEnrollment)*100).toFixed(1):0}% of total`, color:"text-green-600", route: "/students" },
             ].map(s=>(
-              <div key={s.label} className="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
+              <div
+                key={s.label}
+                onClick={() => navigate(s.route)}
+                role="button"
+                tabIndex={0}
+                className="clickable-card bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all"
+              >
                 <p className="text-slate-400 text-[10px] md:text-[11px] font-bold uppercase tracking-widest mb-1 md:mb-2">{s.label}</p>
                 <h3 className="text-3xl md:text-4xl font-extrabold text-[#1e294b] tracking-tight mb-1">{s.value}</h3>
                 <p className={`text-[10px] md:text-[11px] font-bold ${s.color}`}>{s.sub}</p>

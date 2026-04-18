@@ -104,12 +104,17 @@ export default function AcademicsOverview() {
             {/* Metric Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-12">
               {[
-                { label: "Average Score",       ...subject.metrics.avgScore,      type: "green"  },
-                { label: "Pass Rate",           ...subject.metrics.passRate,      type: "green"  },
-                { label: "Top Performers",      ...subject.metrics.topPerformers, type: "green"  },
-                { label: "Areas Needing Focus", ...subject.metrics.focusAreas,    type: "yellow" },
+                { label: "Average Score",       ...subject.metrics.avgScore,      type: "green",  route: "/academics" },
+                { label: "Pass Rate",           ...subject.metrics.passRate,      type: "green",  route: "/academics" },
+                { label: "Top Performers",      ...subject.metrics.topPerformers, type: "green",  route: "/students"  },
+                { label: "Areas Needing Focus", ...subject.metrics.focusAreas,    type: "yellow", route: "/risks"     },
               ].map((stat, i) => (
-                <div key={i} className={`p-5 md:p-8 rounded-2xl md:rounded-[1.5rem] border ${
+                <div
+                  key={i}
+                  onClick={() => navigate(stat.route)}
+                  role="button"
+                  tabIndex={0}
+                  className={`clickable-card p-5 md:p-8 rounded-2xl md:rounded-[1.5rem] border ${
                   stat.type === "green" ? "bg-[#f0fdf4] border-emerald-100/50" : "bg-[#fffbeb] border-amber-100/50"
                 }`}>
                   <p className={`text-[9px] md:text-[11px] font-black uppercase tracking-tight mb-3 md:mb-4 ${
@@ -309,12 +314,18 @@ export default function AcademicsOverview() {
         {overviewLoading
           ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 md:h-40" />)
           : [
-              { label: "Overall Pass Rate",   ...activeData!.stats.overallPassRate, green: true  },
-              { label: "Average Score",       ...activeData!.stats.averageScore,    green: true  },
-              { label: "Distinction Rate",    ...activeData!.stats.distinctionRate, green: true  },
-              { label: "Total Students",      ...activeData!.stats.totalStudents,   green: false },
+              { label: "Overall Pass Rate",   ...activeData!.stats.overallPassRate, green: true,  route: "/academics" },
+              { label: "Average Score",       ...activeData!.stats.averageScore,    green: true,  route: "/academics" },
+              { label: "Distinction Rate",    ...activeData!.stats.distinctionRate, green: true,  route: "/academics" },
+              { label: "Total Students",      ...activeData!.stats.totalStudents,   green: false, route: "/students"  },
             ].map((stat, i) => (
-              <div key={i} className="bg-white p-6 md:p-8 rounded-2xl md:rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-all">
+              <div
+                key={i}
+                onClick={() => navigate(stat.route)}
+                role="button"
+                tabIndex={0}
+                className="clickable-card bg-white p-6 md:p-8 rounded-2xl md:rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-all"
+              >
                 <p className="text-slate-400 text-[10px] md:text-xs font-black uppercase tracking-widest mb-3 md:mb-4">{stat.label}</p>
                 <h3 className="text-3xl md:text-4xl font-black text-[#111827] tracking-tighter mb-1 md:mb-2">{stat.value}</h3>
                 <p className={`text-[10px] md:text-[11px] font-black uppercase ${stat.green ? "text-emerald-500" : "text-blue-500"}`}>
@@ -507,7 +518,13 @@ export default function AcademicsOverview() {
           <h2 className="text-lg font-bold text-[#111827] mb-5">Branch-wise Breakdown</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {branches.map(b => (
-              <div key={b.id} className="bg-white border border-slate-100 rounded-[2rem] p-7 shadow-sm hover:shadow-md transition-all">
+              <div
+                key={b.id}
+                onClick={() => navigate(`/branches/${b.id}`)}
+                role="button"
+                tabIndex={0}
+                className="clickable-card bg-white border border-slate-100 rounded-[2rem] p-7 shadow-sm hover:shadow-md transition-all"
+              >
                 <div className="flex items-center gap-4 mb-6">
                   <div className="w-11 h-11 rounded-xl flex items-center justify-center text-white text-sm font-black shadow-md shrink-0"
                     style={{ backgroundColor: b.color }}>
@@ -547,7 +564,7 @@ export default function AcademicsOverview() {
                           <span key={subj}
                             className="px-3 py-1 rounded-lg text-[10px] font-bold text-white cursor-pointer hover:opacity-80"
                             style={{ backgroundColor: b.color }}
-                            onClick={() => navigate(`/academics/${subj.toLowerCase()}`)}
+                            onClick={(e) => { e.stopPropagation(); navigate(`/academics/${subj.toLowerCase()}`); }}
                           >
                             {subj.slice(0, 8)} {score}%
                           </span>

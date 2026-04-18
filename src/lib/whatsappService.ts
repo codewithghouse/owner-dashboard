@@ -1,22 +1,28 @@
 /**
  * whatsappService.ts
  * Client-side wrapper for /api/send-whatsapp Vercel function.
- * India note: WhatsApp >95% open rate vs email <30% — this is the primary notification channel.
+ * Sends Firebase ID token with every call.
  */
+import { auth } from "./firebase";
 
 type WAType = "attendance_alert" | "fee_reminder" | "critical_alert" | "weekly_digest";
 
 async function sendWhatsApp(to: string, type: WAType, data: Record<string, any>) {
   try {
-    const res  = await fetch("/api/send-whatsapp", {
+    const token = await auth.currentUser?.getIdToken();
+    const res = await fetch("/api/send-whatsapp", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ to, type, data }),
     });
     const json = await res.json().catch(() => ({}));
     return { success: res.ok, ...json };
   } catch (e: any) {
-    return { success: false, error: e.message };
+    console.error("[sendWhatsApp] error:", e);
+    return { success: false, error: "Network error." };
   }
 }
 

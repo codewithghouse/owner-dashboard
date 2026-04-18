@@ -3,12 +3,77 @@
  * Shared analytics primitives used by branchesService, academicsService,
  * financeFees, and risksService to ensure data consistency.
  */
-import { db, auth } from "./firebase";
-import { collection, getDocs, query, limit as fsLimit } from "firebase/firestore";
+import { db } from "./firebase";
+import {
+  collection, getDocs, query, limit as fsLimit,
+  orderBy, startAfter, where,
+  type QueryDocumentSnapshot, type DocumentData, type Query,
+} from "firebase/firestore";
 
-// Safety limit — prevents browser hang on large schools.
-// Full cursor-based pagination will replace this in a future release.
-const COLLECTION_FETCH_LIMIT = 500;
+// Page size per Firestore round-trip. Kept small enough that one page
+// fits comfortably in memory and the network round-trip stays responsive,
+// large enough that we don't spam Firestore for big collections.
+const PAGE_SIZE = 500;
+
+// Hard cap per collection to prevent runaway loops if a bad filter lets
+// the query scan unbounded. Tuned for ~5 years of data for a 5K-student school.
+const MAX_DOCS_PER_COLLECTION = 100_000;
+
+/**
+ * fetchAll — cursor-paginated fetch of every doc matching `baseQuery`.
+ *
+ * Replaces the legacy 500-doc hard limit so owner analytics never silently
+ * drop records for larger schools. Uses `orderBy(__name__)` for a stable,
+ * index-free cursor. Callers must pre-filter with `where("schoolId", "==", ...)`
+ * so we never scan cross-tenant.
+ */
+async function fetchAll<T = DocumentData>(
+  baseQuery: Query<T>,
+  label: string,
+): Promise<QueryDocumentSnapshot<T>[]> {
+  const out: QueryDocumentSnapshot<T>[] = [];
+  let cursor: QueryDocumentSnapshot<T> | null = null;
+
+  while (out.length < MAX_DOCS_PER_COLLECTION) {
+    const q = cursor
+      ? query(baseQuery, orderBy("__name__"), startAfter(cursor), fsLimit(PAGE_SIZE))
+      : query(baseQuery, orderBy("__name__"), fsLimit(PAGE_SIZE));
+
+    const snap = await getDocs(q);
+    if (snap.empty) break;
+
+    out.push(...snap.docs);
+    if (snap.docs.length < PAGE_SIZE) break;
+    cursor = snap.docs[snap.docs.length - 1];
+  }
+
+  if (out.length >= MAX_DOCS_PER_COLLECTION) {
+    console.warn(
+      `[analyticsService] ${label} hit MAX_DOCS_PER_COLLECTION (${MAX_DOCS_PER_COLLECTION}). ` +
+      `Archive older records or raise the cap.`,
+    );
+  }
+
+  return out;
+}
+
+/** Fetch a tenant-scoped collection. Falls back to unfiltered if the
+ *  collection has no schoolId field (e.g. sub-collections). */
+async function fetchSchoolScoped(
+  collName: string,
+  uid: string,
+  { scoped = true }: { scoped?: boolean } = {},
+): Promise<QueryDocumentSnapshot<DocumentData>[]> {
+  try {
+    const base = scoped
+      ? query(collection(db, collName), where("schoolId", "==", uid))
+      : query(collection(db, collName));
+    return await fetchAll(base, collName);
+  } catch (err) {
+    console.error(`[analyticsService] fetch ${collName} failed:`, err);
+    return [];
+  }
+}
 
 // ── in-memory cache ────────────────────────────────────────────────────────────
 type CacheEntry<T> = { data: T; ts: number };
@@ -156,18 +221,28 @@ export async function loadCoreSnapshot(uid: string): Promise<CoreSnapshot> {
   const cached = getCache<CoreSnapshot>(cacheKey);
   if (cached) return cached;
 
-  const lim = fsLimit(COLLECTION_FETCH_LIMIT);
-  const [branchesSnap, studentsSnap, attendanceSnap, resultsSnap, testScoresSnap, feesSnap, teachersSnap, enrollmentsSnap] =
+  const [branchesDocs, studentsDocs, attendanceDocs, resultsDocs, testScoresDocs, feesDocs, teachersDocs, enrollmentsDocs] =
     await Promise.all([
-      getDocs(collection(db, "schools", uid, "branches")),
-      getDocs(query(collection(db, "students"),    lim)).catch(() => ({ docs: [] as any[] })),
-      getDocs(query(collection(db, "attendance"),  lim)).catch(() => ({ docs: [] as any[] })),
-      getDocs(query(collection(db, "results"),     lim)).catch(() => ({ docs: [] as any[] })),
-      getDocs(query(collection(db, "test_scores"), lim)).catch(() => ({ docs: [] as any[] })),
-      getDocs(query(collection(db, "fees"),        lim)).catch(() => ({ docs: [] as any[] })),
-      getDocs(query(collection(db, "teachers"),    lim)).catch(() => ({ docs: [] as any[] })),
-      getDocs(query(collection(db, "enrollments"), lim)).catch(() => ({ docs: [] as any[] })),
+      // Branches live as a subcollection under schools/{uid}/branches — no schoolId filter needed.
+      fetchAll(query(collection(db, "schools", uid, "branches")), `schools/${uid}/branches`),
+      fetchSchoolScoped("students",    uid),
+      fetchSchoolScoped("attendance",  uid),
+      fetchSchoolScoped("results",     uid),
+      fetchSchoolScoped("test_scores", uid),
+      fetchSchoolScoped("fees",        uid),
+      fetchSchoolScoped("teachers",    uid),
+      fetchSchoolScoped("enrollments", uid),
     ]);
+
+  // Adapt to the { docs: [...] } shape the rest of this function already expects.
+  const branchesSnap   = { docs: branchesDocs };
+  const studentsSnap   = { docs: studentsDocs };
+  const attendanceSnap = { docs: attendanceDocs };
+  const resultsSnap    = { docs: resultsDocs };
+  const testScoresSnap = { docs: testScoresDocs };
+  const feesSnap       = { docs: feesDocs };
+  const teachersSnap   = { docs: teachersDocs };
+  const enrollmentsSnap = { docs: enrollmentsDocs };
 
   const months = getLast6Months();
 

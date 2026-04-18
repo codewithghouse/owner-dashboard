@@ -54,24 +54,24 @@ export default defineConfig(({ mode }) => {
                       // Report sharing email
                       const safeBody = (payload.body || "").replace(/\n/g, "<br>");
                       emailPayload = {
-                        from: "EduIntellect Reports <noreply@edulent.dgion.com>",
+                        from: "Edullent Reports <noreply@edulent.dgion.com>",
                         to: [to],
-                        subject: subject || "[EduIntellect] Report",
+                        subject: subject || "[Edullent] Report",
                         html: `
                           <div style="font-family:sans-serif;max-width:600px;margin:auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
                             <div style="background:#1e3a8a;padding:24px 28px;">
-                              <h1 style="color:#fff;margin:0;font-size:20px;">EDUINTELLECT</h1>
+                              <h1 style="color:#fff;margin:0;font-size:20px;">EDULLENT</h1>
                               <p style="color:#bfdbfe;margin:4px 0 0;font-size:13px;">Reports Center</p>
                             </div>
                             <div style="padding:28px;background:#fff;">
-                              <h2 style="color:#1e293b;font-size:17px;margin:0 0 8px;">${(subject || "").replace(/^\[EDUINTELLECT\]\s*/, "")}</h2>
+                              <h2 style="color:#1e293b;font-size:17px;margin:0 0 8px;">${(subject || "").replace(/^\[EDULLENT\]\s*/, "")}</h2>
                               ${reportId ? `<p style="color:#64748b;font-size:12px;margin:0 0 20px;">Report ID: <strong>${reportId}</strong></p>` : ""}
                               <div style="background:#f8fafc;border-left:3px solid #1e3a8a;padding:16px 18px;border-radius:0 8px 8px 0;color:#334155;font-size:14px;line-height:1.6;">
                                 ${safeBody}
                               </div>
                             </div>
                             <div style="background:#f1f5f9;padding:14px 28px;text-align:center;">
-                              <p style="color:#94a3b8;font-size:11px;margin:0;">Powered by EduIntellect Cloud Architecture</p>
+                              <p style="color:#94a3b8;font-size:11px;margin:0;">Powered by Edullent Cloud Architecture</p>
                             </div>
                           </div>
                         `,
@@ -79,13 +79,13 @@ export default defineConfig(({ mode }) => {
                     } else {
                       // Principal invitation email (default)
                       emailPayload = {
-                        from: "EduIntellect <invite@edulent.dgion.com>",
+                        from: "Edullent <invite@edulent.dgion.com>",
                         to: [to],
-                        subject: `Welcome to ${schoolName || "EduIntellect"} – Principal Dashboard Access`,
+                        subject: `Welcome to ${schoolName || "Edullent"} – Principal Dashboard Access`,
                         html: `
                           <div style="font-family:sans-serif;max-width:600px;margin:auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
                             <div style="background:#1e3a8a;padding:24px 28px;">
-                              <h1 style="color:#fff;margin:0;font-size:20px;">EDUINTELLECT</h1>
+                              <h1 style="color:#fff;margin:0;font-size:20px;">EDULLENT</h1>
                               <p style="color:#bfdbfe;margin:4px 0 0;font-size:13px;">Principal Dashboard Invitation</p>
                             </div>
                             <div style="padding:28px;background:#fff;">
@@ -106,7 +106,7 @@ export default defineConfig(({ mode }) => {
                               </div>
                             </div>
                             <div style="background:#f1f5f9;padding:14px 28px;text-align:center;">
-                              <p style="color:#94a3b8;font-size:11px;margin:0;">Powered by EduIntellect Cloud Architecture</p>
+                              <p style="color:#94a3b8;font-size:11px;margin:0;">Powered by Edullent Cloud Architecture</p>
                             </div>
                           </div>
                         `,

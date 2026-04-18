@@ -91,7 +91,13 @@ export default function RisksAlerts() {
       {/* Stats Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {activeData.stats.map((stat, i) => (
-          <div key={i} className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] border border-slate-100 shadow-sm transition-all hover:shadow-md">
+          <div
+            key={i}
+            onClick={() => navigate("/risks")}
+            role="button"
+            tabIndex={0}
+            className="clickable-card bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] border border-slate-100 shadow-sm transition-all hover:shadow-md"
+          >
             <p className="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-tight mb-3 md:mb-4">{stat.label}</p>
             <h3 className="text-3xl md:text-4xl font-extrabold text-[#111827] tracking-tighter mb-1 md:mb-2">{stat.value}</h3>
             <p className={`text-[10px] md:text-[11px] font-bold ${stat.col}`}>{stat.change}</p>
@@ -207,7 +213,13 @@ export default function RisksAlerts() {
               const badgeBg     = alert.type === 'critical' ? 'bg-[#ef4444]' : alert.type === 'warning' ? 'bg-[#f59e0b]' : 'bg-[#0ea5e9]';
 
               return (
-                <div key={alert.id} className={`p-5 md:p-6 rounded-2xl relative overflow-hidden transition-all hover:-translate-y-0.5 duration-300 shadow-sm border ${alert.type === 'critical' ? 'border-red-100' : alert.type === 'warning' ? 'border-amber-100' : 'border-sky-100'} ${accentBg}`}>
+                <div
+                  key={alert.id}
+                  onClick={() => navigate(`/risks/${alert.id}`)}
+                  role="button"
+                  tabIndex={0}
+                  className={`clickable-card p-5 md:p-6 rounded-2xl relative overflow-hidden transition-all hover:-translate-y-0.5 duration-300 shadow-sm border ${alert.type === 'critical' ? 'border-red-100' : alert.type === 'warning' ? 'border-amber-100' : 'border-sky-100'} ${accentBg}`}
+                >
                   <div className={`absolute top-0 left-0 w-1 h-full ${accentBar}`} />
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pl-3">
                     <div className="flex items-start gap-4">
@@ -230,7 +242,7 @@ export default function RisksAlerts() {
                       </div>
                     </div>
                     <button
-                      onClick={() => navigate(`/risks/${alert.id}`)}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/risks/${alert.id}`); }}
                       className="shrink-0 px-5 py-2 bg-[#1e294b] text-white text-xs font-bold rounded-xl hover:bg-[#1e3a8a] transition-colors shadow-sm"
                     >
                       View Details

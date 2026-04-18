@@ -29,7 +29,7 @@ export function exportPDF(payload: ExportPayload): void {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(18);
   doc.setFont("helvetica", "bold");
-  doc.text("EDUINTELLECT", 14, 15);
+  doc.text("EDULLENT", 14, 15);
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.text(payload.title, 14, 24);
@@ -98,7 +98,7 @@ export function exportPDF(payload: ExportPayload): void {
     doc.setFontSize(7);
     doc.setTextColor(148, 163, 184);
     doc.text(
-      `EDUINTELLECT Reports Center | Page ${i} of ${pageCount}`,
+      `EDULLENT Reports Center | Page ${i} of ${pageCount}`,
       105, 290, { align: "center" }
     );
   }
@@ -114,7 +114,7 @@ export function exportExcel(payload: ExportPayload): void {
 
   // Summary sheet
   const summaryData = [
-    ["EDUINTELLECT - " + payload.title],
+    ["EDULLENT - " + payload.title],
     ["Report ID", payload.reportId],
     ["Generated", payload.generatedOn],
     [""],
@@ -144,7 +144,7 @@ export function exportCSV(payload: ExportPayload): void {
   const lines: string[] = [];
 
   // Header
-  lines.push(`"EDUINTELLECT - ${payload.title}"`);
+  lines.push(`"EDULLENT - ${payload.title}"`);
   lines.push(`"Report ID","${payload.reportId}"`);
   lines.push(`"Generated","${payload.generatedOn}"`);
   lines.push("");
@@ -185,7 +185,7 @@ export async function exportEmail(payload: ExportPayload): Promise<{ success: bo
 
   // Fallback helper — uses <a> anchor trick to avoid popup-blocker on mailto
   const mailtoFallback = () => {
-    const subject = encodeURIComponent(`[EDUINTELLECT] ${payload.title}`);
+    const subject = encodeURIComponent(`[EDULLENT] ${payload.title}`);
     const body = encodeURIComponent(emailBody);
     const a = document.createElement("a");
     a.href = `mailto:${ownerEmail ?? ""}?subject=${subject}&body=${body}`;
@@ -205,7 +205,7 @@ export async function exportEmail(payload: ExportPayload): Promise<{ success: bo
       body: JSON.stringify({
         type: "report",
         to: ownerEmail,
-        subject: `[EDUINTELLECT] ${payload.title} – ${payload.reportId}`,
+        subject: `[EDULLENT] ${payload.title} – ${payload.reportId}`,
         body: emailBody,
         reportId: payload.reportId,
       }),

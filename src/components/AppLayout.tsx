@@ -5,14 +5,14 @@ import {
   DollarSign, AlertTriangle, GitBranch, FileText, Settings,
   Menu, X, UserCog, LogOut, ShieldCheck, Bell,
   Clock, ShieldAlert, CheckCircle2, DollarSign as FeeIcon,
-  Search, Activity, Brain,
+  Search, Activity, Brain, ClipboardList, FileSpreadsheet, Trophy,
 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import {
   doc, getDoc, collection, query, where,
   onSnapshot, orderBy, limit
 } from "firebase/firestore";
-import { signOut } from "firebase/auth";
+import { signOut, onAuthStateChanged } from "firebase/auth";
 import SearchModal from "@/components/SearchModal";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -31,8 +31,10 @@ const navItems = [
   { to: "/",          label: "Dashboard",             icon: LayoutDashboard },
   { to: "/students",  label: "Students Intelligence", icon: Users },
   { to: "/teachers",  label: "Teacher Performance",   icon: GraduationCap },
+  { to: "/teachers-directory", label: "Teachers Directory", icon: ClipboardList },
   { to: "/academics", label: "Academics Overview",    icon: BookOpen },
   { to: "/finance",   label: "Finance & Fees",        icon: DollarSign },
+  { to: "/fee-structure", label: "Fee Structure",     icon: FileSpreadsheet },
   { to: "/risks",     label: "Risks & Alerts",        icon: AlertTriangle },
   { to: "/branches",  label: "Branches Comparison",   icon: GitBranch },
   { to: "/reports",   label: "Reports Center",        icon: FileText },
@@ -40,6 +42,7 @@ const navItems = [
   { to: "/deo",       label: "DEO Management",        icon: ShieldCheck },
   { to: "/audit",        label: "Activity Log",          icon: Activity },
   { to: "/ai-predictor", label: "AI Risk Predictor",    icon: Brain },
+  { to: "/teacher-leaderboard", label: "Teacher Leaderboard", icon: Trophy },
   { to: "/settings",     label: "Settings",              icon: Settings },
 ];
 
@@ -68,7 +71,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [bellOpen, setBellOpen]           = useState(false);
   const [searchOpen, setSearchOpen]       = useState(false);
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const bellRef                           = useRef<HTMLDivElement>(null);
+  const avatarRef                         = useRef<HTMLDivElement>(null);
   const location   = useLocation();
   const navigate   = useNavigate();
 
@@ -88,95 +93,116 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("keydown", handleKey);
   }, []);
 
-  // ── School data ─────────────────────────────────────────────────────────
+  // ── School data + notifications (auth-state-aware) ──────────────────────
+  // Fixed 2026-04-18: previously read `auth.currentUser` at mount time which
+  // races with onAuthStateChanged on cold reload — notifications never
+  // subscribed for signed-in users who landed directly on a deep link.
   useEffect(() => {
-    const fetchSchoolData = async () => {
-      if (auth.currentUser) {
-        const snap = await getDoc(doc(db, "schools", auth.currentUser.uid));
+    let unsubDEO: (() => void) | null = null;
+    let unsubRisk: (() => void) | null = null;
+
+    const unsubAuth = onAuthStateChanged(auth, async (user) => {
+      // Tear down any previous subscriptions when auth changes.
+      if (unsubDEO) { unsubDEO(); unsubDEO = null; }
+      if (unsubRisk) { unsubRisk(); unsubRisk = null; }
+
+      if (!user) {
+        setSchoolData(null);
+        setNotifications([]);
+        return;
+      }
+
+      // School profile
+      try {
+        const snap = await getDoc(doc(db, "schools", user.uid));
         if (snap.exists()) setSchoolData(snap.data());
+      } catch (err) {
+        console.warn("[AppLayout] school fetch failed:", err);
       }
+
+      // Parse already-read notification IDs safely — corrupted localStorage
+      // must NOT crash the layout.
+      let readIds: Set<string> = new Set();
+      try {
+        readIds = new Set(JSON.parse(localStorage.getItem(`notif_read_${user.uid}`) || "[]"));
+      } catch (err) {
+        console.warn("[AppLayout] corrupted notif_read cache — ignoring:", err);
+      }
+
+      // ① DEO pending requests
+      unsubDEO = onSnapshot(
+        query(collection(db, "access_requests"), where("schoolId", "==", user.uid), where("status", "==", "pending")),
+        (snap) => {
+          const deoNotifs: Notification[] = snap.docs.map(d => {
+            const data = d.data();
+            const ts = data.requestDate?.toMillis?.() || data.createdAt?.toMillis?.() || Date.now();
+            return {
+              id: `deo_${d.id}`,
+              type: "deo_request" as const,
+              title: "New DEO Access Request",
+              body: `${data.name || "Someone"} from ${data.branchName || "a branch"} requested DEO access`,
+              link: "/deo",
+              read: readIds.has(`deo_${d.id}`),
+              ts,
+            };
+          });
+          setNotifications(prev => {
+            const filtered = prev.filter(n => n.type !== "deo_request");
+            return [...filtered, ...deoNotifs].sort((a, b) => b.ts - a.ts).slice(0, 20);
+          });
+        },
+        (err) => console.warn("[AppLayout] DEO snapshot error:", err.code, err.message),
+      );
+
+      // ② Risk alerts (last 5)
+      unsubRisk = onSnapshot(
+        query(collection(db, "risks"), where("schoolId", "==", user.uid), orderBy("createdAt", "desc"), limit(5)),
+        (snap) => {
+          const riskNotifs: Notification[] = snap.docs.map(d => {
+            const data = d.data();
+            const ts = data.createdAt?.toMillis?.() || Date.now();
+            return {
+              id: `risk_${d.id}`,
+              type: "risk_alert" as const,
+              title: data.title || "Risk Alert",
+              body: data.description || data.message || "A risk was flagged in your school",
+              link: "/risks",
+              read: readIds.has(`risk_${d.id}`),
+              ts,
+            };
+          });
+          setNotifications(prev => {
+            const filtered = prev.filter(n => n.type !== "risk_alert");
+            return [...filtered, ...riskNotifs].sort((a, b) => b.ts - a.ts).slice(0, 20);
+          });
+        },
+        (err) => console.warn("[AppLayout] Risk snapshot error:", err.code, err.message),
+      );
+    });
+
+    return () => {
+      unsubAuth();
+      if (unsubDEO) unsubDEO();
+      if (unsubRisk) unsubRisk();
     };
-    fetchSchoolData();
   }, []);
 
-  // ── Real-time notifications ──────────────────────────────────────────────
-  useEffect(() => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
-
-    // Read already-read IDs from localStorage
-    const readKey = `notif_read_${uid}`;
-    const readIds: Set<string> = new Set(JSON.parse(localStorage.getItem(readKey) || "[]"));
-
-    const notifs: Notification[] = [];
-
-    // ① DEO pending requests
-    const unsubDEO = onSnapshot(
-      query(collection(db, "access_requests"), where("schoolId", "==", uid), where("status", "==", "pending")),
-      snap => {
-        const deoNotifs: Notification[] = snap.docs.map(d => {
-          const data = d.data();
-          const ts = data.requestDate?.toMillis?.() || data.createdAt?.toMillis?.() || Date.now();
-          return {
-            id:    `deo_${d.id}`,
-            type:  "deo_request" as const,
-            title: "New DEO Access Request",
-            body:  `${data.name || "Someone"} from ${data.branchName || "a branch"} requested DEO access`,
-            link:  "/deo",
-            read:  readIds.has(`deo_${d.id}`),
-            ts,
-          };
-        });
-        setNotifications(prev => {
-          const filtered = prev.filter(n => n.type !== "deo_request");
-          return [...filtered, ...deoNotifs].sort((a, b) => b.ts - a.ts).slice(0, 20);
-        });
-      }
-    );
-
-    // ② Risk alerts (from risks collection — last 5)
-    const unsubRisk = onSnapshot(
-      query(collection(db, "risks"), where("schoolId", "==", uid), orderBy("createdAt", "desc"), limit(5)),
-      snap => {
-        const riskNotifs: Notification[] = snap.docs.map(d => {
-          const data = d.data();
-          const ts = data.createdAt?.toMillis?.() || Date.now();
-          return {
-            id:    `risk_${d.id}`,
-            type:  "risk_alert" as const,
-            title: data.title || "Risk Alert",
-            body:  data.description || data.message || "A risk was flagged in your school",
-            link:  "/risks",
-            read:  readIds.has(`risk_${d.id}`),
-            ts,
-          };
-        });
-        setNotifications(prev => {
-          const filtered = prev.filter(n => n.type !== "risk_alert");
-          return [...filtered, ...riskNotifs].sort((a, b) => b.ts - a.ts).slice(0, 20);
-        });
-      },
-      () => {} // silent fail if collection doesn't exist
-    );
-
-    return () => { unsubDEO(); unsubRisk(); };
-  }, []);
-
-  // ── Close bell on outside click ─────────────────────────────────────────
+  // ── Close bell + avatar menu on outside click ────────────────────────────
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (bellRef.current && !bellRef.current.contains(e.target as Node)) {
-        setBellOpen(false);
-      }
+      const t = e.target as Node;
+      if (bellRef.current && !bellRef.current.contains(t)) setBellOpen(false);
+      if (avatarRef.current && !avatarRef.current.contains(t)) setAvatarMenuOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // ── Close sidebar on route change ────────────────────────────────────────
+  // ── Close sidebar / popovers on route change ─────────────────────────────
   useEffect(() => {
     setIsSidebarOpen(false);
     setBellOpen(false);
+    setAvatarMenuOpen(false);
   }, [location.pathname]);
 
   // ── Mark all as read ────────────────────────────────────────────────────
@@ -229,7 +255,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <GraduationCap className="w-5 h-5 text-white" />
             </div>
             <span className="text-lg font-bold text-[#1e294b] tracking-tight uppercase truncate">
-              {schoolData?.schoolName || "EDUINTELLECT"}
+              {schoolData?.schoolName || "EDULLENT"}
             </span>
           </div>
           <button
@@ -430,13 +456,32 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               )}
             </div>
 
-            {/* Avatar */}
-            <div
-              onClick={handleLogout}
-              className="w-9 h-9 lg:w-10 lg:h-10 rounded-xl bg-[#1e294b] text-white flex items-center justify-center text-xs font-bold shadow-lg shadow-slate-900/10 hover:scale-105 active:scale-95 transition-all cursor-pointer uppercase"
-              title="Click to logout"
-            >
-              {schoolData?.ownerName?.substring(0, 2) || "SC"}
+            {/* Avatar + dropdown menu (Settings / Sign out) */}
+            <div ref={avatarRef} className="relative">
+              <button
+                onClick={() => setAvatarMenuOpen(v => !v)}
+                className="w-9 h-9 lg:w-10 lg:h-10 rounded-xl bg-[#1e294b] text-white flex items-center justify-center text-xs font-bold shadow-lg shadow-slate-900/10 hover:scale-105 active:scale-95 transition-all cursor-pointer uppercase"
+                title="Account"
+              >
+                {schoolData?.ownerName?.substring(0, 2) || "SC"}
+              </button>
+              {avatarMenuOpen && (
+                <div className="absolute right-0 top-12 w-44 bg-white rounded-xl shadow-xl border border-slate-100 py-1 z-50 animate-in slide-in-from-top-2 duration-150">
+                  <button
+                    onClick={() => { setAvatarMenuOpen(false); navigate("/settings"); }}
+                    className="w-full text-left px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                  >
+                    Settings
+                  </button>
+                  <div className="my-1 border-t border-slate-100" />
+                  <button
+                    onClick={() => { setAvatarMenuOpen(false); handleLogout(); }}
+                    className="w-full text-left px-4 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors"
+                  >
+                    Sign out
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>

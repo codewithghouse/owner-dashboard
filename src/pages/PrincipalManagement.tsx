@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   UserPlus, Users, CheckCircle2, Clock, Mail, MoreVertical,
   Building2, Search, X, Send, Shield, RefreshCcw, Ban,
@@ -34,6 +35,7 @@ const branchColorOptions = [
 ];
 
 export default function PrincipalManagement() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'principals' | 'branches'>('branches');
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
@@ -492,7 +494,13 @@ export default function PrincipalManagement() {
               const assignedPrincipal = principals.find(p => p.branch === branch.name && (p.status === 'Active' || p.status === 'Invited'));
               const statusConf = getStatusConfig(branch.status);
               return (
-                <div key={branch.id} className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden transition-all hover:shadow-lg group">
+                <div
+                  key={branch.id}
+                  onClick={() => navigate(`/branches/${branch.id}`)}
+                  role="button"
+                  tabIndex={0}
+                  className="clickable-card bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden transition-all group"
+                >
                   {/* Branch Header Strip */}
                   <div className="h-2" style={{ backgroundColor: branch.color }}></div>
                   <div className="p-8">

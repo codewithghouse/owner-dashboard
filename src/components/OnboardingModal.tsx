@@ -31,7 +31,7 @@ const STEPS = [
   { title: "Welcome! Let's set up your school",    sub: "Tell us a bit about your school" },
   { title: "Add your first branch",                sub: "You can add more branches later from the dashboard" },
   { title: "Invite your first principal",          sub: "They'll get login access immediately — skip if you want" },
-  { title: "You're all set!",                      sub: "Here's everything you can do with EduIntellect" },
+  { title: "You're all set!",                      sub: "Here's everything you can do with Edullent" },
 ];
 
 // ── Feature cards shown on Done screen ───────────────────────────────────────

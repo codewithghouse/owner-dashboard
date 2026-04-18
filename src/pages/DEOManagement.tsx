@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ShieldCheck, Clock, CheckCircle2, XCircle, User, Mail,
   Phone, Building2, Loader2, Search, Filter, RefreshCw,
@@ -67,6 +68,7 @@ const EmptyDEO = ({ tab }: { tab: string }) => (
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function DEOManagement() {
+  const navigate = useNavigate();
   const [requests, setRequests]     = useState<DEORequest[]>([]);
   const [branches, setBranches]     = useState<Record<string, string>>({});
   const [loading, setLoading]       = useState(true);
@@ -244,7 +246,13 @@ export default function DEOManagement() {
           { label: "Awaiting Approval", value: counts.pending,    icon: Clock,       color: "text-amber-600",  bg: "bg-amber-50"   },
           { label: "Branches with DEOs",value: new Set(requests.filter(r=>r.status==="approved").map(r=>r.branchId)).size, icon: Building2, color: "text-purple-600", bg: "bg-purple-50" },
         ].map((s, i) => (
-          <div key={i} className="bg-white rounded-[1.5rem] border border-slate-100 p-6 shadow-sm">
+          <div
+            key={i}
+            onClick={() => navigate("/deo")}
+            role="button"
+            tabIndex={0}
+            className="clickable-card bg-white rounded-[1.5rem] border border-slate-100 p-6 shadow-sm"
+          >
             <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center mb-4`}>
               <s.icon className={`w-5 h-5 ${s.color}`} />
             </div>

@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { GraduationCap, Mail, Lock, ArrowRight, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { syncClaimsAndRefreshToken } from "@/lib/syncClaims";
 import { toast } from "sonner";
 
 export default function LoginPage() {
@@ -20,25 +20,26 @@ export default function LoginPage() {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resetEmail.trim()) return;
+    const target = resetEmail.trim();
+    if (!target) return;
     setResetLoading(true);
     try {
-      await sendPasswordResetEmail(auth, resetEmail.trim());
-      toast.success("Password reset email sent! Check your inbox.");
-      setForgotOpen(false);
-      setResetEmail("");
-    } catch (error: any) {
-      const code = error?.code ?? "";
-      if (code === "auth/user-not-found" || code === "auth/invalid-email") {
-        toast.error("No account found with this email address.");
-      } else if (code === "auth/too-many-requests") {
+      await sendPasswordResetEmail(auth, target);
+    } catch (err: any) {
+      // Swallow auth/user-not-found etc. to prevent user-enumeration.
+      // Only surface rate-limit so the user knows to wait.
+      if (err?.code === "auth/too-many-requests") {
         toast.error("Too many requests. Please wait a few minutes and try again.");
-      } else {
-        toast.error("Failed to send reset email. Please try again.");
+        setResetLoading(false);
+        return;
       }
-    } finally {
-      setResetLoading(false);
+      console.warn("[reset-password] non-fatal:", err?.code);
     }
+    // Generic success message regardless of whether the account exists.
+    toast.success("If an account exists for that email, a reset link has been sent.");
+    setForgotOpen(false);
+    setResetEmail("");
+    setResetLoading(false);
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -46,47 +47,52 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+      await signInWithEmailAndPassword(auth, email, password);
+      const user = auth.currentUser;
+      if (!user) throw new Error("Login failed — no user session.");
 
-      // Verify role in Firestore (separate try so Firestore errors don't block login)
+      // Sync custom claims so Firestore rules + role gates work.
+      // Failure = can't determine role = block login (secure default).
+      let role: string | undefined;
       try {
-        const docRef  = doc(db, "schools", user.uid);
-        const docSnap = await getDoc(docRef);
-
-        if (!docSnap.exists()) {
-          // No school document found — let them in if auth passed (owner may not have a schools doc)
-          toast.success("Welcome back!");
-          navigate("/");
-          return;
+        const synced = await syncClaimsAndRefreshToken(user);
+        role = synced?.role;
+        // Double-check via token in case sync returned null from caught error.
+        if (!role) {
+          const tok = await user.getIdTokenResult(true);
+          role = (tok.claims as any)?.role;
         }
-
-        const role = (docSnap.data()?.role ?? "").toString().toLowerCase().trim();
-        if (role === "owner") {
-          toast.success("Welcome back, Chairman!");
-          navigate("/");
-        } else {
-          await auth.signOut();
-          toast.error(`Access denied — your role is "${docSnap.data()?.role ?? "unknown"}". Owner portal only.`);
-        }
-      } catch (firestoreErr: any) {
-        // Firestore check failed (rules / network) but auth succeeded — let them in
-        console.warn("Firestore role check failed:", firestoreErr?.code, firestoreErr?.message);
-        toast.success("Welcome back!");
-        navigate("/");
+      } catch (syncErr) {
+        console.error("[login] claims sync failed:", syncErr);
+        await auth.signOut();
+        toast.error("Could not verify your account. Please try again.");
+        setLoading(false);
+        return;
       }
+
+      // HARD role gate — no "let them in on error" path.
+      if (role !== "owner") {
+        await auth.signOut();
+        toast.error("Access denied — this portal is for school owners only.");
+        setLoading(false);
+        return;
+      }
+
+      toast.success("Welcome back, Chairman!");
+      navigate("/");
     } catch (error: any) {
       const code = error?.code ?? "";
       if (code === "auth/wrong-password" || code === "auth/user-not-found" || code === "auth/invalid-credential") {
         toast.error("Invalid email or password.");
       } else if (code === "auth/too-many-requests") {
-        toast.error("Too many failed attempts. Please try again later.");
+        toast.error("Too many failed attempts. Please try again in a few minutes.");
       } else if (code === "auth/invalid-email") {
         toast.error("Invalid email format.");
       } else if (code === "auth/network-request-failed") {
         toast.error("Network error. Check your internet connection.");
       } else {
-        toast.error(`Login failed: ${code || error?.message || "Unknown error"}`);
+        console.error("[login] unexpected error:", code, error?.message);
+        toast.error("Login failed. Please try again.");
       }
     } finally {
       setLoading(false);
@@ -145,7 +151,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <Button 
+            <Button
               disabled={loading}
               className="w-full h-12 rounded-xl bg-[#1e294b] hover:bg-[#1e3a8a] text-white font-bold shadow-lg shadow-blue-900/10 transition-all active:scale-95 flex items-center justify-center gap-2 mt-2"
             >
@@ -155,7 +161,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-slate-400 text-xs font-medium">
-          Secured by EduIntellect Cloud Architecture
+          Secured by Edullent Cloud Architecture
         </p>
       </div>
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   FileText, Download, Star, Plus, Printer, Mail, FileSpreadsheet,
   ChevronRight, GraduationCap, Presentation, DollarSign, Loader2,
@@ -160,6 +161,7 @@ function getStatColor(type: string, idx: number): string {
 // ══════════════════════════════════════════════════════════════════════════════
 
 export default function ReportsCenter() {
+  const navigate = useNavigate();
   const [dashboard, setDashboard] = useState<ReportsDashboardData | null>(null);
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [reportData, setReportData] = useState<AnyReportData | null>(null);
@@ -455,9 +457,9 @@ export default function ReportsCenter() {
                       href={(() => {
                         const reg = selectedSlug ? REPORT_REGISTRY[selectedSlug] : null;
                         const title = reg?.label || "Report";
-                        const subject = encodeURIComponent(`[EduIntellect] ${title} Report`);
+                        const subject = encodeURIComponent(`[Edullent] ${title} Report`);
                         const body = encodeURIComponent(
-                          `Hi,\n\nPlease find the ${title} report from EduIntellect Dashboard.\n\nGenerated on: ${new Date().toLocaleDateString()}\nReport: ${window.location.origin}/reports\n\nRegards`
+                          `Hi,\n\nPlease find the ${title} report from Edullent Dashboard.\n\nGenerated on: ${new Date().toLocaleDateString()}\nReport: ${window.location.origin}/reports\n\nRegards`
                         );
                         return `mailto:?subject=${subject}&body=${body}`;
                       })()}
@@ -599,7 +601,13 @@ export default function ReportsCenter() {
           { label: "Recent Downloads", value: stats?.recentDownloads?.toString() || "0", note: "Last 7 days" },
           { label: "Favorites", value: stats?.favorites?.toString() || "0", note: "Quick access" },
         ].map((stat, i) => (
-          <div key={i} className="bg-white p-6 md:p-8 rounded-2xl md:rounded-[2rem] border border-slate-100 shadow-sm transition-all hover:shadow-md">
+          <div
+            key={i}
+            onClick={() => navigate("/reports")}
+            role="button"
+            tabIndex={0}
+            className="clickable-card bg-white p-6 md:p-8 rounded-2xl md:rounded-[2rem] border border-slate-100 shadow-sm transition-all hover:shadow-md"
+          >
             <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-3 md:mb-4">{stat.label}</p>
             <h3 className="text-3xl md:text-4xl font-black text-[#111827] tracking-tighter mb-1 md:mb-2">{stat.value}</h3>
             <p className={`text-[10px] font-bold uppercase tracking-tight ${stat.noteCol || "text-slate-400 opacity-70"}`}>{stat.note}</p>

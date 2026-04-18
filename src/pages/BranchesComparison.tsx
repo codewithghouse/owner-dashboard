@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -6,7 +6,8 @@ import {
 } from "recharts";
 import {
   ArrowLeft, CheckCircle, AlertTriangle, Building2, Loader2,
-  Plus, Pencil, Trash2, X, Save
+  Plus, Pencil, Trash2, X, Save,
+  BarChart3, CircleDollarSign, GraduationCap, CalendarCheck2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,6 +33,92 @@ interface BranchForm {
   color: string;
 }
 const EMPTY_FORM: BranchForm = { name: "", location: "", established: "", color: "#1e3a8a" };
+
+/* ══════════════════════════════════════════════════════════════════════════
+   BranchTiltCard — 3D mouse-tracking wrapper.
+   Each instance tracks its own tilt + cursor position.
+   Adds: perspective rotation, subtle Z-lift on hover, cursor spotlight.
+   ══════════════════════════════════════════════════════════════════════════ */
+function BranchTiltCard({
+  children, onClick, outerStyle, outerClassName, isDark,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  outerStyle: React.CSSProperties;
+  outerClassName: string;
+  isDark: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [tilt, setTilt]     = useState({ x: 0, y: 0 });
+  const [mouse, setMouse]   = useState({ x: 50, y: 50 }); // percent
+  const [hovered, setHovered] = useState(false);
+
+  const MAX_TILT = 8;    // degrees
+  const LIFT_Z   = 20;   // pixels on hover
+
+  const handleMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const relX = (e.clientX - rect.left) / rect.width;   // 0..1
+    const relY = (e.clientY - rect.top)  / rect.height;  // 0..1
+    /* Invert Y so moving up tilts forward */
+    setTilt({
+      x: (0.5 - relY) * MAX_TILT * 2,
+      y: (relX - 0.5) * MAX_TILT * 2,
+    });
+    setMouse({ x: relX * 100, y: relY * 100 });
+  };
+
+  const handleLeave = () => {
+    setTilt({ x: 0, y: 0 });
+    setHovered(false);
+  };
+
+  return (
+    <div
+      style={{ perspective: 1400 }}
+      className="[transform-style:preserve-3d]"
+    >
+      <div
+        ref={ref}
+        onClick={onClick}
+        onMouseMove={handleMove}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={handleLeave}
+        role="button"
+        tabIndex={0}
+        style={{
+          ...outerStyle,
+          transform:
+            `perspective(1400px) ` +
+            `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) ` +
+            `translateZ(${hovered ? LIFT_Z : 0}px)`,
+          transition: hovered
+            ? "transform 80ms linear, box-shadow 200ms ease-out"
+            : "transform 400ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 300ms ease-out",
+          transformStyle: "preserve-3d",
+          willChange: "transform",
+        }}
+        className={outerClassName}
+      >
+        {children}
+
+        {/* Cursor-following spotlight — an extra sheen that chases the pointer */}
+        <div
+          className="absolute inset-0 pointer-events-none transition-opacity duration-200 rounded-[1.65rem]"
+          style={{
+            opacity: hovered ? 1 : 0,
+            background: `radial-gradient(420px circle at ${mouse.x}% ${mouse.y}%, ${
+              isDark ? "rgba(197,167,112,0.22)" : "rgba(30,58,138,0.10)"
+            } 0%, transparent 55%)`,
+            mixBlendMode: isDark ? "screen" : "multiply",
+            zIndex: 5,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
 
 // ── Branch Modal (Add / Edit) ─────────────────────────────────────────────────
 function BranchModal({
@@ -312,6 +399,211 @@ export default function BranchesComparison() {
   // ── Metric color helper ───────────────────────────────────────────────────
   const metricColor = (v: number) =>
     v >= 85 ? "text-[#22c55e]" : v >= 70 ? "text-[#f59e0b]" : "text-[#ef4444]";
+
+  /* ── Luxury-metal theme: looks like real platinum / gold / onyx ──
+     Each tier uses MULTI-STOP gradients to fake the way light hits metal,
+     plus an overlay specular highlight + noise grain layered on top. */
+  const tierTheme = (status: string, hasData: boolean) => {
+
+    if (!hasData) {
+      /* PEARL — iridescent mother-of-pearl finish for empty branches */
+      return {
+        key: "neutral",
+        label: "AWAITING DATA",
+        bg:
+          /* Soft pearl with subtle pink-blue iridescence */
+          "linear-gradient(135deg," +
+            "#fdfdfd 0%," +
+            "#f8fafc 22%," +
+            "#f0eef5 48%," +
+            "#f6f4f8 72%," +
+            "#eef2f7 100%)",
+        /* Specular highlight — diagonal gloss band near top-left */
+        gloss:
+          "linear-gradient(125deg," +
+            "rgba(255,255,255,0) 0%," +
+            "rgba(255,255,255,0.55) 18%," +
+            "rgba(255,255,255,0.0) 38%)",
+        ringBorder:
+          "linear-gradient(135deg,#ffffff 0%,#cfd6e0 50%,#9aa4b2 100%)",
+        border: "border-transparent",
+        title:      "text-[#1e294b]",
+        subtitle:   "text-slate-500",
+        metricLabel:"text-slate-500",
+        divider:    "border-slate-100",
+        iconBg:     "linear-gradient(135deg,#cbd5e1 0%,#94a3b8 50%,#64748b 100%)",
+        patternOpacity: 0.55,
+        badgeBg:    "bg-gradient-to-r from-slate-100 to-slate-200",
+        badgeText:  "text-slate-700",
+        accent:     "#B8985F",
+        noiseOpacity: 0.18,
+      };
+    }
+
+    if (status === "Strong") {
+      /* OBSIDIAN + 24K — black-platinum tile with deep gold trim (Luxury) */
+      return {
+        key: "luxury",
+        label: "LUXURY",
+        bg:
+          /* Layered: radial highlight near top-right + diagonal black-gradient */
+          "radial-gradient(120% 80% at 100% 0%, rgba(197,167,112,0.18) 0%, rgba(197,167,112,0) 45%)," +
+          "linear-gradient(135deg," +
+            "#0A1424 0%," +
+            "#0F1E36 25%," +
+            "#15264B 50%," +
+            "#0F1E36 75%," +
+            "#070D18 100%)",
+        gloss:
+          "linear-gradient(120deg," +
+            "rgba(255,255,255,0) 0%," +
+            "rgba(229,212,177,0.18) 12%," +
+            "rgba(255,255,255,0) 28%)",
+        ringBorder:
+          "linear-gradient(135deg,#E5D4B1 0%,#C5A770 30%,#8B6D3E 60%,#C5A770 100%)",
+        border: "border-transparent",
+        title:      "text-white",
+        subtitle:   "text-[#E5D4B1]",
+        metricLabel:"text-[#C5A770]/85",
+        divider:    "border-[#C5A770]/15",
+        iconBg:
+          "linear-gradient(135deg," +
+            "#F4E5BE 0%," +
+            "#D4B26A 30%," +
+            "#A07F3B 65%," +
+            "#7A5A24 100%)",
+        patternOpacity: 1,
+        badgeBg:
+          "bg-gradient-to-r from-[#F4E5BE] via-[#C5A770] to-[#8B6D3E]",
+        badgeText:  "text-[#0A1424]",
+        accent:     "#C5A770",
+        noiseOpacity: 0.12,
+      };
+    }
+
+    if (status === "Good") {
+      /* 24K LIQUID GOLD — molten gold finish with bright reflection band (Premium) */
+      return {
+        key: "premium",
+        label: "PREMIUM",
+        bg:
+          /* Reflection band near top + smooth gold gradient */
+          "radial-gradient(120% 90% at 0% 0%, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 40%)," +
+          "linear-gradient(135deg," +
+            "#D4A85F 0%," +
+            "#C09255 22%," +
+            "#A57B45 50%," +
+            "#8E6938 78%," +
+            "#7A5926 100%)",
+        gloss:
+          "linear-gradient(115deg," +
+            "rgba(255,255,255,0) 0%," +
+            "rgba(255,255,255,0.32) 14%," +
+            "rgba(255,255,255,0) 32%)",
+        ringBorder:
+          "linear-gradient(135deg,#FFE9B8 0%,#D4A85F 35%,#7A5926 65%,#D4A85F 100%)",
+        border: "border-transparent",
+        title:      "text-white",
+        subtitle:   "text-white/90",
+        metricLabel:"text-white/78",
+        divider:    "border-white/20",
+        iconBg:
+          "linear-gradient(135deg," +
+            "#ffffff 0%," +
+            "#FFF4DC 35%," +
+            "#F4E5BE 100%)",
+        patternOpacity: 0.95,
+        badgeBg:    "bg-gradient-to-r from-white to-[#FFF4DC]",
+        badgeText:  "text-[#7A5926]",
+        accent:     "#ffffff",
+        noiseOpacity: 0.12,
+      };
+    }
+
+    /* OBSIDIAN + GOLD — same luxury navy-gold palette for "Needs Focus",
+       distinguished from LUXURY only by the red icon + red status pill. */
+    return {
+      key: "standard",
+      label: "NEEDS FOCUS",
+      bg:
+        /* Same layered navy as LUXURY, but the radial tint uses a rose hint
+           near top-right so the "alert" mood is subtly embedded in the finish. */
+        "radial-gradient(120% 80% at 100% 0%, rgba(239,68,68,0.14) 0%, rgba(239,68,68,0) 45%)," +
+        "linear-gradient(135deg," +
+          "#0A1424 0%," +
+          "#0F1E36 25%," +
+          "#15264B 50%," +
+          "#0F1E36 75%," +
+          "#070D18 100%)",
+      gloss:
+        "linear-gradient(120deg," +
+          "rgba(255,255,255,0) 0%," +
+          "rgba(229,212,177,0.18) 12%," +
+          "rgba(255,255,255,0) 28%)",
+      ringBorder:
+        "linear-gradient(135deg,#E5D4B1 0%,#C5A770 30%,#8B6D3E 60%,#C5A770 100%)",
+      border: "border-transparent",
+      title:      "text-white",
+      subtitle:   "text-[#E5D4B1]",
+      metricLabel:"text-[#C5A770]/80",
+      divider:    "border-[#C5A770]/15",
+      iconBg:
+        /* Rose-red icon tile — retains "Needs Focus" signal against gold theme */
+        "linear-gradient(135deg," +
+          "#fb7185 0%," +
+          "#ef4444 50%," +
+          "#b91c1c 100%)",
+      patternOpacity: 1,
+      badgeBg:    "bg-gradient-to-r from-rose-500 to-rose-600",
+      badgeText:  "text-white",
+      accent:     "#C5A770",
+      noiseOpacity: 0.12,
+    };
+  };
+
+  /* Subtle film-grain noise to give cards a real "metal" texture (no API call — pure SVG) */
+  const NOISE_SVG =
+    "data:image/svg+xml;utf8," +
+    encodeURIComponent(
+      `<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'>
+        <filter id='n'>
+          <feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='4'/>
+          <feColorMatrix values='0 0 0 0 1   0 0 0 0 1   0 0 0 0 1   0 0 0 0.6 0'/>
+        </filter>
+        <rect width='180' height='180' filter='url(#n)'/>
+      </svg>`
+    );
+
+  /* Decorative flowing-lines SVG pattern — dense silk curves (right half of card) */
+  const LINES_PATTERN =
+    "data:image/svg+xml;utf8," +
+    encodeURIComponent(
+      `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 400' fill='none' preserveAspectRatio='xMaxYMid slice'>
+        <g stroke='currentColor' stroke-width='0.55' fill='none'>
+          <path stroke-opacity='0.18' d='M 420 -60 C 280 40, 180 180, 360 440' />
+          <path stroke-opacity='0.22' d='M 420 -40 C 290 50, 195 195, 370 440' />
+          <path stroke-opacity='0.26' d='M 420 -20 C 300 60, 210 210, 380 440' />
+          <path stroke-opacity='0.30' d='M 420   0 C 310 70, 225 225, 390 440' />
+          <path stroke-opacity='0.34' d='M 420  20 C 320 80, 240 240, 400 440' />
+          <path stroke-opacity='0.38' d='M 420  40 C 330 90, 250 250, 405 440' />
+          <path stroke-opacity='0.42' d='M 420  60 C 340 100, 260 260, 410 440' />
+          <path stroke-opacity='0.46' d='M 420  80 C 350 110, 270 270, 413 440' />
+          <path stroke-opacity='0.50' d='M 420 100 C 355 120, 280 280, 416 440' />
+          <path stroke-opacity='0.54' d='M 420 120 C 360 130, 290 290, 418 440' />
+          <path stroke-opacity='0.55' d='M 420 140 C 365 140, 300 300, 420 440' />
+          <path stroke-opacity='0.55' d='M 420 160 C 370 150, 310 310, 422 440' />
+          <path stroke-opacity='0.54' d='M 420 180 C 375 160, 318 320, 424 440' />
+          <path stroke-opacity='0.50' d='M 420 200 C 380 170, 326 330, 426 440' />
+          <path stroke-opacity='0.46' d='M 420 220 C 385 180, 332 340, 428 440' />
+          <path stroke-opacity='0.42' d='M 420 240 C 388 192, 338 350, 430 440' />
+          <path stroke-opacity='0.38' d='M 420 260 C 390 204, 344 358, 432 440' />
+          <path stroke-opacity='0.34' d='M 420 280 C 392 216, 350 366, 434 440' />
+          <path stroke-opacity='0.30' d='M 420 300 C 394 228, 356 374, 436 440' />
+          <path stroke-opacity='0.26' d='M 420 320 C 396 240, 362 382, 438 440' />
+          <path stroke-opacity='0.22' d='M 420 340 C 398 252, 368 390, 440 440' />
+        </g>
+      </svg>`
+    );
 
   const statusConfig = (status: string) => {
     if (status === "Strong")      return "bg-emerald-500";
@@ -613,84 +905,237 @@ export default function BranchesComparison() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {branches.map(b => (
-            <div
-              key={b.id}
-              className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-lg transition-all group relative"
-            >
-              {/* Edit / Delete buttons — top right */}
-              <div className="absolute top-5 right-5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
-                <button
-                  onClick={(e) => { e.stopPropagation(); openEdit(b, b.id); }}
-                  className="w-8 h-8 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center hover:bg-blue-50 hover:border-blue-200 hover:text-[#1e3a8a] transition-all"
-                  title="Edit branch"
-                >
-                  <Pencil className="w-3.5 h-3.5 text-slate-400" />
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); openDelete(b.id, b.name); }}
-                  className="w-8 h-8 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center hover:bg-rose-50 hover:border-rose-200 hover:text-rose-500 transition-all"
-                  title="Delete branch"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-slate-400" />
-                </button>
-              </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
+          {branches.map(b => {
+            const hasData = b.ahi > 0 || b.feeCollection > 0 || b.passRate > 0 || b.attendance > 0;
+            const theme   = tierTheme(b.status, hasData);
+            const isDark  = theme.key === "luxury" || theme.key === "premium" || theme.key === "standard";
 
-              <div
-                className="cursor-pointer"
+            /* Color for metric value text — tier-aware */
+            const metricValColor = (v: number) => {
+              if (!isDark) return metricColor(v);
+              if (v >= 85) return "text-emerald-300";
+              if (v >= 70) return theme.key === "luxury" ? "text-[#C5A770]" : "text-white";
+              return "text-rose-300";
+            };
+
+            /* Tier-specific HUGE title text (top-left, like LUXURY / PREMIUM / STANDARD) */
+            const tierTitleText =
+              theme.key === "luxury"  ? "LUXURY"   :
+              theme.key === "premium" ? "PREMIUM"  :
+              theme.key === "standard"? "STANDARD" :
+                                        "BRANCH";
+
+            const tierTitleColor =
+              theme.key === "luxury"  ? "text-[#C5A770]" :
+              isDark                  ? "text-white"     :
+                                        "text-[#1e294b]";
+
+            /* Tier descriptive tagline — same slot as Hajj card's description */
+            const tagline =
+              theme.key === "luxury"  ? "Top-performing branch · highest academic health &\u00A0pass rates" :
+              theme.key === "premium" ? "Well-rounded performance · healthy balance of attendance &\u00A0results" :
+              theme.key === "standard"? "Needs focus · boost attendance &\u00A0results to raise tier" :
+                                        "Awaiting performance data · track will appear here";
+
+            const metrics = [
+              { icon: Building2,     label: "AHI",             value: b.ahi,           has: b.ahi > 0 },
+              { icon: CircleDollarSign, label: "Fee Collection", value: b.feeCollection, has: b.feeCollection > 0 },
+              { icon: GraduationCap, label: "Pass Rate",       value: b.passRate,      has: b.passRate > 0 },
+              { icon: CalendarCheck2,label: "Attendance",      value: b.attendance,    has: b.attendance > 0 },
+            ];
+
+            return (
+              <BranchTiltCard
+                key={b.id}
                 onClick={() => navigate(`/branches/${b.id}`)}
+                isDark={isDark}
+                outerStyle={{
+                  background: theme.bg,
+                  /* Layered shadow:
+                     ① outer drop (lift) ② tight depth ③ inner top-edge highlight
+                        ④ inner bottom-edge gloom — gives the card metal-edge bevel */
+                  boxShadow: isDark
+                    ? [
+                        "0 30px 60px -18px rgba(8,14,28,0.55)",
+                        "0 12px 24px -10px rgba(0,0,0,0.30)",
+                        "inset 0 1px 0 rgba(255,255,255,0.18)",
+                        "inset 0 -1px 0 rgba(0,0,0,0.35)",
+                      ].join(",")
+                    : [
+                        "0 18px 38px -14px rgba(15,23,42,0.18)",
+                        "0 6px 14px -8px rgba(15,23,42,0.10)",
+                        "inset 0 1px 0 rgba(255,255,255,0.85)",
+                        "inset 0 -1px 0 rgba(15,23,42,0.05)",
+                      ].join(","),
+                  minHeight: 340,
+                  /* Gradient ring border via padding-trick: inner card sits inside */
+                  padding: 1.5,
+                  backgroundImage: theme.ringBorder,
+                }}
+                outerClassName={`clickable-card relative overflow-hidden rounded-[1.75rem] border ${theme.border} group cursor-pointer`}
               >
-                <div className="flex items-center gap-4 mb-8">
-                  <div
-                    className="w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg shrink-0"
-                    style={{ backgroundColor: b.color }}
+                {/* Inner card surface — the "metal plate" itself */}
+                <div
+                  className="relative h-full w-full overflow-hidden rounded-[1.65rem]"
+                  style={{
+                    background: theme.bg,
+                    transform: "translateZ(0)",
+                  }}
+                >
+
+                {/* ── Layer 1: noise grain — gives real metal texture ── */}
+                <div
+                  className="absolute inset-0 pointer-events-none mix-blend-overlay"
+                  style={{
+                    backgroundImage: `url("${NOISE_SVG}")`,
+                    backgroundSize: "180px 180px",
+                    opacity: theme.noiseOpacity,
+                  }}
+                />
+
+                {/* ── Layer 2: specular gloss highlight (the "shine") ── */}
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{ background: theme.gloss }}
+                />
+
+                {/* ── Layer 3: decorative flowing silk curves ── */}
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    color: theme.accent,
+                    backgroundImage: `url("${LINES_PATTERN}")`,
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "right -30px center",
+                    backgroundSize: "70% 120%",
+                    opacity: theme.patternOpacity,
+                    mixBlendMode: isDark ? "screen" : "multiply",
+                  }}
+                />
+
+                {/* ── Edit / Delete — appear on hover, glass/subtle depending on tier ── */}
+                <div className="absolute top-5 right-5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 z-[3]">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); openEdit(b, b.id); }}
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+                      isDark
+                        ? "bg-white/15 border border-white/25 hover:bg-white/25 text-white backdrop-blur"
+                        : "bg-slate-50 border border-slate-100 hover:bg-blue-50 hover:border-blue-200 hover:text-[#1e3a8a] text-slate-400"
+                    }`}
+                    title="Edit branch"
                   >
-                    <Building2 className="w-7 h-7" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-[#111827] group-hover:text-blue-600 transition-colors">{b.name}</h3>
-                    <p className="text-xs font-bold text-slate-400">{b.studentCount.toLocaleString()} students</p>
-                  </div>
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); openDelete(b.id, b.name); }}
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+                      isDark
+                        ? "bg-white/15 border border-white/25 hover:bg-rose-500/40 text-white backdrop-blur"
+                        : "bg-slate-50 border border-slate-100 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-500 text-slate-400"
+                    }`}
+                    title="Delete branch"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
 
-                {/* Always show all 4 metrics — N/A when data not yet available */}
-                <div className="divide-y divide-slate-50">
-                  {[
-                    { label: "AHI",            value: b.ahi,           hasData: b.ahi > 0 },
-                    { label: "Fee Collection", value: b.feeCollection, hasData: b.feeCollection > 0 },
-                    { label: "Pass Rate",      value: b.passRate,      hasData: b.passRate > 0 },
-                    { label: "Attendance",     value: b.attendance,    hasData: b.attendance > 0 },
-                  ].map(m => (
-                    <div key={m.label} className="flex justify-between items-center py-3.5">
-                      <span className="text-sm text-slate-500">{m.label}</span>
-                      {m.hasData ? (
-                        <span className={`text-sm font-bold ${metricColor(m.value)}`}>{m.value}%</span>
-                      ) : (
-                        <span className="text-sm font-semibold text-slate-300">N/A</span>
-                      )}
+                {/* ── Card body — content on LEFT, decorative pattern flows on RIGHT ── */}
+                <div
+                  className="relative z-[2] p-7 md:p-8 flex flex-col h-full"
+                  style={{ transform: "translateZ(30px)", transformStyle: "preserve-3d" }}
+                >
+
+                  {/* Big tier title — mirrors LUXURY/PREMIUM/STANDARD in ref image */}
+                  <h2
+                    className={`text-[32px] md:text-[40px] leading-[1.05] font-black tracking-tight ${tierTitleColor} mb-3 uppercase`}
+                    style={{ letterSpacing: "-0.015em" }}
+                  >
+                    {tierTitleText}
+                  </h2>
+
+                  {/* Description/tagline — max two lines, like ref image */}
+                  <p className={`text-[13px] leading-relaxed font-medium max-w-[85%] ${theme.subtitle} mb-7`}>
+                    {tagline}
+                  </p>
+
+                  {/* Branch name + student count — compact line beneath tagline */}
+                  <div className="flex items-center gap-2.5 mb-6">
+                    <div
+                      className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-md"
+                      style={{
+                        background: theme.iconBg,
+                        color: theme.key === "premium" ? "#A57B45" : "#ffffff",
+                      }}
+                    >
+                      <Building2 className="w-4.5 h-4.5" strokeWidth={2.2} />
                     </div>
-                  ))}
+                    <div className="min-w-0">
+                      <p className={`text-[13px] font-extrabold ${theme.title} truncate`}>{b.name}</p>
+                      <p className={`text-[10px] font-bold uppercase tracking-wider ${theme.metricLabel}`}>
+                        {b.studentCount.toLocaleString()} student{b.studentCount !== 1 ? "s" : ""}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 2-column feature grid — metrics as icon + label/value (Hajj card style) */}
+                  <div className="grid grid-cols-2 gap-x-5 gap-y-3.5 mb-6">
+                    {metrics.map(m => (
+                      <div key={m.label} className="flex items-start gap-2.5">
+                        <div
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                            isDark ? "bg-white/10 border border-white/15" : "bg-slate-50 border border-slate-100"
+                          }`}
+                        >
+                          <m.icon className={`w-3.5 h-3.5 ${isDark ? "text-white/90" : "text-slate-500"}`} strokeWidth={2} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className={`text-[10px] font-bold uppercase tracking-wider ${theme.metricLabel} leading-tight`}>
+                            {m.label}
+                          </p>
+                          <p className={`text-[14px] font-extrabold leading-tight mt-0.5 ${
+                            m.has ? metricValColor(m.value) : (isDark ? "text-white/45" : "text-slate-400")
+                          }`}>
+                            {m.has ? `${m.value}%` : "N/A"}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Spacer to push footer down */}
+                  <div className="flex-1" />
+
+                  {/* Footer: alerts + tier pill */}
+                  <div className="flex items-center justify-between gap-3 flex-wrap mt-2">
+                    {hasData ? (
+                      <span
+                        className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-[0.2em] shadow ${theme.badgeBg} ${theme.badgeText}`}
+                      >
+                        {b.status}
+                      </span>
+                    ) : (
+                      <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${theme.metricLabel}`}>
+                        {theme.label}
+                      </span>
+                    )}
+
+                    {b.activeAlerts > 0 && (
+                      <span className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold ${
+                        isDark
+                          ? "bg-rose-500/15 border-rose-400/30 text-rose-200"
+                          : "bg-[#fef2f2] border-rose-100 text-rose-500"
+                      }`}>
+                        <AlertTriangle className="w-3 h-3 shrink-0" />
+                        {b.activeAlerts} at&nbsp;risk
+                      </span>
+                    )}
+                  </div>
                 </div>
-
-                {b.activeAlerts > 0 && (
-                  <div className="mt-4 px-4 py-2.5 rounded-xl bg-[#fef2f2] border border-rose-100 flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-                    <span className="text-xs font-bold text-rose-500">{b.activeAlerts} student{b.activeAlerts > 1 ? "s" : ""} at risk</span>
-                  </div>
-                )}
-
-                {/* Status badge — bottom */}
-                {b.ahi > 0 && (
-                  <div className="mt-4 flex">
-                    <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest text-white ${statusConfig(b.status)}`}>
-                      {b.status}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
+                </div>{/* /inner metal plate */}
+              </BranchTiltCard>
+            );
+          })}
         </div>
       )}
 

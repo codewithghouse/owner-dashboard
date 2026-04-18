@@ -449,6 +449,7 @@ export default function TeacherPerformance() {
                   note: selectedTeacher.avgScore > 0 ? sl.label : "No exam data",
                   icon: Award,
                   color: "text-emerald-600",
+                  route: `/teachers/profile/${id}`,
                 },
                 {
                   label: "Class Attendance",
@@ -456,6 +457,7 @@ export default function TeacherPerformance() {
                   note: detailAttPct !== null ? (detailAttPct >= 90 ? "Excellent" : detailAttPct >= 75 ? "Good" : "Needs attention") : "No data",
                   icon: Users,
                   color: detailAttPct !== null && detailAttPct >= 90 ? "text-emerald-600" : "text-amber-600",
+                  route: `/teachers/profile/${id}`,
                 },
                 {
                   label: "Classes Assigned",
@@ -463,6 +465,7 @@ export default function TeacherPerformance() {
                   note: `${detailClasses.filter(c => c.status === "Active").length} active`,
                   icon: BookOpen,
                   color: "text-blue-600",
+                  route: `/teachers/profile/${id}`,
                 },
                 {
                   label: "Students Taught",
@@ -470,9 +473,16 @@ export default function TeacherPerformance() {
                   note: "Across all classes",
                   icon: TrendingUp,
                   color: "text-purple-600",
+                  route: `/students`,
                 },
               ].map(s => (
-                <div key={s.label} className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+                <div
+                  key={s.label}
+                  onClick={() => navigate(s.route)}
+                  role="button"
+                  tabIndex={0}
+                  className="clickable-card bg-white rounded-2xl border border-slate-100 p-5 shadow-sm"
+                >
                   <div className="flex items-center justify-between mb-3 text-slate-400">
                     <p className="text-[10px] md:text-[11px] font-bold uppercase tracking-widest">{s.label}</p>
                     <s.icon className={`w-4 h-4 ${s.color}`} />
@@ -596,12 +606,18 @@ export default function TeacherPerformance() {
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {[
-          { label: "Total Teachers",             value: totalTeachers.toString(),      note: `In ${branchFilter === "All" ? "all branches" : branchFilter}`, color: "text-blue-600"    },
-          { label: "Avg Effectiveness Score",    value: `${avgEffectiveness}%`,        note: "Across all exams",                                            color: "text-emerald-600" },
-          { label: "Top Performers",             value: topPerformers.toString(),      note: `${totalTeachers > 0 ? ((topPerformers/totalTeachers)*100).toFixed(1) : 0}% of staff`,    color: "text-emerald-600" },
-          { label: "Needs Improvement",          value: needsImprovement.toString(),   note: `${totalTeachers > 0 ? ((needsImprovement/totalTeachers)*100).toFixed(1) : 0}% of staff`, color: "text-amber-600"   },
+          { label: "Total Teachers",             value: totalTeachers.toString(),      note: `In ${branchFilter === "All" ? "all branches" : branchFilter}`, color: "text-blue-600",    route: "/teachers-directory" },
+          { label: "Avg Effectiveness Score",    value: `${avgEffectiveness}%`,        note: "Across all exams",                                            color: "text-emerald-600", route: "/teachers" },
+          { label: "Top Performers",             value: topPerformers.toString(),      note: `${totalTeachers > 0 ? ((topPerformers/totalTeachers)*100).toFixed(1) : 0}% of staff`,    color: "text-emerald-600", route: "/teachers-directory" },
+          { label: "Needs Improvement",          value: needsImprovement.toString(),   note: `${totalTeachers > 0 ? ((needsImprovement/totalTeachers)*100).toFixed(1) : 0}% of staff`, color: "text-amber-600",   route: "/teachers-directory" },
         ].map(s => (
-          <div key={s.label} className="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
+          <div
+            key={s.label}
+            onClick={() => navigate(s.route)}
+            role="button"
+            tabIndex={0}
+            className="clickable-card bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all"
+          >
             <p className="text-slate-400 text-[10px] md:text-[11px] font-bold uppercase tracking-widest mb-1 md:mb-2">{s.label}</p>
             <h3 className="text-3xl md:text-4xl font-extrabold text-[#1e294b] tracking-tight mb-1">{s.value}</h3>
             <p className={`text-[10px] md:text-[11px] font-bold ${s.color}`}>{s.note}</p>

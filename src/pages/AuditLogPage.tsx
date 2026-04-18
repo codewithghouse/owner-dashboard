@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Activity, Clock, Download, Loader2, RefreshCcw,
 } from "lucide-react";
@@ -73,6 +74,7 @@ function groupByDate(entries: AuditEntry[]): { date: string; items: AuditEntry[]
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function AuditLogPage() {
+  const navigate = useNavigate();
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter]   = useState("all");
@@ -130,7 +132,13 @@ export default function AuditLogPage() {
             { label: "Principals",      value: entries.filter(e => e.action.startsWith("principal")).length, color: "text-emerald-500" },
             { label: "DEO Changes",     value: entries.filter(e => e.action.startsWith("deo")).length,       color: "text-amber-500" },
           ].map((stat, i) => (
-            <div key={i} className="bg-white border border-slate-100 rounded-[1.5rem] p-5">
+            <div
+              key={i}
+              onClick={() => navigate("/audit")}
+              role="button"
+              tabIndex={0}
+              className="clickable-card bg-white border border-slate-100 rounded-[1.5rem] p-5"
+            >
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{stat.label}</p>
               <p className={`text-3xl font-black ${stat.color}`}>{stat.value}</p>
             </div>

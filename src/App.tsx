@@ -6,8 +6,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import AppLayout from "@/components/AppLayout";
 import Dashboard from "@/pages/Dashboard";
 import StudentsIntelligence from "@/pages/StudentsIntelligence";
+import StudentProfile from "@/pages/StudentProfile";
 import TeacherPerformance from "@/pages/TeacherPerformance";
 import TeacherProfile from "@/pages/TeacherProfile";
+import TeachersDirectory from "@/pages/TeachersDirectory";
+import FeeStructureOverview from "@/pages/FeeStructureOverview";
 import AcademicsOverview from "@/pages/AcademicsOverview";
 import FinanceFees from "@/pages/FinanceFees";
 import RisksAlerts from "@/pages/RisksAlerts";
@@ -19,6 +22,7 @@ import PrincipalManagement from "@/pages/PrincipalManagement";
 import DEOManagement from "@/pages/DEOManagement";
 import AuditLogPage from "@/pages/AuditLogPage";
 import AIPredictorPage from "@/pages/AIPredictorPage";
+import TeacherLeaderboard from "@/pages/TeacherLeaderboard";
 import ParentPortal from "@/pages/ParentPortal";
 import NotFound from "@/pages/NotFound";
 import LoginPage from "@/pages/LoginPage";
@@ -27,6 +31,7 @@ import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs, limit, query, setDoc } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
+import { syncClaimsAndRefreshToken } from "@/lib/syncClaims";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -38,6 +43,10 @@ const App = () => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      // Sync custom claims first so subsequent reads pass through Firestore rules.
+      if (currentUser) {
+        await syncClaimsAndRefreshToken(currentUser);
+      }
       setUser(currentUser);
       setLoading(false);
 
@@ -107,13 +116,15 @@ const App = () => {
                     <Routes>
                       <Route path="/"                      element={<Dashboard />} />
                       <Route path="/students"              element={<StudentsIntelligence />} />
-                      <Route path="/students/:id"          element={<StudentsIntelligence />} />
+                      <Route path="/students/:id"          element={<StudentProfile />} />
                       <Route path="/teachers"              element={<TeacherPerformance />} />
                       <Route path="/teachers/:id"          element={<TeacherPerformance />} />
                       <Route path="/teachers/profile/:id"  element={<TeacherProfile />} />
+                      <Route path="/teachers-directory"    element={<TeachersDirectory />} />
                       <Route path="/academics"             element={<AcademicsOverview />} />
                       <Route path="/academics/:id"         element={<AcademicsOverview />} />
                       <Route path="/finance"               element={<FinanceFees />} />
+                      <Route path="/fee-structure"         element={<FeeStructureOverview />} />
                       <Route path="/risks"                 element={<RisksAlerts />} />
                       <Route path="/risks/:id"             element={<AlertDetail />} />
                       <Route path="/branches"              element={<BranchesComparison />} />
@@ -123,6 +134,7 @@ const App = () => {
                       <Route path="/deo"                   element={<DEOManagement />} />
                       <Route path="/audit"                 element={<AuditLogPage />} />
                       <Route path="/ai-predictor"          element={<AIPredictorPage />} />
+                      <Route path="/teacher-leaderboard"   element={<TeacherLeaderboard />} />
                       <Route path="/settings"              element={<SettingsPage />} />
                       <Route path="*"                      element={<NotFound />} />
                     </Routes>

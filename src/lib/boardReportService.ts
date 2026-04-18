@@ -173,7 +173,7 @@ export async function generateBoardReportPDF({ schoolName, quarter, ownerName }:
   doc.setTextColor(...WHITE);
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.text("EDUINTELLECT", 18, 40);
+  doc.text("EDULLENT", 18, 40);
   doc.setFontSize(6);
   doc.setFont("helvetica", "normal");
   doc.text("School Management Platform", 18, 45);
@@ -205,7 +205,7 @@ export async function generateBoardReportPDF({ schoolName, quarter, ownerName }:
   doc.setTextColor(100, 120, 180);
   doc.setFontSize(7);
   doc.text("Confidential — For Board Members Only", 14, 280);
-  doc.text("Powered by EduIntellect Cloud Platform", 120, 280);
+  doc.text("Powered by Edullent Cloud Platform", 120, 280);
 
   // ── Page 2 — Executive Summary ─────────────────────────────────────────────
   doc.addPage();

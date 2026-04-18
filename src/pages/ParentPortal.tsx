@@ -170,7 +170,7 @@ export default function ParentPortal() {
     <div className="min-h-screen bg-[#f8fafc]">
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="bg-gradient-to-r from-[#1e3a8a] to-[#2563eb] text-white px-6 pt-10 pb-8">
-        <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-200 mb-3">EduIntellect</p>
+        <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-200 mb-3">Edullent</p>
         <h1 className="text-2xl font-black">Student Progress Report</h1>
         <p className="text-blue-100 text-sm mt-1 font-medium">{data.studentName}</p>
         <div className="mt-2 flex items-center gap-2">
@@ -292,7 +292,7 @@ export default function ParentPortal() {
         {/* ── Footer ───────────────────────────────────────────────────── */}
         <div className="text-center pt-2 pb-6">
           <p className="text-[10px] text-slate-400 font-medium">
-            Powered by <span className="font-black text-[#1e3a8a]">EduIntellect</span>
+            Powered by <span className="font-black text-[#1e3a8a]">Edullent</span>
             {data.expiresAt && (
               <span> · Link valid until {new Date(data.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
             )}
