@@ -376,109 +376,423 @@ export default function Dashboard() {
   // Fresh school detection (no branches and no loading)
   const isFreshSchool = !loading && branches.length === 0 && totalStudents === 0;
 
-  return (
-    <div className="space-y-8 animate-in fade-in duration-700 pb-10">
+  // ─── Design tokens (principal dashboard system) ────────────────────────
+  const B1 = "#0055FF";
+  const B2 = "#1166FF";
+  const T1 = "#001040";
+  const T3 = "#5070B0";
+  const T4 = "#99AACC";
+  const SEP = "rgba(0,85,255,0.07)";
+  const GREEN = "#00C853";
+  const RED = "#FF3355";
 
-      {/* ── Header ───────────────────────────────────────── */}
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl md:text-3xl font-extrabold text-[#1e294b] tracking-tight">Executive Dashboard</h1>
-        <p className="text-slate-500 text-xs md:text-sm font-medium">Real-time overview of all school operations</p>
+  const GRAD_PRIMARY = `linear-gradient(135deg, ${B1}, ${B2})`;
+  const GRAD_HERO = "linear-gradient(135deg,#001040 0%,#001888 35%,#0033CC 70%,#0055FF 100%)";
+  const SHADOW_SM = "0 0 0 .5px rgba(0,85,255,.08), 0 2px 8px rgba(0,85,255,.08), 0 10px 26px rgba(0,85,255,.10)";
+  const SHADOW_LG = "0 0 0 .5px rgba(0,85,255,.10), 0 4px 16px rgba(0,85,255,.11), 0 18px 44px rgba(0,85,255,.13)";
+  const SHADOW_BTN = "0 6px 22px rgba(0,85,255,.40), 0 2px 5px rgba(0,85,255,.20)";
+
+  const ahiDelta = deltas.ahi;
+  const feeDelta = deltas.fee;
+
+  const ahiTier =
+    ahi >= 85
+      ? { label: "Excellent", bg: "rgba(0,200,83,.22)", border: "rgba(0,200,83,.4)", color: "#66FFAA" }
+      : ahi >= 70
+      ? { label: "Healthy", bg: "rgba(0,85,255,.22)", border: "rgba(0,85,255,.4)", color: "#AACCFF" }
+      : ahi >= 55
+      ? { label: "Average", bg: "rgba(255,170,0,.22)", border: "rgba(255,170,0,.4)", color: "#FFDD44" }
+      : ahi > 0
+      ? { label: "Needs Focus", bg: "rgba(255,51,85,.22)", border: "rgba(255,51,85,.4)", color: "#FF99AA" }
+      : { label: "No Data", bg: "rgba(153,170,204,.18)", border: "rgba(153,170,204,.32)", color: "#CCDDEE" };
+
+  return (
+    <div
+      style={{
+        fontFamily: "'DM Sans', -apple-system, sans-serif",
+        background: "#EEF4FF",
+        minHeight: "100vh",
+        margin: "-16px -24px 0",
+        padding: "24px 32px 40px",
+      }}
+    >
+      {/* ── Page Head ─────────────────────────────────────── */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 20, marginBottom: 22, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 14,
+              background: GRAD_PRIMARY,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 8px 22px rgba(0,85,255,.35)",
+            }}
+          >
+            <Activity size={24} color="#fff" strokeWidth={2.2} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: 32, fontWeight: 700, color: T1, letterSpacing: "-0.8px", margin: 0, lineHeight: 1.1 }}>
+              Executive Dashboard
+            </h1>
+            <p style={{ fontSize: 12, color: T3, fontWeight: 500, margin: "5px 0 0 0", letterSpacing: "0.10em", textTransform: "uppercase" }}>
+              Real-time overview of all school operations
+            </p>
+          </div>
+        </div>
+        {lastRefreshed && (
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 7,
+              padding: "8px 14px",
+              borderRadius: 14,
+              background: "#fff",
+              border: "0.5px solid rgba(0,85,255,.12)",
+              boxShadow: SHADOW_SM,
+              fontSize: 11,
+              fontWeight: 700,
+              color: T3,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+            }}
+          >
+            <div
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                background: GREEN,
+                boxShadow: "0 0 0 3px rgba(0,200,83,.15), 0 0 10px rgba(0,200,83,.5)",
+              }}
+            />
+            Updated {timeAgo(lastRefreshed)}
+          </div>
+        )}
       </div>
 
       {/* ── Fresh School Onboarding Banner ───────────────── */}
       {isFreshSchool && (
-        <div className="bg-gradient-to-r from-[#1e3a8a] to-[#3b82f6] rounded-3xl p-8 text-white shadow-xl shadow-blue-900/20 animate-in slide-in-from-top-2 duration-500">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div className="flex items-start gap-5">
-              <div className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
-                <GraduationCap className="w-6 h-6 text-white" />
+        <div
+          style={{
+            background: GRAD_HERO,
+            borderRadius: 24,
+            padding: "28px 32px",
+            color: "#fff",
+            marginBottom: 24,
+            position: "relative",
+            overflow: "hidden",
+            boxShadow: "0 14px 40px rgba(0,8,60,.32), 0 0 0 .5px rgba(255,255,255,.12)",
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              top: -60,
+              right: -40,
+              width: 260,
+              height: 260,
+              background: "radial-gradient(circle, rgba(255,255,255,.12) 0%, transparent 65%)",
+              borderRadius: "50%",
+              pointerEvents: "none",
+            }}
+          />
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: 24,
+              flexWrap: "wrap",
+              position: "relative",
+              zIndex: 1,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 16, flex: 1, minWidth: 300 }}>
+              <div
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 15,
+                  background: "rgba(255,255,255,.16)",
+                  border: "0.5px solid rgba(255,255,255,.26)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <GraduationCap size={26} color="#fff" strokeWidth={2.2} />
               </div>
               <div>
-                <h2 className="text-lg font-black tracking-tight">Welcome to Edullent!</h2>
-                <p className="text-blue-100 text-sm font-medium mt-1 leading-relaxed">
-                  Your dashboard is ready. Set up your school branches, invite principals, and start adding data to see live analytics here.
+                <h2 style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.5px", margin: 0, color: "#fff" }}>
+                  Welcome to Edullent!
+                </h2>
+                <p style={{ fontSize: 13, color: "rgba(255,255,255,.72)", fontWeight: 400, margin: "6px 0 0 0", lineHeight: 1.6 }}>
+                  Your dashboard is ready. Set up branches, invite principals, and start adding data to see live analytics here.
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-3 flex-wrap shrink-0">
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <button
                 onClick={() => navigate("/branches")}
-                className="px-5 py-2.5 rounded-xl bg-white text-[#1e3a8a] text-xs font-black hover:bg-blue-50 transition-all"
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: 12,
+                  background: "#fff",
+                  color: T1,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  border: "none",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 12px rgba(0,0,0,.18)",
+                  fontFamily: "inherit",
+                }}
               >
                 Add First Branch
               </button>
               <button
                 onClick={() => navigate("/principals")}
-                className="px-5 py-2.5 rounded-xl bg-white/15 text-white text-xs font-black hover:bg-white/25 transition-all"
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: 12,
+                  background: "rgba(255,255,255,.14)",
+                  color: "#fff",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  border: "0.5px solid rgba(255,255,255,.22)",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
               >
                 Invite Principal
               </button>
             </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4, 1fr)",
+              gap: 12,
+              marginTop: 24,
+              position: "relative",
+              zIndex: 1,
+            }}
+          >
             {[
-              { step: "1", label: "Add Branches",     done: false },
-              { step: "2", label: "Invite Principals", done: false },
-              { step: "3", label: "Enroll Students",   done: false },
-              { step: "4", label: "Start Analytics",   done: false },
-            ].map(s => (
-              <div key={s.step} className="flex items-center gap-3 bg-white/10 rounded-2xl px-4 py-3">
-                <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-xs font-black text-white shrink-0">
+              { step: "1", label: "Add Branches" },
+              { step: "2", label: "Invite Principals" },
+              { step: "3", label: "Enroll Students" },
+              { step: "4", label: "Start Analytics" },
+            ].map((s) => (
+              <div
+                key={s.step}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  background: "rgba(255,255,255,.10)",
+                  borderRadius: 14,
+                  padding: "12px 16px",
+                  border: "0.5px solid rgba(255,255,255,.14)",
+                }}
+              >
+                <div
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "50%",
+                    background: "rgba(255,255,255,.18)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "#fff",
+                    flexShrink: 0,
+                  }}
+                >
                   {s.step}
                 </div>
-                <span className="text-xs font-bold text-blue-100">{s.label}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,.80)", letterSpacing: "0.04em" }}>
+                  {s.label}
+                </span>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* ── Stat Cards ───────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* ── Dark Hero Banner (AHI) ────────────────────────── */}
+      {!isFreshSchool && (
+        <div
+          style={{
+            background: GRAD_HERO,
+            borderRadius: 24,
+            padding: "22px 28px",
+            position: "relative",
+            overflow: "hidden",
+            boxShadow: "0 12px 36px rgba(0,8,60,.28), 0 0 0 .5px rgba(255,255,255,.12)",
+            marginBottom: 18,
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              top: -60,
+              right: -40,
+              width: 240,
+              height: 240,
+              background: "radial-gradient(circle, rgba(255,255,255,.12) 0%, transparent 65%)",
+              borderRadius: "50%",
+              pointerEvents: "none",
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              backgroundImage:
+                "linear-gradient(rgba(255,255,255,.014) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.014) 1px,transparent 1px)",
+              backgroundSize: "22px 22px",
+              inset: 0,
+              pointerEvents: "none",
+            }}
+          />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24, flexWrap: "wrap", position: "relative", zIndex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <div
+                style={{
+                  width: 54,
+                  height: 54,
+                  borderRadius: 16,
+                  background: "rgba(255,255,255,.16)",
+                  border: "0.5px solid rgba(255,255,255,.24)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Activity size={26} color="rgba(255,255,255,.92)" strokeWidth={2.1} />
+              </div>
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,.50)", marginBottom: 4 }}>
+                  Academic Health Index
+                </div>
+                <div style={{ fontSize: 40, fontWeight: 700, color: "#fff", letterSpacing: "-1.2px", lineHeight: 1 }}>
+                  {loading ? "—" : ahi}
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 18px",
+                borderRadius: 100,
+                background: ahiTier.bg,
+                border: `0.5px solid ${ahiTier.border}`,
+                fontSize: 13,
+                fontWeight: 700,
+                color: ahiTier.color,
+              }}
+            >
+              <TrendingUp size={14} strokeWidth={2.5} />
+              {ahiTier.label} tier
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: 1,
+                background: "rgba(255,255,255,.12)",
+                borderRadius: 14,
+                overflow: "hidden",
+                minWidth: 340,
+              }}
+            >
+              {[
+                { v: branches.length, l: "Branches", c: "#fff" },
+                { v: totalStudents.toLocaleString(), l: "Students", c: "#AACCFF" },
+                { v: `${feeRate}%`, l: "Fee Rate", c: "#66EE88" },
+              ].map((s, i) => (
+                <div key={i} style={{ background: "rgba(255,255,255,.08)", padding: "14px 18px", textAlign: "center", minWidth: 100 }}>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: s.c, letterSpacing: "-0.5px", lineHeight: 1, marginBottom: 4 }}>
+                    {s.v}
+                  </div>
+                  <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,.40)" }}>
+                    {s.l}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bright Stat Grid (4 cards) ───────────────────── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 20 }}>
         {[
           {
-            title:  "Academic Health Index",
-            value:  loading ? "—" : ahi.toString(),
-            badge:  deltas.ahi != null ? `${deltas.ahi >= 0 ? "+" : ""}${deltas.ahi}` : "—",
-            label:  deltas.ahi != null ? "vs last month" : "no prior data",
-            icon:   Activity,
-            color:  deltas.ahi != null && deltas.ahi >= 0 ? "text-green-500" : "text-red-500",
-            bg:     "bg-green-50",
-            up:     deltas.ahi == null ? true : deltas.ahi >= 0,
-            href:   "/academics",
+            title: "Academic Health Index",
+            value: loading ? "—" : ahi.toString(),
+            sub: ahiDelta != null ? `${ahiDelta >= 0 ? "+" : ""}${ahiDelta} vs last month` : "No prior data",
+            up: ahiDelta == null ? true : ahiDelta >= 0,
+            bg: "linear-gradient(140deg,#DDEAFF 0%,#A8C5FF 55%,#7AA5FF 100%)",
+            border: "0.5px solid rgba(0,85,255,.4)",
+            lblColor: "#002080",
+            valColor: "#001055",
+            subColor: "#002080",
+            icon: <Activity size={18} color="#001055" strokeWidth={2.5} />,
+            href: "/academics",
           },
           {
-            title:  "Total Students",
-            value:  loading ? "—" : totalStudents.toLocaleString(),
-            badge:  branches.length > 0 ? `${branches.length}` : "—",
-            label:  branches.length > 0 ? `across ${branches.length} branch${branches.length !== 1 ? "es" : ""}` : "no branches yet",
-            icon:   Users,
-            color:  "text-blue-500",
-            bg:     "bg-blue-50",
-            up:     true,
-            href:   "/students",
+            title: "Total Students",
+            value: loading ? "—" : totalStudents.toLocaleString(),
+            sub: branches.length > 0 ? `Across ${branches.length} branch${branches.length !== 1 ? "es" : ""}` : "No branches yet",
+            up: true,
+            bg: "linear-gradient(140deg,#EEE0FF 0%,#C9A8FF 55%,#A880FF 100%)",
+            border: "0.5px solid rgba(123,63,244,.4)",
+            lblColor: "#3A1580",
+            valColor: "#280C5C",
+            subColor: "#3A1580",
+            icon: <Users size={18} color="#3A1580" strokeWidth={2.5} />,
+            href: "/students",
           },
           {
-            title:  "Fee Collection Rate",
-            value:  loading ? "—" : `${feeRate}%`,
-            badge:  deltas.fee != null ? `${deltas.fee >= 0 ? "+" : ""}${deltas.fee}%` : "—",
-            label:  deltas.fee != null ? "vs last month" : "no prior data",
-            icon:   Percent,
-            color:  deltas.fee != null && deltas.fee >= 0 ? "text-emerald-500" : "text-red-500",
-            bg:     "bg-emerald-50",
-            up:     deltas.fee == null ? true : deltas.fee >= 0,
-            href:   "/finance",
+            title: "Fee Collection Rate",
+            value: loading ? "—" : `${feeRate}%`,
+            sub: feeDelta != null ? `${feeDelta >= 0 ? "+" : ""}${feeDelta}% vs last month` : "No prior data",
+            up: feeDelta == null ? true : feeDelta >= 0,
+            bg: "linear-gradient(140deg,#DEFCE8 0%,#8CF0B0 55%,#50E088 100%)",
+            border: "0.5px solid rgba(0,200,83,.4)",
+            lblColor: "#005A20",
+            valColor: "#004018",
+            subColor: "#005A20",
+            icon: <Percent size={18} color="#005A20" strokeWidth={2.5} />,
+            href: "/finance",
           },
           {
-            title:  "Active Alerts",
-            value:  loading ? "—" : displayAlertsCount.toString(),
-            badge:  criticalAlerts > 0 ? `${criticalAlerts}` : "0",
-            label:  criticalAlerts > 0 ? "critical" : "no critical",
-            icon:   Bell,
-            color:  criticalAlerts > 0 ? "text-red-500" : "text-slate-400",
-            bg:     "bg-red-50",
-            up:     criticalAlerts === 0,
-            href:   "/risks",
+            title: "Active Alerts",
+            value: loading ? "—" : displayAlertsCount.toString(),
+            sub: criticalAlerts > 0 ? `${criticalAlerts} critical` : "No critical issues",
+            up: criticalAlerts === 0,
+            bg: criticalAlerts > 0 ? "linear-gradient(140deg,#FFE3E8 0%,#FFA8B8 55%,#FF7085 100%)" : "linear-gradient(140deg,#FFF6D1 0%,#FFE488 55%,#FFCC33 100%)",
+            border: criticalAlerts > 0 ? "0.5px solid rgba(255,51,85,.4)" : "0.5px solid rgba(255,170,0,.4)",
+            lblColor: criticalAlerts > 0 ? "#8A0A22" : "#664400",
+            valColor: criticalAlerts > 0 ? "#60081A" : "#472A00",
+            subColor: criticalAlerts > 0 ? "#8A0A22" : "#664400",
+            icon: <Bell size={18} color={criticalAlerts > 0 ? "#8A0A22" : "#664400"} strokeWidth={2.5} />,
+            href: "/risks",
           },
         ].map((s) => (
           <div
@@ -486,121 +800,130 @@ export default function Dashboard() {
             onClick={() => navigate(s.href)}
             role="button"
             tabIndex={0}
-            className="clickable-card bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm"
+            style={{
+              borderRadius: 20,
+              padding: 20,
+              position: "relative",
+              overflow: "hidden",
+              background: s.bg,
+              border: s.border,
+              boxShadow: "0 10px 28px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.04)",
+              cursor: "pointer",
+              transition: "transform .18s cubic-bezier(.34,1.56,.64,1)",
+            }}
           >
-            <div className="flex items-start justify-between mb-4">
-              <span className="text-slate-500 text-sm font-semibold tracking-tight">{s.title}</span>
-              <div className={`p-2 rounded-lg ${s.bg}`}>
-                <s.icon className={`w-5 h-5 ${s.color}`} />
-              </div>
+            <div style={{ position: "absolute", top: -24, right: -20, width: 110, height: 110, borderRadius: "50%", background: "radial-gradient(circle, rgba(255,255,255,.65) 0%, transparent 70%)", pointerEvents: "none" }} />
+            <div style={{ position: "absolute", top: 16, right: 16, width: 38, height: 38, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,.75)", border: "0.5px solid rgba(255,255,255,.95)", boxShadow: "0 2px 6px rgba(0,0,0,.05)" }}>
+              {s.icon}
+            </div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: s.lblColor, marginBottom: 12, position: "relative", zIndex: 1 }}>
+              {s.title}
             </div>
             {loading ? (
-              <Loader2 className="w-6 h-6 animate-spin text-slate-300 mt-2" />
+              <Loader2 size={24} color={s.valColor} style={{ animation: "spin 1s linear infinite" }} />
             ) : (
-              <div>
-                <span className="text-4xl font-bold text-[#1e294b] tracking-tight">{s.value}</span>
-                <div className="flex items-center gap-1 mt-2">
-                  <TrendingUp className={`w-3 h-3 ${s.up ? "text-green-500" : "text-red-500"}`} />
-                  <span className={`text-xs font-bold ${s.up ? "text-green-500" : "text-red-500"}`}>{s.badge}</span>
-                  <span className="text-slate-400 text-xs font-medium">{s.label}</span>
+              <>
+                <div style={{ fontSize: 32, fontWeight: 700, color: s.valColor, letterSpacing: "-1px", lineHeight: 1, marginBottom: 6, position: "relative", zIndex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {s.value}
                 </div>
-              </div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: s.subColor, position: "relative", zIndex: 1, display: "flex", alignItems: "center", gap: 4 }}>
+                  {s.up ? <ArrowUpRight size={12} strokeWidth={2.5} /> : <ArrowDownRight size={12} strokeWidth={2.5} />}
+                  {s.sub}
+                </div>
+              </>
             )}
           </div>
         ))}
+        <style>{`@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
       </div>
 
       {/* ── Middle Row ───────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 14, marginBottom: 20 }}>
 
         {/* Branch Overview */}
-        <div className="lg:col-span-4 bg-white rounded-3xl border border-slate-100 p-6 md:p-8 shadow-sm">
-          <h3 className="text-base md:text-lg font-bold text-[#1e294b] mb-6 md:mb-8">Branch Overview</h3>
+        <div style={{ gridColumn: "span 4", background: "#fff", borderRadius: 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: "22px 24px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: 0 }}>Branch Overview</h3>
+            {branches.length > 0 && (
+              <span style={{ padding: "3px 9px", borderRadius: 100, background: "rgba(0,85,255,.10)", border: "0.5px solid rgba(0,85,255,.16)", fontSize: 10, fontWeight: 700, color: B1 }}>
+                {branches.length}
+              </span>
+            )}
+          </div>
           {loading ? (
-            <div className="flex items-center justify-center h-40">
-              <Loader2 className="w-6 h-6 animate-spin text-slate-300" />
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 180 }}>
+              <Loader2 size={24} color={T4} style={{ animation: "spin 1s linear infinite" }} />
             </div>
           ) : branches.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 text-center">
-              <p className="text-sm font-semibold text-slate-400">No branches found</p>
-              <p className="text-xs text-slate-300 mt-1">Schools will appear here once registered</p>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 180, textAlign: "center" }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: T4, margin: 0 }}>No branches found</p>
+              <p style={{ fontSize: 11, color: T4, marginTop: 4 }}>Schools will appear here once registered</p>
             </div>
           ) : (
-            <div className="flex flex-col gap-6">
-              {branches.map((branch) => (
-                <div
-                  key={branch.id}
-                  onClick={() => navigate("/branches")}
-                  className="flex items-center justify-between group cursor-pointer"
-                >
-                  <div>
-                    <h4 className="text-[15px] font-bold text-[#1e294b] group-hover:text-blue-600 transition-colors">
-                      {branch.name}
-                    </h4>
-                    <p className="text-slate-400 text-xs font-medium">
-                      {branch.students.toLocaleString()} students
-                    </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {branches.map((branch) => {
+                const ahiColor = branch.ahi >= 90 ? GREEN : branch.ahi >= 80 ? "#22C865" : branch.ahi >= 60 ? B1 : "#FF8800";
+                const ahiBg = branch.ahi >= 90 ? "linear-gradient(135deg, #00C853, #66EE88)" : branch.ahi >= 80 ? "linear-gradient(135deg, #22C865, #50E088)" : branch.ahi >= 60 ? GRAD_PRIMARY : "linear-gradient(135deg, #FF8800, #FFAA00)";
+                return (
+                  <div
+                    key={branch.id}
+                    onClick={() => navigate("/branches")}
+                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", padding: "10px 14px", borderRadius: 14, border: "0.5px solid rgba(0,85,255,.07)", background: "rgba(0,85,255,.02)", transition: "background .15s" }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: T1, letterSpacing: "-0.2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {branch.name}
+                      </div>
+                      <div style={{ fontSize: 10, color: T4, fontWeight: 600, marginTop: 2 }}>
+                        {branch.students.toLocaleString()} students
+                      </div>
+                    </div>
+                    <div style={{ padding: "5px 12px", borderRadius: 100, fontSize: 11, fontWeight: 700, color: "#fff", background: branch.ahi > 0 ? ahiBg : "rgba(153,170,204,.7)", boxShadow: branch.ahi > 0 ? `0 3px 10px ${ahiColor}40` : "none", letterSpacing: "0.02em", whiteSpace: "nowrap", flexShrink: 0 }}>
+                      {branch.ahi > 0 ? `${branch.ahi}%` : "N/A"} AHI
+                    </div>
                   </div>
-                  <div className={`px-4 py-1.5 rounded-lg text-xs font-bold text-white ${
-                    branch.ahi >= 90 ? "bg-green-500" :
-                    branch.ahi >= 80 ? "bg-emerald-500" : "bg-orange-500"
-                  }`}>
-                    {branch.ahi > 0 ? `${branch.ahi}%` : "N/A"} AHI
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
 
         {/* Risk Distribution */}
-        <div className="lg:col-span-4 bg-white rounded-3xl border border-slate-100 p-6 md:p-8 shadow-sm">
-          <h3 className="text-base md:text-lg font-bold text-[#1e294b] mb-6">Risk Distribution</h3>
+        <div style={{ gridColumn: "span 4", background: "#fff", borderRadius: 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: "22px 24px" }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: "0 0 18px 0" }}>Risk Distribution</h3>
           {riskData.every(r => r.value === 0) ? (
-            <div className="h-[220px] flex flex-col items-center justify-center gap-3 border border-dashed border-slate-200 rounded-2xl">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-emerald-400" />
+            <div style={{ height: 220, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, borderRadius: 18, border: "0.5px dashed rgba(0,85,255,.2)", background: "rgba(0,200,83,.03)" }}>
+              <div style={{ width: 48, height: 48, borderRadius: 16, background: "rgba(0,200,83,.10)", border: "0.5px solid rgba(0,200,83,.22)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <TrendingUp size={24} color={GREEN} strokeWidth={2.2} />
               </div>
-              <div className="text-center">
-                <p className="text-sm font-bold text-slate-400">No risk data yet</p>
-                <p className="text-xs text-slate-300 mt-1">Risk distribution appears once student data is added</p>
+              <div style={{ textAlign: "center" }}>
+                <p style={{ fontSize: 13, fontWeight: 700, color: T4, margin: 0 }}>No risk data yet</p>
+                <p style={{ fontSize: 11, color: T4, marginTop: 4 }}>Appears once student data is added</p>
               </div>
             </div>
           ) : (
             <>
-              <div className="h-[220px] relative flex items-center justify-center">
+              <div style={{ height: 220, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie
-                      data={riskData}
-                      cx="50%" cy="50%"
-                      innerRadius={70} outerRadius={100}
-                      paddingAngle={6} cornerRadius={10}
-                      dataKey="value"
-                      stroke="none"
-                      startAngle={90} endAngle={-270}
-                    >
+                    <Pie data={riskData} cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={6} cornerRadius={10} dataKey="value" stroke="none" startAngle={90} endAngle={-270}>
                       {riskData.map((entry) => (
                         <Cell key={entry.name} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip
-                      formatter={(v: any) => [`${v}%`, ""]}
-                      contentStyle={{ borderRadius:"16px", border:"none", boxShadow:"0 10px 25px rgba(0,0,0,0.1)", padding:"10px 16px" }}
-                      itemStyle={{ fontWeight:"bold", fontSize:"12px" }}
-                    />
+                    <Tooltip formatter={(v: any) => [`${v}%`, ""]} contentStyle={{ borderRadius: 14, border: "none", boxShadow: "0 10px 25px rgba(0,0,0,.10)", padding: "10px 16px" }} itemStyle={{ fontWeight: 700, fontSize: 12 }} />
                   </PieChart>
                 </ResponsiveContainer>
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-4">
-                  <span className="text-3xl font-bold text-[#1e294b]">{lowPct}%</span>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Safe</span>
+                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none", marginTop: 4 }}>
+                  <span style={{ fontSize: 32, fontWeight: 700, color: T1, letterSpacing: "-0.8px", lineHeight: 1 }}>{lowPct}%</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: T4, letterSpacing: "0.14em", textTransform: "uppercase", marginTop: 4 }}>Safe</span>
                 </div>
               </div>
-              <div className="flex items-center justify-center gap-6 mt-4">
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 18, marginTop: 14 }}>
                 {riskData.map(r => (
-                  <div key={r.name} className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ background: r.color }} />
-                    <span className="text-[11px] font-bold text-slate-500">{r.name}</span>
+                  <div key={r.name} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: 3, background: r.color }} />
+                    <span style={{ fontSize: 11, fontWeight: 700, color: T3 }}>{r.name}</span>
                   </div>
                 ))}
               </div>
@@ -609,44 +932,33 @@ export default function Dashboard() {
         </div>
 
         {/* Revenue Trend */}
-        <div className="lg:col-span-4 bg-white rounded-3xl border border-slate-100 p-6 md:p-8 shadow-sm">
-          <h3 className="text-base md:text-lg font-bold text-[#1e294b] mb-6">Revenue Trend</h3>
+        <div style={{ gridColumn: "span 4", background: "#fff", borderRadius: 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: "22px 24px" }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: "0 0 18px 0" }}>Revenue Trend</h3>
           {revenueTrend.every(r => r.revenue === 0) ? (
-            <div className="h-[220px] flex flex-col items-center justify-center gap-3 border border-dashed border-slate-200 rounded-2xl">
-              <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center">
-                <Download className="w-6 h-6 text-blue-300" />
+            <div style={{ height: 220, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, borderRadius: 18, border: "0.5px dashed rgba(0,85,255,.2)", background: "rgba(0,85,255,.03)" }}>
+              <div style={{ width: 48, height: 48, borderRadius: 16, background: "rgba(0,85,255,.10)", border: "0.5px solid rgba(0,85,255,.22)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Download size={24} color={B1} strokeWidth={2.2} />
               </div>
-              <div className="text-center">
-                <p className="text-sm font-bold text-slate-400">No revenue data yet</p>
-                <p className="text-xs text-slate-300 mt-1">Appears once fee payments are recorded</p>
+              <div style={{ textAlign: "center" }}>
+                <p style={{ fontSize: 13, fontWeight: 700, color: T4, margin: 0 }}>No revenue data yet</p>
+                <p style={{ fontSize: 11, color: T4, marginTop: 4 }}>Appears once fee payments are recorded</p>
               </div>
             </div>
           ) : (
-            <div className="h-[220px] w-full">
+            <div style={{ height: 220, width: "100%" }}>
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={revenueTrend} margin={{ top:10, right:10, left:-20, bottom:0 }}>
+                <AreaChart data={revenueTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="#1e3a8a" stopOpacity={0.12} />
-                      <stop offset="95%" stopColor="#1e3a8a" stopOpacity={0}    />
+                      <stop offset="5%" stopColor={B1} stopOpacity={0.18} />
+                      <stop offset="95%" stopColor={B1} stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false}
-                    tick={{ fill:"#94a3b8", fontSize:12, fontWeight:500 }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false}
-                    tick={{ fill:"#94a3b8", fontSize:12, fontWeight:500 }} />
-                  <Tooltip
-                    formatter={(v:any) => [`${v}K`, "Revenue"]}
-                    contentStyle={{ borderRadius:"16px", border:"none", boxShadow:"0 10px 15px rgba(0,0,0,0.1)" }}
-                    itemStyle={{ fontWeight:"bold", fontSize:"12px" }}
-                  />
-                  <Area type="monotone" dataKey="revenue"
-                    stroke="#1e3a8a" strokeWidth={3}
-                    fillOpacity={1} fill="url(#revGrad)"
-                    dot={{ r:4, fill:"#1e3a8a", strokeWidth:2, stroke:"#fff" }}
-                    activeDot={{ r:6, strokeWidth:0 }}
-                  />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,85,255,.08)" />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: T4, fontSize: 11, fontWeight: 700 }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: T4, fontSize: 11, fontWeight: 700 }} />
+                  <Tooltip formatter={(v: any) => [`${v}K`, "Revenue"]} contentStyle={{ borderRadius: 14, border: "none", boxShadow: "0 10px 25px rgba(0,0,0,.10)", padding: "10px 14px" }} itemStyle={{ fontWeight: 700, fontSize: 12 }} />
+                  <Area type="monotone" dataKey="revenue" stroke={B1} strokeWidth={3} fillOpacity={1} fill="url(#revGrad)" dot={{ r: 4, fill: B1, strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 6, strokeWidth: 0 }} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -655,18 +967,17 @@ export default function Dashboard() {
       </div>
 
       {/* ── Bottom Row ───────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
 
         {/* Critical Alerts */}
-        <div className="bg-white rounded-3xl border border-slate-100 p-6 md:p-8 shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-            <h3 className="text-base md:text-lg font-bold text-[#1e294b]">Critical Alerts</h3>
-            <div className="flex items-center justify-between gap-3">
+        <div style={{ background: "#fff", borderRadius: 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: "22px 24px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: 0 }}>Critical Alerts</h3>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <select
                 value={selectedAlertBranch}
                 onChange={(e) => setSelectedAlertBranch(e.target.value)}
-                className="text-xs font-bold text-slate-500 bg-slate-50 border border-slate-100 rounded-lg px-2 py-1 outline-none focus:border-blue-500 transition-colors"
-                style={{ cursor: 'pointer' }}
+                style={{ fontSize: 11, fontWeight: 700, color: T3, background: "#fff", border: "0.5px solid rgba(0,85,255,.14)", borderRadius: 10, padding: "6px 10px", outline: "none", cursor: "pointer", fontFamily: "inherit", boxShadow: SHADOW_SM }}
               >
                 <option value="all">All Branches</option>
                 {branches.map(b => (
@@ -675,48 +986,44 @@ export default function Dashboard() {
               </select>
               <button
                 onClick={() => navigate("/risks")}
-                className="text-xs font-bold text-[#1e3a8a] hover:underline flex items-center gap-1"
+                style={{ fontSize: 11, fontWeight: 700, color: B1, background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.06em", textTransform: "uppercase" }}
               >
-                View All
+                View All →
               </button>
             </div>
           </div>
-          <div className="space-y-3">
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {filteredAlerts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-6 text-center">
-                <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center mb-2">
-                  <AlertCircle className="w-5 h-5 text-slate-300" />
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 16px", textAlign: "center" }}>
+                <div style={{ width: 44, height: 44, borderRadius: 14, background: "rgba(0,200,83,.10)", border: "0.5px solid rgba(0,200,83,.22)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10 }}>
+                  <AlertCircle size={22} color={GREEN} strokeWidth={2.2} />
                 </div>
-                <p className="text-sm font-semibold text-slate-400">No critical alerts for this branch</p>
-                <p className="text-xs text-slate-300 mt-0.5">Everything looks good!</p>
+                <p style={{ fontSize: 13, fontWeight: 700, color: T4, margin: 0 }}>No critical alerts</p>
+                <p style={{ fontSize: 11, color: T4, marginTop: 4 }}>Everything looks good!</p>
               </div>
             ) : (
-              filteredAlerts.slice(0,5).map((alert) => {
-                const isCritical = (alert.severity||"warning") === "critical";
+              filteredAlerts.slice(0, 5).map((alert) => {
+                const isCritical = (alert.severity || "warning") === "critical";
+                const accent = isCritical ? "linear-gradient(180deg, #FF3355, #FF6688)" : "linear-gradient(180deg, #FF8800, #FFAA00)";
+                const bg = isCritical ? "rgba(255,51,85,.05)" : "rgba(255,170,0,.05)";
+                const iconColor = isCritical ? RED : "#FF8800";
+                const iconBg = isCritical ? "rgba(255,51,85,.10)" : "rgba(255,170,0,.10)";
+                const iconBorder = isCritical ? "rgba(255,51,85,.22)" : "rgba(255,170,0,.22)";
                 return (
                   <div
                     key={alert.id}
                     onClick={() => navigate("/risks")}
-                    className={`relative flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 rounded-2xl cursor-pointer hover:scale-[1.01] transition-all overflow-hidden ${
-                      isCritical ? "bg-red-50" : "bg-amber-50/70"
-                    }`}
+                    style={{ position: "relative", display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 14, background: bg, border: `0.5px solid ${iconBorder}`, cursor: "pointer", overflow: "hidden", transition: "transform .15s" }}
                   >
-                    {/* Rounded pill left accent */}
-                    <div className={`absolute left-0 top-3 bottom-3 w-[5px] rounded-r-full ${
-                      isCritical ? "bg-red-500" : "bg-amber-400"
-                    }`} />
-
-                    <div className={`w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center shrink-0 ${
-                      isCritical ? "border border-red-100" : "border border-amber-100"
-                    }`}>
-                      <AlertCircle className={`w-4 h-4 ${isCritical ? "text-red-500" : "text-amber-500"}`} />
+                    <div style={{ position: "absolute", left: 0, top: 6, bottom: 6, width: 4, borderRadius: "0 3px 3px 0", background: accent }} />
+                    <div style={{ width: 34, height: 34, borderRadius: 11, background: iconBg, border: `0.5px solid ${iconBorder}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginLeft: 4 }}>
+                      <AlertCircle size={16} color={iconColor} strokeWidth={2.3} />
                     </div>
-
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-[#1e294b] leading-snug">
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 13, fontWeight: 700, color: T1, letterSpacing: "-0.1px", margin: 0, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}>
                         {alert.message || alert.description || alert.title || "Alert"}
                       </p>
-                      <p className="text-[11px] text-slate-400 font-semibold mt-0.5">
+                      <p style={{ fontSize: 10, color: T4, fontWeight: 600, marginTop: 3, margin: "3px 0 0 0" }}>
                         {alert._fallback
                           ? (alert.id === "f1" ? "2 hours ago" : alert.id === "f2" ? "5 hours ago" : "1 day ago")
                           : timeAgo(alert.createdAt)}
@@ -730,44 +1037,45 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="bg-white rounded-3xl border border-slate-100 p-6 md:p-8 shadow-sm">
-          <h3 className="text-base md:text-lg font-bold text-[#1e294b] mb-6">Quick Actions</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div style={{ background: "#fff", borderRadius: 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: "22px 24px" }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: "0 0 16px 0" }}>Quick Actions</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <button
               onClick={() => navigate("/reports")}
-              className="flex items-center gap-4 bg-[#1e3a8a] text-white p-5 rounded-2xl shadow-lg shadow-blue-900/20 hover:bg-[#1e4fc0] transition-all group"
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: 18, borderRadius: 16, background: GRAD_PRIMARY, color: "#fff", border: "none", boxShadow: SHADOW_BTN, cursor: "pointer", textAlign: "left", fontFamily: "inherit", position: "relative", overflow: "hidden" }}
             >
-              <div className="p-2.5 rounded-xl bg-white/15 group-hover:scale-110 transition-transform">
-                <Download className="w-5 h-5" />
+              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, rgba(255,255,255,.14) 0%, transparent 52%)", pointerEvents: "none" }} />
+              <div style={{ padding: 10, borderRadius: 11, background: "rgba(255,255,255,.18)", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", zIndex: 1 }}>
+                <Download size={18} color="#fff" strokeWidth={2.4} />
               </div>
-              <span className="text-sm font-bold">Export Report</span>
+              <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "-0.1px", position: "relative", zIndex: 1 }}>Export Report</span>
             </button>
             <button
               onClick={() => navigate("/branches")}
-              className="flex items-center gap-4 bg-white border border-slate-100 text-[#1e294b] p-5 rounded-2xl shadow-sm hover:bg-slate-50 transition-all group"
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: 18, borderRadius: 16, background: "rgba(0,200,83,.06)", color: "#005A20", border: "0.5px solid rgba(0,200,83,.22)", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}
             >
-              <div className="p-2.5 rounded-xl bg-slate-50 group-hover:scale-110 transition-transform">
-                <Mail className="w-5 h-5 text-slate-400" />
+              <div style={{ padding: 10, borderRadius: 11, background: "rgba(0,200,83,.10)", border: "0.5px solid rgba(0,200,83,.22)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Mail size={18} color={GREEN} strokeWidth={2.4} />
               </div>
-              <span className="text-sm font-bold">Message Branches</span>
+              <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "-0.1px" }}>Message Branches</span>
             </button>
             <button
               onClick={() => navigate("/principals")}
-              className="flex items-center gap-4 bg-white border border-slate-100 text-[#1e294b] p-5 rounded-2xl shadow-sm hover:bg-slate-50 transition-all group"
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: 18, borderRadius: 16, background: "rgba(123,63,244,.06)", color: "#3A1580", border: "0.5px solid rgba(123,63,244,.22)", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}
             >
-              <div className="p-2.5 rounded-xl bg-slate-50 group-hover:scale-110 transition-transform">
-                <Calendar className="w-5 h-5 text-slate-400" />
+              <div style={{ padding: 10, borderRadius: 11, background: "rgba(123,63,244,.10)", border: "0.5px solid rgba(123,63,244,.22)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Calendar size={18} color="#7B3FF4" strokeWidth={2.4} />
               </div>
-              <span className="text-sm font-bold">Schedule Meeting</span>
+              <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "-0.1px" }}>Schedule Meeting</span>
             </button>
             <button
               onClick={() => navigate("/settings")}
-              className="flex items-center gap-4 bg-white border border-slate-100 text-[#1e294b] p-5 rounded-2xl shadow-sm hover:bg-slate-50 transition-all group"
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: 18, borderRadius: 16, background: "rgba(255,136,0,.06)", color: "#663300", border: "0.5px solid rgba(255,136,0,.22)", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}
             >
-              <div className="p-2.5 rounded-xl bg-slate-50 group-hover:scale-110 transition-transform">
-                <Settings className="w-5 h-5 text-slate-400" />
+              <div style={{ padding: 10, borderRadius: 11, background: "rgba(255,136,0,.10)", border: "0.5px solid rgba(255,136,0,.22)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Settings size={18} color="#FF8800" strokeWidth={2.4} />
               </div>
-              <span className="text-sm font-bold">System Settings</span>
+              <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "-0.1px" }}>System Settings</span>
             </button>
           </div>
         </div>
@@ -775,88 +1083,78 @@ export default function Dashboard() {
       </div>
 
       {/* ── Improvement Timeline ─────────────────────────── */}
-      <div className="bg-white rounded-3xl border border-slate-100 p-6 md:p-8 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+      <div style={{ background: "#fff", borderRadius: 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: "22px 24px", marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
           <div>
-            <h3 className="text-base md:text-lg font-bold text-[#1e294b]">School Improvement Timeline</h3>
-            <p className="text-xs text-slate-400 font-medium mt-0.5">AHI · Attendance · Fee Collection — last 6 months</p>
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: 0 }}>School Improvement Timeline</h3>
+            <p style={{ fontSize: 11, color: T4, fontWeight: 600, margin: "4px 0 0 0", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+              AHI · Attendance · Fee Collection — last 6 months
+            </p>
           </div>
           {improvementTimeline.length >= 2 && (() => {
             const first = improvementTimeline[0];
-            const last  = improvementTimeline[improvementTimeline.length - 1];
+            const last = improvementTimeline[improvementTimeline.length - 1];
             const delta = (last.ahi ?? 0) - (first.ahi ?? 0);
-            const isUp  = delta > 0;
+            const isUp = delta > 0;
             const isFlat = delta === 0;
+            const chipBg = isUp ? "rgba(0,200,83,.10)" : isFlat ? "rgba(153,170,204,.12)" : "rgba(255,51,85,.10)";
+            const chipColor = isUp ? "#007830" : isFlat ? T3 : "#B01030";
+            const chipBorder = isUp ? "rgba(0,200,83,.22)" : isFlat ? "rgba(153,170,204,.22)" : "rgba(255,51,85,.22)";
             return (
-              <div className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black ${
-                isUp ? "bg-green-50 text-green-600" : isFlat ? "bg-slate-50 text-slate-500" : "bg-red-50 text-red-500"
-              }`}>
-                {isFlat ? <Minus className="w-3.5 h-3.5" /> : isUp ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
-                <span>AHI {isUp ? "+" : ""}{delta} pts over 6 months</span>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 100, background: chipBg, border: `0.5px solid ${chipBorder}`, fontSize: 11, fontWeight: 700, color: chipColor, letterSpacing: "0.02em" }}>
+                {isFlat ? <Minus size={13} strokeWidth={2.5} /> : isUp ? <ArrowUpRight size={13} strokeWidth={2.5} /> : <ArrowDownRight size={13} strokeWidth={2.5} />}
+                AHI {isUp ? "+" : ""}{delta} pts over 6 months
               </div>
             );
           })()}
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center h-52">
-            <Loader2 className="w-6 h-6 animate-spin text-slate-300" />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 208 }}>
+            <Loader2 size={24} color={T4} style={{ animation: "spin 1s linear infinite" }} />
           </div>
         ) : improvementTimeline.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-52 text-center">
-            <TrendingUp className="w-8 h-8 text-slate-200 mb-2" />
-            <p className="text-sm font-semibold text-slate-400">No historical data yet</p>
-            <p className="text-xs text-slate-300 mt-1">Timeline will appear as months of data accumulate</p>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 208, textAlign: "center", borderRadius: 18, border: "0.5px dashed rgba(0,85,255,.2)" }}>
+            <TrendingUp size={32} color="rgba(0,85,255,.22)" strokeWidth={1.8} style={{ marginBottom: 10 }} />
+            <p style={{ fontSize: 13, fontWeight: 700, color: T4, margin: 0 }}>No historical data yet</p>
+            <p style={{ fontSize: 11, color: T4, marginTop: 4 }}>Timeline will appear as months of data accumulate</p>
           </div>
         ) : (
           <>
-            <div className="h-[240px] w-full">
+            <div style={{ height: 240, width: "100%" }}>
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={improvementTimeline} margin={{ top:10, right:10, left:-20, bottom:0 }}>
+                <LineChart data={improvementTimeline} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="ahiGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="#1e3a8a" stopOpacity={0.1} />
-                      <stop offset="95%" stopColor="#1e3a8a" stopOpacity={0}   />
+                      <stop offset="5%" stopColor={B1} stopOpacity={0.15} />
+                      <stop offset="95%" stopColor={B1} stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false}
-                    tick={{ fill:"#94a3b8", fontSize:11, fontWeight:600 }} dy={8} />
-                  <YAxis domain={[40,100]} axisLine={false} tickLine={false}
-                    tick={{ fill:"#94a3b8", fontSize:11, fontWeight:600 }} />
-                  <Tooltip
-                    contentStyle={{ borderRadius:"16px", border:"none", boxShadow:"0 10px 25px rgba(0,0,0,0.1)", padding:"10px 16px" }}
-                    itemStyle={{ fontWeight:"bold", fontSize:"12px" }}
-                    formatter={(v: any, name: string) => [`${v}%`, name]}
-                  />
-                  <Legend wrapperStyle={{ fontSize:11, fontWeight:700, paddingTop:12 }} />
-                  <Line type="monotone" dataKey="ahi" name="AHI" stroke="#1e3a8a" strokeWidth={3}
-                    dot={{ r:4, fill:"#1e3a8a", stroke:"#fff", strokeWidth:2 }}
-                    activeDot={{ r:6, strokeWidth:0 }} connectNulls />
-                  <Line type="monotone" dataKey="attendance" name="Attendance" stroke="#22c55e" strokeWidth={2.5}
-                    strokeDasharray="5 3"
-                    dot={{ r:3, fill:"#22c55e", stroke:"#fff", strokeWidth:2 }}
-                    activeDot={{ r:5, strokeWidth:0 }} connectNulls />
-                  <Line type="monotone" dataKey="fee" name="Fee Collection" stroke="#f59e0b" strokeWidth={2.5}
-                    strokeDasharray="8 4"
-                    dot={{ r:3, fill:"#f59e0b", stroke:"#fff", strokeWidth:2 }}
-                    activeDot={{ r:5, strokeWidth:0 }} connectNulls />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,85,255,.08)" />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: T4, fontSize: 11, fontWeight: 700 }} dy={8} />
+                  <YAxis domain={[40, 100]} axisLine={false} tickLine={false} tick={{ fill: T4, fontSize: 11, fontWeight: 700 }} />
+                  <Tooltip contentStyle={{ borderRadius: 14, border: "none", boxShadow: "0 10px 25px rgba(0,0,0,.10)", padding: "10px 14px" }} itemStyle={{ fontWeight: 700, fontSize: 12 }} formatter={(v: any, name: string) => [`${v}%`, name]} />
+                  <Legend wrapperStyle={{ fontSize: 11, fontWeight: 700, paddingTop: 12, color: T3 }} />
+                  <Line type="monotone" dataKey="ahi" name="AHI" stroke={B1} strokeWidth={3} dot={{ r: 4, fill: B1, stroke: "#fff", strokeWidth: 2 }} activeDot={{ r: 6, strokeWidth: 0 }} connectNulls />
+                  <Line type="monotone" dataKey="attendance" name="Attendance" stroke={GREEN} strokeWidth={2.5} strokeDasharray="5 3" dot={{ r: 3, fill: GREEN, stroke: "#fff", strokeWidth: 2 }} activeDot={{ r: 5, strokeWidth: 0 }} connectNulls />
+                  <Line type="monotone" dataKey="fee" name="Fee Collection" stroke="#FF8800" strokeWidth={2.5} strokeDasharray="8 4" dot={{ r: 3, fill: "#FF8800", stroke: "#fff", strokeWidth: 2 }} activeDot={{ r: 5, strokeWidth: 0 }} connectNulls />
                 </LineChart>
               </ResponsiveContainer>
             </div>
 
             {/* Month-over-month delta chips */}
             {improvementTimeline.length >= 2 && (
-              <div className="flex flex-wrap gap-2 mt-4">
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 16 }}>
                 {improvementTimeline.slice(1).map((m, i) => {
-                  const prev  = improvementTimeline[i];
+                  const prev = improvementTimeline[i];
                   const delta = (m.ahi ?? 0) - (prev.ahi ?? 0);
-                  const isUp  = delta > 0;
+                  const isUp = delta > 0;
+                  const chipBg = isUp ? "rgba(0,200,83,.10)" : delta < 0 ? "rgba(255,51,85,.10)" : "rgba(153,170,204,.10)";
+                  const chipColor = isUp ? "#007830" : delta < 0 ? "#B01030" : T4;
+                  const chipBorder = isUp ? "rgba(0,200,83,.22)" : delta < 0 ? "rgba(255,51,85,.22)" : "rgba(153,170,204,.22)";
                   return (
-                    <div key={m.month} className={`flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-black ${
-                      isUp ? "bg-green-50 text-green-600" : delta < 0 ? "bg-red-50 text-red-500" : "bg-slate-50 text-slate-400"
-                    }`}>
-                      {isUp ? <ArrowUpRight className="w-3 h-3" /> : delta < 0 ? <ArrowDownRight className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                    <div key={m.month} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 100, fontSize: 10, fontWeight: 700, background: chipBg, color: chipColor, border: `0.5px solid ${chipBorder}`, letterSpacing: "0.02em" }}>
+                      {isUp ? <ArrowUpRight size={11} strokeWidth={2.5} /> : delta < 0 ? <ArrowDownRight size={11} strokeWidth={2.5} /> : <Minus size={11} strokeWidth={2.5} />}
                       {prev.month}→{m.month}: {isUp ? "+" : ""}{delta}
                     </div>
                   );
