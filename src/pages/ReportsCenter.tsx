@@ -5,8 +5,14 @@ import {
   ChevronRight, GraduationCap, Presentation, DollarSign, Loader2,
   Users, TrendingUp, TrendingDown, AlertTriangle, BookOpen,
   ArrowLeft, CheckCircle, Clock, BarChart3, Bell, Calendar, RefreshCw,
-  Building2,
+  Building2, Sparkles,
 } from "lucide-react";
+import {
+  B1, T1, T3, T4, GREEN, RED, GOLD, VIOLET, ORANGE,
+  GRAD_PRIMARY, GRAD_BLUE, GRAD_GREEN, GRAD_VIOLET, GRAD_GOLD, GRAD_RED, GRAD_ORANGE,
+  SHADOW_SM, SHADOW_LG, SHADOW_BTN, pageShellStyle,
+  DashGlobalStyles, PageHead, StatTile, DarkHero, AIInsightCard,
+} from "@/lib/dashboardTokens";
 import { generateBoardReportPDF } from "@/lib/boardReportService";
 import { doc, getDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
@@ -580,108 +586,110 @@ export default function ReportsCenter() {
   const stats = dashboard?.stats;
   const scheduled = dashboard?.scheduledReports || [];
 
-  return (
-    <div className="space-y-10 max-w-[1600px] mx-auto animate-in fade-in duration-500 pb-10">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-[#111827] tracking-tight">Reports Center</h1>
-          <p className="text-slate-400 font-bold text-[10px] md:text-sm uppercase tracking-tight">Generate, schedule & download reports</p>
-        </div>
-        <Button className="w-full sm:w-auto bg-[#1e294b] hover:bg-[#1e3a8a] text-white font-black text-[10px] md:text-xs uppercase tracking-widest h-11 md:h-12 rounded-xl px-8 shadow-lg shadow-blue-900/10 flex items-center justify-center gap-2">
-          <Plus className="w-4 h-4" /> Create Report
-        </Button>
-      </div>
+  const totalReports = stats?.totalReports ?? 12;
+  const scheduledCount = stats?.scheduled ?? 0;
+  const recentDownloads = stats?.recentDownloads ?? 0;
+  const favorites = stats?.favorites ?? 0;
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        {[
-          { label: "Total Reports", value: stats?.totalReports?.toString() || "12", note: `${stats?.totalCategories || 3} categories` },
-          { label: "Scheduled", value: stats?.scheduled?.toString() || "0", note: "Auto-generated", noteCol: "text-emerald-500" },
-          { label: "Recent Downloads", value: stats?.recentDownloads?.toString() || "0", note: "Last 7 days" },
-          { label: "Favorites", value: stats?.favorites?.toString() || "0", note: "Quick access" },
-        ].map((stat, i) => (
-          <div
-            key={i}
-            onClick={() => navigate("/reports")}
-            role="button"
-            tabIndex={0}
-            className="clickable-card bg-white p-6 md:p-8 rounded-2xl md:rounded-[2rem] border border-slate-100 shadow-sm transition-all hover:shadow-md"
+  const categoryBlocks = [
+    { key:"student",   title:"Student Reports",  icon:GraduationCap,  grad:GRAD_BLUE,    bg:"rgba(0,85,255,.08)",    items: REPORT_CATEGORIES.student },
+    { key:"teacher",   title:"Teacher Reports",  icon:Presentation,   grad:GRAD_GREEN,   bg:"rgba(0,200,83,.10)",    items: REPORT_CATEGORIES.teacher },
+    { key:"financial", title:"Financial Reports",icon:DollarSign,     grad:GRAD_GOLD,    bg:"rgba(255,170,0,.12)",   items: REPORT_CATEGORIES.financial },
+  ];
+
+  return (
+    <>
+      <DashGlobalStyles />
+      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap:24 }}>
+
+      <PageHead
+        icon={FileText}
+        title="Reports Center"
+        subtitle="Generate, schedule & download reports"
+        right={
+          <button
+            className="dash-btn"
+            style={{
+              display:"inline-flex", alignItems:"center", gap:7,
+              padding:"11px 18px", borderRadius:14,
+              background:GRAD_PRIMARY, color:"#fff",
+              fontSize:12, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
+              border:"none", cursor:"pointer", boxShadow:SHADOW_BTN, fontFamily:"inherit",
+            }}
           >
-            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-3 md:mb-4">{stat.label}</p>
-            <h3 className="text-3xl md:text-4xl font-black text-[#111827] tracking-tighter mb-1 md:mb-2">{stat.value}</h3>
-            <p className={`text-[10px] font-bold uppercase tracking-tight ${stat.noteCol || "text-slate-400 opacity-70"}`}>{stat.note}</p>
-          </div>
-        ))}
+            <Plus size={15} strokeWidth={2.4}/> Create Report
+          </button>
+        }
+      />
+
+      <DarkHero
+        icon={BarChart3}
+        eyebrow={<><Sparkles size={11} style={{ display:"inline", marginRight:4 }}/> Reporting Intelligence</> as any}
+        title={totalReports.toString()}
+        subtitle={`Available report${totalReports!==1?"s":""} across ${stats?.totalCategories || 3} categories · ${scheduledCount} scheduled · ${recentDownloads} recent downloads`}
+        stats={[
+          { label:"Scheduled", value: scheduledCount.toString() },
+          { label:"Downloads", value: recentDownloads.toString() },
+          { label:"Favorites", value: favorites.toString() },
+        ]}
+      />
+
+      {/* Bright Stat Grid */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16 }}>
+        <StatTile label="Total Reports"     value={totalReports.toString()}     sub={`${stats?.totalCategories || 3} categories`}  grad={GRAD_BLUE}   icon={FileText}     onClick={()=>navigate("/reports")} />
+        <StatTile label="Scheduled"         value={scheduledCount.toString()}   sub="Auto-generated"                               grad={GRAD_GREEN}  icon={Clock}        onClick={()=>navigate("/reports")} />
+        <StatTile label="Recent Downloads"  value={recentDownloads.toString()}  sub="Last 7 days"                                  grad={GRAD_VIOLET} icon={Download}     onClick={()=>navigate("/reports")} />
+        <StatTile label="Favorites"         value={favorites.toString()}        sub="Quick access"                                 grad={GRAD_GOLD}   icon={Star}         onClick={()=>navigate("/reports")} />
       </div>
 
       {/* Report Categories */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Student Reports */}
-        <div className="bg-white rounded-[2rem] border border-slate-100 p-8 shadow-sm">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="w-12 h-12 rounded-2xl bg-[#1e3a8a] flex items-center justify-center text-white shadow-lg">
-              <GraduationCap className="w-6 h-6" />
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:16 }}>
+        {categoryBlocks.map(cat => {
+          const Icon = cat.icon;
+          return (
+            <div
+              key={cat.key}
+              className="dash3d"
+              style={{
+                background:"#fff", borderRadius:22, padding:"22px 24px",
+                boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
+              }}
+            >
+              <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16, paddingBottom:14, borderBottom:"0.5px solid rgba(0,85,255,.08)" }}>
+                <div style={{
+                  width:42, height:42, borderRadius:13, background:cat.grad,
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  boxShadow:"0 6px 14px rgba(0,85,255,.18)", flexShrink:0,
+                }}>
+                  <Icon size={20} color="#fff" strokeWidth={2.3}/>
+                </div>
+                <div>
+                  <h3 style={{ fontSize:15, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.3px" }}>{cat.title}</h3>
+                  <p style={{ fontSize:10, fontWeight:700, color:T4, margin:"2px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>{cat.items.length} templates</p>
+                </div>
+              </div>
+              <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+                {cat.items.map(item => (
+                  <button
+                    key={item}
+                    onClick={() => openReport(item)}
+                    className="dash-row"
+                    style={{
+                      width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between",
+                      padding:"11px 12px", borderRadius:10,
+                      background:"transparent", border:"none",
+                      fontSize:12, fontWeight:600, color:T3,
+                      cursor:"pointer", fontFamily:"inherit", textAlign:"left",
+                    }}
+                  >
+                    <span>{item}</span>
+                    <ChevronRight size={14} color={T4}/>
+                  </button>
+                ))}
+              </div>
             </div>
-            <h3 className="text-base font-bold text-[#111827]">Student Reports</h3>
-          </div>
-          <div className="space-y-0 divide-y divide-slate-50">
-            {REPORT_CATEGORIES.student.map(item => (
-              <button
-                key={item}
-                onClick={() => openReport(item)}
-                className="w-full flex items-center justify-between py-4 text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors group"
-              >
-                {item}
-                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-400 transition-colors" />
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Teacher Reports */}
-        <div className="bg-white rounded-[2rem] border border-slate-100 p-8 shadow-sm">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="w-12 h-12 rounded-2xl bg-[#22c55e] flex items-center justify-center text-white shadow-lg">
-              <Presentation className="w-6 h-6" />
-            </div>
-            <h3 className="text-base font-bold text-[#111827]">Teacher Reports</h3>
-          </div>
-          <div className="space-y-0 divide-y divide-slate-50">
-            {REPORT_CATEGORIES.teacher.map(item => (
-              <button
-                key={item}
-                onClick={() => openReport(item)}
-                className="w-full flex items-center justify-between py-4 text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors group"
-              >
-                {item}
-                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-400 transition-colors" />
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Financial Reports */}
-        <div className="bg-white rounded-[2rem] border border-slate-100 p-8 shadow-sm">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="w-12 h-12 rounded-2xl bg-[#f59e0b] flex items-center justify-center text-white shadow-lg">
-              <DollarSign className="w-6 h-6" />
-            </div>
-            <h3 className="text-base font-bold text-[#111827]">Financial Reports</h3>
-          </div>
-          <div className="space-y-0 divide-y divide-slate-50">
-            {REPORT_CATEGORIES.financial.map(item => (
-              <button
-                key={item}
-                onClick={() => openReport(item)}
-                className="w-full flex items-center justify-between py-4 text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors group"
-              >
-                {item}
-                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-400 transition-colors" />
-              </button>
-            ))}
-          </div>
-        </div>
+          );
+        })}
       </div>
 
       {/* Scheduled Reports Table */}
@@ -797,7 +805,17 @@ export default function ReportsCenter() {
         </div>
       </div>
 
-    </div>
+      <AIInsightCard
+        title="Reports Intelligence Summary"
+        items={[
+          { label:"Report Coverage",  value: `${totalReports} available`, sub: `${stats?.totalCategories || 3} categories ready` },
+          { label:"Automation",       value: scheduledCount > 0 ? `${scheduledCount} scheduled` : "No auto jobs yet", sub: scheduledCount > 0 ? "Running on schedule" : "Set up recurring reports" },
+          { label:"Usage Pulse",      value: recentDownloads > 0 ? `${recentDownloads} downloads` : "No recent activity", sub: favorites > 0 ? `${favorites} favorite${favorites!==1?"s":""}` : "Mark favorites for quick access" },
+        ]}
+      />
+
+      </div>
+    </>
   );
 }
 

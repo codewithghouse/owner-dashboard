@@ -1,10 +1,12 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { db, auth } from "@/lib/firebase";
-import { collection, getDocs, query, orderBy, where } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import {
-  Users, Search, Plus, Filter, TrendingUp, TrendingDown,
-  ChevronLeft, ChevronRight, X, Loader2
+  Users, Search, Plus, Filter, TrendingUp,
+  X, Loader2,
+  GraduationCap, Award, Percent, AlertTriangle, ArrowUpRight, ArrowDownRight,
+  BarChart3, Activity, Sparkles, Mail
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -39,18 +41,6 @@ function getRisk(score: number): { label: string; color: string; bg: string } {
 
 function getInitials(name: string) {
   return (name || "?").split(" ").map(n=>n[0]).join("").toUpperCase().slice(0,2);
-}
-
-function getAvatarColor(score: number) {
-  if (score >= 75) return "bg-emerald-500";
-  if (score >= 50) return "bg-amber-500";
-  return "bg-red-500";
-}
-
-function getHeatColor(v: number) {
-  if (v >= 95) return "bg-green-600 text-white";
-  if (v >= 85) return "bg-amber-500 text-white";
-  return "bg-red-500 text-white";
 }
 
 const PAGE_SIZE = 10;
@@ -462,122 +452,293 @@ export default function StudentsIntelligence() {
     fetchDetail();
   }, [selected?.id]);
 
-  /* ─────────────────────────────────────────────────── */
-  return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-10">
+  /* ─── Design tokens (principal/owner dashboard system) ─── */
+  const B1 = "#0055FF", B2 = "#1166FF";
+  const T1 = "#001040", T3 = "#5070B0", T4 = "#99AACC";
+  const GREEN = "#00C853", RED = "#FF3355", GOLD = "#FFAA00", VIOLET = "#7B3FF4";
+  const GRAD_PRIMARY = `linear-gradient(135deg, ${B1}, ${B2})`;
+  const GRAD_HERO = "linear-gradient(135deg,#001040 0%,#001888 35%,#0033CC 70%,#0055FF 100%)";
+  const GRAD_BLUE = "linear-gradient(135deg,#0055FF 0%,#2277FF 100%)";
+  const GRAD_GREEN = "linear-gradient(135deg,#00C853 0%,#33DD77 100%)";
+  const GRAD_VIOLET = "linear-gradient(135deg,#7B3FF4 0%,#A060FF 100%)";
+  const GRAD_GOLD = "linear-gradient(135deg,#FFAA00 0%,#FFCC33 100%)";
+  const GRAD_RED = "linear-gradient(135deg,#FF3355 0%,#FF6677 100%)";
+  const SHADOW_SM = "0 0 0 .5px rgba(0,85,255,.08), 0 2px 8px rgba(0,85,255,.08), 0 10px 26px rgba(0,85,255,.10)";
+  const SHADOW_LG = "0 0 0 .5px rgba(0,85,255,.10), 0 4px 16px rgba(0,85,255,.11), 0 18px 44px rgba(0,85,255,.13)";
+  const SHADOW_BTN = "0 6px 22px rgba(0,85,255,.40), 0 2px 5px rgba(0,85,255,.20)";
 
-      {/* ── Header ──────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-[#1e294b] tracking-tight">Students Intelligence</h1>
-          <p className="text-slate-500 text-xs md:text-sm font-medium">Enrollment, performance &amp; behavior analytics</p>
+  return (
+    <>
+      <style>{`
+        .stu3d {
+          transition: transform .45s cubic-bezier(.2,.9,.25,1.2), box-shadow .35s ease;
+          transform-style: preserve-3d;
+          will-change: transform;
+        }
+        .stu3d:hover {
+          transform: perspective(1000px) translateY(-6px) rotateX(3deg) rotateY(-3deg) scale(1.015);
+          box-shadow: 0 0 0 .5px rgba(0,85,255,.18), 0 22px 54px rgba(0,16,64,.22), 0 6px 18px rgba(0,85,255,.22) !important;
+        }
+        .stu-tile {
+          transition: transform .5s cubic-bezier(.2,.9,.25,1.2), box-shadow .35s ease;
+        }
+        .stu-tile:hover {
+          transform: perspective(1100px) translateY(-8px) rotateX(4deg) rotateY(-4deg) scale(1.025);
+        }
+        .stu-row {
+          transition: transform .3s ease, background .2s ease;
+        }
+        .stu-row:hover {
+          transform: translateX(4px);
+          background: rgba(0,85,255,.04) !important;
+        }
+        .stu-btn {
+          transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+        }
+        .stu-btn:hover {
+          transform: translateY(-1px);
+        }
+      `}</style>
+      <div
+        style={{
+          fontFamily: "'DM Sans', -apple-system, sans-serif",
+          background: "#EEF4FF",
+          minHeight: "100vh",
+          margin: "-16px -24px 0",
+          padding: "24px 32px 40px",
+        }}
+      >
+      {/* ── Page Head ───────────────────────────────────── */}
+      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:20, marginBottom:22, flexWrap:"wrap" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+          <div style={{ width:48, height:48, borderRadius:14, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 8px 22px rgba(0,85,255,.35)" }}>
+            <GraduationCap size={24} color="#fff" strokeWidth={2.2}/>
+          </div>
+          <div>
+            <h1 style={{ fontSize:32, fontWeight:700, color:T1, letterSpacing:"-0.8px", margin:0, lineHeight:1.1 }}>
+              Students Intelligence
+            </h1>
+            <p style={{ fontSize:12, color:T3, fontWeight:500, margin:"5px 0 0 0", letterSpacing:"0.10em", textTransform:"uppercase" }}>
+              Enrollment, performance &amp; behavior analytics
+            </p>
+          </div>
         </div>
-        <button className="flex items-center justify-center gap-2 bg-[#1e3a8a] text-white font-bold h-10 md:h-11 rounded-xl px-6 shadow-lg shadow-blue-900/15 hover:bg-[#1e4fc0] transition-all text-xs md:text-sm">
-          <Plus className="w-4 h-4" /> Add Student
+        <button
+          onClick={()=>navigate("/students")}
+          className="stu-btn"
+          style={{
+            display:"inline-flex", alignItems:"center", gap:8,
+            padding:"11px 18px", borderRadius:14,
+            background:GRAD_PRIMARY, color:"#fff",
+            fontSize:12, fontWeight:700, letterSpacing:"0.06em", textTransform:"uppercase",
+            border:"none", cursor:"pointer", boxShadow:SHADOW_BTN, fontFamily:"inherit",
+          }}
+        >
+          <Plus size={16} strokeWidth={2.4}/> Add Student
         </button>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="w-8 h-8 animate-spin text-[#1e3a8a]" />
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:260 }}>
+          <Loader2 className="animate-spin" size={32} color={B1}/>
         </div>
       ) : (
         <>
-          {/* ── Stat Cards ────────────────────────────── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-            {[
-              { label:"Total Enrollment",   value: totalEnrollment.toLocaleString(), sub: newThisTerm > 0 ? `+${newThisTerm} this term` : "No new this term",     color:"text-green-600", route: "/students" },
-              { label:"Average Attendance", value:`${avgAttendance}%`,               sub: avgAttendance > 0 ? `Across ${totalEnrollment} students` : "No data yet", color:"text-green-600", route: "/students" },
-              { label:"At-Risk Students",   value: atRisk.toString(),                sub:`${totalEnrollment>0?((atRisk/totalEnrollment)*100).toFixed(1):0}% of total`, color:"text-red-500", route: "/risks" },
-              { label:"High Performers",    value: highPerformers.toString(),         sub:`${totalEnrollment>0?((highPerformers/totalEnrollment)*100).toFixed(1):0}% of total`, color:"text-green-600", route: "/students" },
-            ].map(s=>(
-              <div
-                key={s.label}
-                onClick={() => navigate(s.route)}
-                role="button"
-                tabIndex={0}
-                className="clickable-card bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all"
-              >
-                <p className="text-slate-400 text-[10px] md:text-[11px] font-bold uppercase tracking-widest mb-1 md:mb-2">{s.label}</p>
-                <h3 className="text-3xl md:text-4xl font-extrabold text-[#1e294b] tracking-tight mb-1">{s.value}</h3>
-                <p className={`text-[10px] md:text-[11px] font-bold ${s.color}`}>{s.sub}</p>
+          {/* ── Dark Hero Banner ───────────────────────── */}
+          <div
+            style={{
+              background:GRAD_HERO, borderRadius:24, padding:"24px 28px", color:"#fff",
+              marginBottom:24, position:"relative", overflow:"hidden",
+              boxShadow:"0 14px 40px rgba(0,8,60,.32), 0 0 0 .5px rgba(255,255,255,.12)",
+            }}
+          >
+            <div style={{ position:"absolute", top:-60, right:-40, width:280, height:280, background:"radial-gradient(circle, rgba(255,255,255,.12) 0%, transparent 65%)", borderRadius:"50%", pointerEvents:"none" }}/>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:24, flexWrap:"wrap", position:"relative", zIndex:1 }}>
+              <div style={{ display:"flex", alignItems:"flex-start", gap:16, flex:1, minWidth:300 }}>
+                <div style={{ width:52, height:52, borderRadius:15, background:"rgba(255,255,255,.16)", border:"0.5px solid rgba(255,255,255,.26)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                  <Users size={26} color="#fff" strokeWidth={2.2}/>
+                </div>
+                <div>
+                  <div style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"4px 10px", borderRadius:999, background:"rgba(255,255,255,.14)", border:"0.5px solid rgba(255,255,255,.22)", fontSize:10, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:10 }}>
+                    <Sparkles size={11}/> Academic Intelligence
+                  </div>
+                  <h2 style={{ fontSize:38, fontWeight:800, letterSpacing:"-1px", margin:0, color:"#fff", lineHeight:1 }}>
+                    {totalEnrollment.toLocaleString()}
+                  </h2>
+                  <p style={{ fontSize:13, color:"rgba(255,255,255,.72)", fontWeight:500, margin:"8px 0 0 0" }}>
+                    Total scholars across {branchList.length-1} branches · {newThisTerm > 0 ? `+${newThisTerm} new this term` : "steady enrollment"}
+                  </p>
+                </div>
               </div>
-            ))}
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(3, minmax(120px,1fr))", gap:10 }}>
+                {[
+                  { label:"Avg Attendance", value:avgAttendance > 0 ? `${avgAttendance}%` : "—" },
+                  { label:"At Risk",        value:atRisk.toString() },
+                  { label:"High Performers",value:highPerformers.toString() },
+                ].map(s=>(
+                  <div key={s.label} style={{ background:"rgba(255,255,255,.10)", borderRadius:14, padding:"12px 14px", border:"0.5px solid rgba(255,255,255,.14)" }}>
+                    <p style={{ fontSize:9, fontWeight:700, color:"rgba(255,255,255,.65)", letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 6px 0" }}>{s.label}</p>
+                    <p style={{ fontSize:20, fontWeight:800, color:"#fff", margin:0, letterSpacing:"-0.4px" }}>{s.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
-          {/* ── Charts Row ────────────────────────────── */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* ── Bright Stat Grid ─────────────────────── */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16, marginBottom:24 }}>
+            {[
+              { label:"Total Enrollment", value:totalEnrollment.toLocaleString(), sub:newThisTerm > 0 ? `+${newThisTerm} this term` : "Steady", grad:GRAD_BLUE, icon:Users, delta:newThisTerm > 0 ? "up" : null, route:"/students" },
+              { label:"Avg Attendance", value:avgAttendance > 0 ? `${avgAttendance}%` : "—", sub:`Across ${totalEnrollment} students`, grad:GRAD_GREEN, icon:Percent, delta:null, route:"/students" },
+              { label:"At-Risk Students", value:atRisk.toString(), sub:`${totalEnrollment>0?((atRisk/totalEnrollment)*100).toFixed(1):0}% of total`, grad:atRisk > 0 ? GRAD_RED : GRAD_GOLD, icon:AlertTriangle, delta:atRisk > 0 ? "down" : null, route:"/risks" },
+              { label:"High Performers", value:highPerformers.toString(), sub:`${totalEnrollment>0?((highPerformers/totalEnrollment)*100).toFixed(1):0}% of total`, grad:GRAD_VIOLET, icon:Award, delta:"up", route:"/students" },
+            ].map(s=>{
+              const Icon = s.icon;
+              return (
+                <div
+                  key={s.label}
+                  onClick={()=>navigate(s.route)}
+                  role="button"
+                  tabIndex={0}
+                  className="stu-tile"
+                  style={{
+                    background:s.grad, borderRadius:22, padding:"20px 22px", color:"#fff",
+                    cursor:"pointer", position:"relative", overflow:"hidden",
+                    boxShadow:"0 0 0 .5px rgba(255,255,255,.15), 0 14px 38px rgba(0,85,255,.26), 0 4px 12px rgba(0,85,255,.18)",
+                  }}
+                >
+                  <div style={{ position:"absolute", top:-30, right:-20, width:110, height:110, background:"radial-gradient(circle, rgba(255,255,255,.22) 0%, transparent 70%)", borderRadius:"50%", pointerEvents:"none" }}/>
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14, position:"relative", zIndex:1 }}>
+                    <div style={{ width:38, height:38, borderRadius:12, background:"rgba(255,255,255,.22)", border:"0.5px solid rgba(255,255,255,.28)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                      <Icon size={19} color="#fff" strokeWidth={2.3}/>
+                    </div>
+                    {s.delta && (
+                      <div style={{ display:"inline-flex", alignItems:"center", gap:3, padding:"4px 8px", borderRadius:8, background:"rgba(255,255,255,.22)", fontSize:10, fontWeight:800, color:"#fff" }}>
+                        {s.delta === "up" ? <ArrowUpRight size={11}/> : <ArrowDownRight size={11}/>}
+                      </div>
+                    )}
+                  </div>
+                  <p style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,.75)", letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 4px 0", position:"relative", zIndex:1 }}>{s.label}</p>
+                  <p style={{ fontSize:30, fontWeight:800, color:"#fff", letterSpacing:"-0.6px", margin:0, lineHeight:1.1, position:"relative", zIndex:1 }}>{s.value}</p>
+                  <p style={{ fontSize:11, fontWeight:600, color:"rgba(255,255,255,.78)", margin:"6px 0 0 0", position:"relative", zIndex:1 }}>{s.sub}</p>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── Charts Row (3-col) ───────────────────── */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:16, marginBottom:24 }}>
 
             {/* Grade Distribution */}
-            <div className="bg-white rounded-2xl border border-slate-100 p-5 md:p-6 shadow-sm">
-              <h3 className="text-sm md:text-base font-bold text-[#1e294b] mb-4">Grade Distribution</h3>
-              <div className="h-[220px] md:h-[260px]">
+            <div
+              className="stu3d"
+              style={{
+                background:"#fff", borderRadius:22, padding:"22px 22px 18px",
+                boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
+              }}
+            >
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+                <div>
+                  <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Grade Distribution</h3>
+                  <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Scholars by grade</p>
+                </div>
+                <div style={{ width:32, height:32, borderRadius:10, background:"rgba(0,85,255,.08)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  <BarChart3 size={16} color={B1} strokeWidth={2.3}/>
+                </div>
+              </div>
+              <div style={{ height:220 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={gradeDistData.length ? gradeDistData : [{name:"No Data",value:1,fill:"#e2e8f0"}]}
-                      cx="50%" cy="50%"
-                      outerRadius={95}
-                      dataKey="value"
-                      stroke="#fff" strokeWidth={2}
+                      cx="50%" cy="50%" outerRadius={78} innerRadius={38}
+                      dataKey="value" stroke="#fff" strokeWidth={2} paddingAngle={3}
                       label={({name,midAngle,cx,cy,outerRadius:or})=>{
                         const R=Math.PI/180;
-                        const x=cx+(or+22)*Math.cos(-midAngle*R);
-                        const y=cy+(or+22)*Math.sin(-midAngle*R);
-                        return <text x={x} y={y} fill="#94a3b8" fontSize={10} fontWeight="bold" textAnchor={x>cx?"start":"end"} dominantBaseline="central">{name}</text>;
+                        const x=cx+(or+18)*Math.cos(-midAngle*R);
+                        const y=cy+(or+18)*Math.sin(-midAngle*R);
+                        return <text x={x} y={y} fill={T3} fontSize={10} fontWeight="700" textAnchor={x>cx?"start":"end"} dominantBaseline="central">{name}</text>;
                       }}
                     >
-                      {gradeDistData.map((e,i)=><Cell key={i} fill={e.fill}/>)}
+                      {(gradeDistData.length?gradeDistData:[{fill:"#e2e8f0"}]).map((e:any,i:number)=><Cell key={i} fill={e.fill}/>)}
                     </Pie>
-                    <Tooltip contentStyle={{borderRadius:"12px",border:"none",boxShadow:"0 10px 15px rgba(0,0,0,0.1)"}}/>
+                    <Tooltip contentStyle={{ borderRadius:12, border:"none", boxShadow:SHADOW_LG, fontSize:11, fontWeight:700 }}/>
                   </PieChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
             {/* Enrollment Trend */}
-            <div className="bg-white rounded-2xl border border-slate-100 p-5 md:p-6 shadow-sm">
-              <h3 className="text-sm md:text-base font-bold text-[#1e294b] mb-4">Enrollment Trend</h3>
-              <div className="h-[220px] md:h-[260px]">
+            <div
+              className="stu3d"
+              style={{
+                background:"#fff", borderRadius:22, padding:"22px 22px 18px",
+                boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
+              }}
+            >
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+                <div>
+                  <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Enrollment Trend</h3>
+                  <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Last 6 months</p>
+                </div>
+                <div style={{ width:32, height:32, borderRadius:10, background:"rgba(123,63,244,.1)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  <TrendingUp size={16} color={VIOLET} strokeWidth={2.3}/>
+                </div>
+              </div>
+              <div style={{ height:220 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={enrollTrend} margin={{top:10,right:10,left:-20,bottom:0}}>
+                  <AreaChart data={enrollTrend} margin={{top:5,right:10,left:-22,bottom:0}}>
                     <defs>
-                      <linearGradient id="enGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%"  stopColor="#1e3a8a" stopOpacity={0.1}/>
-                        <stop offset="95%" stopColor="#1e3a8a" stopOpacity={0}/>
+                      <linearGradient id="enGradOw" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%"  stopColor={B1} stopOpacity={0.22}/>
+                        <stop offset="95%" stopColor={B1} stopOpacity={0}/>
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
-                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fill:"#94a3b8",fontSize:11,fontWeight:600}}/>
-                    <YAxis axisLine={false} tickLine={false} tick={{fill:"#94a3b8",fontSize:11,fontWeight:600}}/>
-                    <Tooltip contentStyle={{borderRadius:"12px",border:"none",boxShadow:"0 10px 15px rgba(0,0,0,0.1)"}}/>
-                    <Area type="monotone" dataKey="value" stroke="#1e3a8a" strokeWidth={3} fill="url(#enGrad)"
-                      dot={{r:4,fill:"#1e3a8a",strokeWidth:2,stroke:"#fff"}}/>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,85,255,.07)"/>
+                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fill:T3,fontSize:11,fontWeight:600}}/>
+                    <YAxis axisLine={false} tickLine={false} tick={{fill:T3,fontSize:11,fontWeight:600}}/>
+                    <Tooltip contentStyle={{ borderRadius:12, border:"none", boxShadow:SHADOW_LG, fontSize:11, fontWeight:700 }}/>
+                    <Area type="monotone" dataKey="value" stroke={B1} strokeWidth={3} fill="url(#enGradOw)"
+                      dot={{r:4,fill:B1,strokeWidth:2,stroke:"#fff"}} activeDot={{r:6}}/>
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
             {/* Performance by Branch */}
-            <div className="bg-white rounded-2xl border border-slate-100 p-5 md:p-6 shadow-sm">
-              <h3 className="text-sm md:text-base font-bold text-[#1e294b] mb-4">Performance by Branch</h3>
-              <div className="h-[220px] md:h-[260px]">
+            <div
+              className="stu3d"
+              style={{
+                background:"#fff", borderRadius:22, padding:"22px 22px 18px",
+                boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
+              }}
+            >
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+                <div>
+                  <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Performance by Branch</h3>
+                  <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Avg scores</p>
+                </div>
+                <div style={{ width:32, height:32, borderRadius:10, background:"rgba(0,200,83,.1)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  <Activity size={16} color={GREEN} strokeWidth={2.3}/>
+                </div>
+              </div>
+              <div style={{ height:220 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={perfByBranch.length ? perfByBranch : [{branch:"No Data",value:0}]}
                     layout="vertical"
-                    margin={{left:0,right:40,top:10,bottom:10}}
+                    margin={{left:0,right:40,top:5,bottom:5}}
                   >
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9"/>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(0,85,255,.07)"/>
                     <XAxis type="number" domain={[0,100]} axisLine={false} tickLine={false}
-                      tick={{fill:"#94a3b8",fontSize:11}} ticks={[0,20,40,60,80,100]}/>
+                      tick={{fill:T3,fontSize:11,fontWeight:600}} ticks={[0,25,50,75,100]}/>
                     <YAxis dataKey="branch" type="category" axisLine={false} tickLine={false}
-                      tick={{fill:"#64748b",fontSize:12,fontWeight:700}} width={55}/>
-                    <Tooltip contentStyle={{borderRadius:"12px",border:"none",boxShadow:"0 10px 15px rgba(0,0,0,0.1)"}}/>
-                    <Bar dataKey="value" radius={[0,6,6,0]} barSize={26}
-                      label={{position:"right",fill:"#64748b",fontSize:12,fontWeight:700,formatter:(v:any)=>`${v}%`}}>
+                      tick={{fill:T3,fontSize:11,fontWeight:700}} width={60}/>
+                    <Tooltip contentStyle={{ borderRadius:12, border:"none", boxShadow:SHADOW_LG, fontSize:11, fontWeight:700 }} cursor={{fill:"rgba(0,85,255,.04)"}}/>
+                    <Bar dataKey="value" radius={[0,6,6,0]} barSize={22}
+                      label={{position:"right",fill:T3,fontSize:11,fontWeight:700,formatter:(v:any)=>`${v}%`}}>
                       {perfByBranch.map((e,i)=>(
-                        <Cell key={i} fill={e.value>=80?"#16a34a":e.value>=60?"#f59e0b":"#ef4444"}/>
+                        <Cell key={i} fill={e.value>=80?GREEN:e.value>=60?GOLD:RED}/>
                       ))}
                     </Bar>
                   </BarChart>
@@ -586,56 +747,81 @@ export default function StudentsIntelligence() {
             </div>
           </div>
 
-          {/* ── Attendance Heatmap ────────────────────── */}
-          <div className="bg-white rounded-2xl border border-slate-100 p-5 md:p-6 shadow-sm">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-              <h3 className="text-sm md:text-base font-bold text-[#1e294b]">Attendance Heatmap</h3>
-              <div className="flex flex-wrap items-center gap-3 sm:gap-6">
-                {/* Branch selector */}
+          {/* ── Attendance Heatmap ───────────────────── */}
+          <div
+            className="stu3d"
+            style={{
+              background:"#fff", borderRadius:22, padding:"22px 24px",
+              boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
+              marginBottom:24,
+            }}
+          >
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:16, marginBottom:20, flexWrap:"wrap" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                <div style={{ width:36, height:36, borderRadius:11, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(0,85,255,.28)" }}>
+                  <Percent size={18} color="#fff" strokeWidth={2.3}/>
+                </div>
+                <div>
+                  <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Attendance Heatmap</h3>
+                  <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Branch × grade</p>
+                </div>
+              </div>
+              <div style={{ display:"flex", alignItems:"center", gap:14, flexWrap:"wrap" }}>
                 <select
                   value={heatBranch}
-                  onChange={e => setHeatBranch(e.target.value)}
-                  className="border border-slate-200 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-600 bg-slate-50 outline-none w-full sm:w-auto"
+                  onChange={e=>setHeatBranch(e.target.value)}
+                  style={{
+                    padding:"7px 12px", borderRadius:10, border:"0.5px solid rgba(0,85,255,.18)",
+                    background:"#F5F9FF", fontSize:11, fontWeight:700, color:T3,
+                    letterSpacing:"0.04em", outline:"none", fontFamily:"inherit",
+                  }}
                 >
-                  {branchList.map(b => <option key={b} value={b}>{b === "All" ? "All Branches" : b}</option>)}
+                  {branchList.map(b=><option key={b} value={b}>{b==="All"?"All Branches":b}</option>)}
                 </select>
-                {/* Legend */}
-                <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-                  {[["bg-green-600","95%+"],["bg-amber-500","85-94%"],["bg-red-500","<85%"]].map(([c,l])=>(
-                    <div key={l} className="flex items-center gap-1.5">
-                      <div className={`w-2 h-2 rounded-full ${c}`}/>
-                      <span className="text-[10px] font-bold text-slate-600">{l}</span>
+                <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                  {[[GREEN,"95%+"],[GOLD,"85-94%"],[RED,"<85%"]].map(([c,l])=>(
+                    <div key={l as string} style={{ display:"flex", alignItems:"center", gap:5 }}>
+                      <div style={{ width:8, height:8, borderRadius:"50%", background:c as string }}/>
+                      <span style={{ fontSize:10, fontWeight:700, color:T3 }}>{l}</span>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
 
-            <div className="overflow-x-auto pb-4">
-              <div className="min-w-[600px]">
-                {/* Grade headers */}
-                <div className="grid gap-2 mb-2" style={{gridTemplateColumns:`140px repeat(${Math.max(heatmapGrades.length,1)},1fr)`}}>
-                  <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Branch</div>
+            <div style={{ overflowX:"auto", paddingBottom:4 }}>
+              <div style={{ minWidth:600 }}>
+                <div style={{ display:"grid", gap:8, marginBottom:8, gridTemplateColumns:`140px repeat(${Math.max(heatmapGrades.length,1)},1fr)` }}>
+                  <div style={{ fontSize:9, fontWeight:700, color:T4, letterSpacing:"0.12em", textTransform:"uppercase" }}>Branch</div>
                   {heatmapGrades.map(g=>(
-                    <div key={g} className="text-center text-[9px] font-bold text-slate-400 uppercase tracking-wide">{g}</div>
+                    <div key={g} style={{ textAlign:"center", fontSize:9, fontWeight:700, color:T4, letterSpacing:"0.12em", textTransform:"uppercase" }}>{g}</div>
                   ))}
                 </div>
-                {/* Rows */}
                 {heatmapData.length === 0 ? (
-                  <div className="text-center py-8 text-xs text-slate-400 font-semibold">No attendance data yet</div>
+                  <div style={{ textAlign:"center", padding:"30px 0", fontSize:12, color:T4, fontWeight:600 }}>No attendance data yet</div>
                 ) : (
                   heatmapData.map(row=>(
-                    <div key={row.branch} className="grid gap-2 mb-2" style={{gridTemplateColumns:`140px repeat(${Math.max(heatmapGrades.length,1)},1fr)`}}>
-                      <div className="flex items-center">
-                        <span className="text-[10px] font-bold text-slate-500 tracking-tight truncate pr-2">{row.branch}</span>
+                    <div key={row.branch} style={{ display:"grid", gap:8, marginBottom:8, gridTemplateColumns:`140px repeat(${Math.max(heatmapGrades.length,1)},1fr)` }}>
+                      <div style={{ display:"flex", alignItems:"center" }}>
+                        <span style={{ fontSize:11, fontWeight:700, color:T3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", paddingRight:6 }}>{row.branch}</span>
                       </div>
-                      {row.cells.map((val,i)=>(
-                        <div key={i} className={`h-10 rounded-lg flex items-center justify-center font-bold text-xs transition-transform hover:scale-105 ${
-                          val>0 ? getHeatColor(val) : "bg-slate-100 text-slate-400"
-                        }`}>
-                          {val>0 ? `${val}%` : "—"}
-                        </div>
-                      ))}
+                      {row.cells.map((val,i)=>{
+                        const bg = val >= 95 ? GREEN : val >= 85 ? GOLD : val > 0 ? RED : "rgba(0,85,255,.06)";
+                        return (
+                          <div key={i} className="stu-btn"
+                            style={{
+                              height:40, borderRadius:10,
+                              display:"flex", alignItems:"center", justifyContent:"center",
+                              fontWeight:800, fontSize:11,
+                              color: val>0 ? "#fff" : T4,
+                              background: bg,
+                              boxShadow: val>0 ? "0 4px 10px rgba(0,0,0,.08)" : "none",
+                            }}
+                          >
+                            {val>0 ? `${val}%` : "—"}
+                          </div>
+                        );
+                      })}
                     </div>
                   ))
                 )}
@@ -644,122 +830,183 @@ export default function StudentsIntelligence() {
           </div>
 
           {/* ── Student Table ─────────────────────────── */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-            {/* Table header + search */}
-            <div className="p-4 md:px-6 md:py-4 border-b border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
+          <div
+            style={{
+              background:"#fff", borderRadius:22,
+              boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
+              overflow:"hidden", marginBottom:24,
+            }}
+          >
+            <div style={{ padding:"18px 24px", borderBottom:"0.5px solid rgba(0,85,255,.08)", display:"flex", gap:12, alignItems:"center", flexWrap:"wrap" }}>
+              <div style={{ position:"relative", flex:1, minWidth:220 }}>
+                <Search style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)" }} size={15} color={T4}/>
                 <input
                   value={search}
                   onChange={e=>{setSearch(e.target.value);setPage(1);}}
-                  placeholder="Search students..."
-                  className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[#1e3a8a]/10 bg-slate-50"
+                  placeholder="Search scholars by name..."
+                  style={{
+                    width:"100%", padding:"10px 12px 10px 36px", borderRadius:12,
+                    border:"0.5px solid rgba(0,85,255,.14)", background:"#F5F9FF",
+                    fontSize:13, fontWeight:500, color:T1, outline:"none", fontFamily:"inherit",
+                  }}
                 />
               </div>
-              {/* Branch filter dropdown */}
-              <div className="flex items-center gap-2">
-                <select
-                  value={tableBranch}
-                  onChange={e=>{setTableBranch(e.target.value);setPage(1);}}
-                  className="flex-1 sm:w-40 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-600 bg-slate-50 outline-none"
-                >
-                  {branchList.map(b=><option key={b} value={b}>{b === "All" ? "All Branches" : b}</option>)}
-                </select>
-                <button className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50">
-                  <Filter className="w-3.5 h-3.5"/> Filters
-                </button>
-              </div>
+              <select
+                value={tableBranch}
+                onChange={e=>{setTableBranch(e.target.value);setPage(1);}}
+                style={{
+                  padding:"10px 14px", borderRadius:12, border:"0.5px solid rgba(0,85,255,.14)",
+                  background:"#F5F9FF", fontSize:12, fontWeight:700, color:T3,
+                  outline:"none", fontFamily:"inherit", minWidth:140,
+                }}
+              >
+                {branchList.map(b=><option key={b} value={b}>{b==="All"?"All Branches":b}</option>)}
+              </select>
+              <button
+                className="stu-btn"
+                style={{
+                  display:"inline-flex", alignItems:"center", gap:6,
+                  padding:"10px 14px", borderRadius:12,
+                  background:"#F5F9FF", border:"0.5px solid rgba(0,85,255,.14)",
+                  fontSize:12, fontWeight:700, color:T3, cursor:"pointer", fontFamily:"inherit",
+                }}
+              >
+                <Filter size={13}/> Filters
+              </button>
             </div>
 
-            {/* Columns */}
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[700px]">
+            <div style={{ overflowX:"auto" }}>
+              <table style={{ width:"100%", minWidth:720, borderCollapse:"collapse" }}>
                 <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50/30">
-                    <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Student</th>
-                    <th className="hidden sm:table-cell px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Grade</th>
-                    <th className="hidden md:table-cell px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Branch</th>
-                    <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Attendance</th>
-                    <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Score</th>
-                    <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Actions</th>
+                  <tr style={{ background:"rgba(0,85,255,.03)", borderBottom:"0.5px solid rgba(0,85,255,.08)" }}>
+                    {["Student","Grade","Branch","Attendance","Score","Actions"].map((h,i)=>(
+                      <th key={h} style={{
+                        padding:"12px 18px", textAlign:"left", fontSize:10, fontWeight:800,
+                        color:T4, letterSpacing:"0.14em", textTransform:"uppercase",
+                        display:i===1||i===2?"table-cell":undefined,
+                      }}>{h}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {grouped.map(([letter, rows])=>(
-                    <>
-                      {/* Alphabet group header */}
-                      <tr key={`hdr-${letter}`} className="bg-slate-50/60">
-                        <td colSpan={7} className="px-6 py-2 text-xs font-extrabold text-slate-400 uppercase tracking-widest">{letter}</td>
+                    <React.Fragment key={letter}>
+                      <tr style={{ background:"rgba(0,85,255,.04)" }}>
+                        <td colSpan={6} style={{ padding:"8px 22px", fontSize:10, fontWeight:800, color:B1, letterSpacing:"0.16em", textTransform:"uppercase" }}>
+                          {letter}
+                        </td>
                       </tr>
                       {rows.map(s=>{
                         const risk = getRisk(s.score);
+                        const riskBg = s.score>=75 ? "rgba(0,200,83,.1)" : s.score>=50 ? "rgba(255,170,0,.1)" : "rgba(255,51,85,.1)";
+                        const riskColor = s.score>=75 ? GREEN : s.score>=50 ? GOLD : RED;
+                        const avatarBg = s.score>=75 ? GRAD_GREEN : s.score>=50 ? GRAD_GOLD : GRAD_RED;
+                        const isSelected = selected?._eid===s._eid;
                         return (
                           <tr key={s._eid}
-                            className={`border-b border-slate-50 hover:bg-slate-50/50 transition-all ${selected?._eid===s._eid?"bg-blue-50/30":""}`}
+                            className="stu-row"
+                            style={{
+                              borderBottom:"0.5px solid rgba(0,85,255,.04)",
+                              background: isSelected ? "rgba(0,85,255,.06)" : "transparent",
+                              cursor:"pointer",
+                            }}
                           >
-                            <td className="px-5 py-3">
-                               <div className="flex items-center gap-3">
-                                 <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-[10px] font-black shrink-0 ${getAvatarColor(s.score)}`}>
-                                   {getInitials(s.name)}
-                                 </div>
-                                 <div className="min-w-0">
-                                   <p className="text-xs font-bold text-[#1e294b] truncate">{s.name}</p>
-                                   <p className="text-[10px] text-slate-400 font-bold truncate">ID: {s.id.length>8?s.id.slice(0,8):s.id}</p>
-                                 </div>
-                               </div>
+                            <td style={{ padding:"12px 18px" }}>
+                              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                                <div style={{
+                                  width:36, height:36, borderRadius:"50%", background:avatarBg,
+                                  display:"flex", alignItems:"center", justifyContent:"center",
+                                  color:"#fff", fontSize:11, fontWeight:800,
+                                  boxShadow:"0 4px 10px rgba(0,85,255,.18)", flexShrink:0,
+                                }}>
+                                  {getInitials(s.name)}
+                                </div>
+                                <div style={{ minWidth:0 }}>
+                                  <p style={{ fontSize:13, fontWeight:700, color:T1, margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{s.name}</p>
+                                  <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"2px 0 0 0", letterSpacing:"0.04em" }}>ID: {s.id.length>10?s.id.slice(0,10):s.id}</p>
+                                </div>
+                              </div>
                             </td>
-                            <td className="hidden sm:table-cell px-5 py-3 text-xs font-bold text-slate-500">{s.grade}</td>
-                            <td className="hidden md:table-cell px-5 py-3 text-xs font-bold text-slate-500">{s.branch}</td>
-                            <td className="px-5 py-3 text-xs font-extrabold text-[#1e294b]">
-                              {s.attendance>0?`${s.attendance}%`:"—"}
+                            <td style={{ padding:"12px 18px", fontSize:12, fontWeight:700, color:T3 }}>{s.grade}</td>
+                            <td style={{ padding:"12px 18px", fontSize:12, fontWeight:700, color:T3 }}>{s.branch}</td>
+                            <td style={{ padding:"12px 18px", fontSize:13, fontWeight:800, color:T1 }}>{s.attendance>0?`${s.attendance}%`:"—"}</td>
+                            <td style={{ padding:"12px 18px" }}>
+                              <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
+                                <span style={{ fontSize:13, fontWeight:800, color:T1 }}>{s.score>0?`${s.score}%`:"—"}</span>
+                                <span style={{
+                                  fontSize:9, fontWeight:800, letterSpacing:"0.14em", textTransform:"uppercase",
+                                  padding:"2px 7px", borderRadius:6, background:riskBg, color:riskColor,
+                                  alignSelf:"flex-start",
+                                }}>{risk.label}</span>
+                              </div>
                             </td>
-                            <td className="px-5 py-3">
-                               <div className="flex flex-col">
-                                 <span className="text-xs font-extrabold text-[#1e294b]">{s.score>0?`${s.score}%`:"—"}</span>
-                                 <span className={`text-[9px] font-black uppercase ${risk.color}`}>{risk.label}</span>
-                               </div>
-                            </td>
-                            <td className="px-5 py-3">
+                            <td style={{ padding:"12px 18px" }}>
                               <button
-                                onClick={()=>setSelected(selected?._eid===s._eid ? null : s)}
-                                className="text-xs font-black text-[#1e3a8a] bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors"
+                                onClick={()=>setSelected(isSelected ? null : s)}
+                                className="stu-btn"
+                                style={{
+                                  padding:"7px 14px", borderRadius:10,
+                                  background:isSelected?GRAD_PRIMARY:"rgba(0,85,255,.08)",
+                                  color:isSelected?"#fff":B1,
+                                  fontSize:11, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
+                                  border:"none", cursor:"pointer", fontFamily:"inherit",
+                                  boxShadow:isSelected?SHADOW_BTN:"none",
+                                }}
                               >
-                                {selected?._eid===s._eid ? "Close" : "View"}
+                                {isSelected ? "Close" : "View"}
                               </button>
                             </td>
                           </tr>
                         );
                       })}
-                    </>
+                    </React.Fragment>
                   ))}
                   {filtered.length===0 && (
-                    <tr><td colSpan={6} className="py-16 text-center text-xs text-slate-400 font-bold uppercase tracking-widest">No scholars found</td></tr>
+                    <tr><td colSpan={6} style={{ padding:"60px 0", textAlign:"center", fontSize:12, fontWeight:700, color:T4, letterSpacing:"0.14em", textTransform:"uppercase" }}>No scholars found</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
 
-            {/* Pagination */}
-            <div className="p-4 md:px-6 md:py-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            <div style={{ padding:"14px 24px", borderTop:"0.5px solid rgba(0,85,255,.08)", display:"flex", alignItems:"center", justifyContent:"space-between", gap:16, flexWrap:"wrap" }}>
+              <p style={{ fontSize:10, fontWeight:700, color:T4, letterSpacing:"0.14em", textTransform:"uppercase", margin:0 }}>
                 Showing {Math.min((page-1)*PAGE_SIZE+1, filtered.length)}–{Math.min(page*PAGE_SIZE, filtered.length)} of {filtered.length}
               </p>
-              <div className="flex items-center gap-1.5 md:gap-2">
+              <div style={{ display:"flex", gap:6 }}>
                 <button
                   disabled={page===1}
                   onClick={()=>setPage(p=>p-1)}
-                  className="px-2 md:px-3 py-1.5 border border-slate-200 rounded-lg text-[10px] font-black text-slate-400 hover:bg-slate-50 disabled:opacity-30"
+                  className="stu-btn"
+                  style={{
+                    padding:"7px 14px", borderRadius:10,
+                    background:"#F5F9FF", border:"0.5px solid rgba(0,85,255,.12)",
+                    fontSize:11, fontWeight:800, color:T3, cursor:page===1?"not-allowed":"pointer",
+                    opacity:page===1?0.4:1, fontFamily:"inherit",
+                  }}
                 >Prev</button>
-                {Array.from({length:Math.min(totalPages,3)},(_,i)=>i+1).map(n=>(
+                {Array.from({length:Math.min(totalPages,5)},(_,i)=>i+1).map(n=>(
                   <button key={n} onClick={()=>setPage(n)}
-                    className={`w-7 h-7 md:w-8 md:h-8 rounded-lg text-[10px] font-black transition-all ${page===n?"bg-[#1e3a8a] text-white shadow-md":"border border-slate-200 text-slate-400 hover:bg-slate-50"}`}>
-                    {n}
-                  </button>
+                    className="stu-btn"
+                    style={{
+                      width:32, height:32, borderRadius:10,
+                      background:page===n?GRAD_PRIMARY:"#F5F9FF",
+                      color:page===n?"#fff":T3,
+                      border: page===n ? "none" : "0.5px solid rgba(0,85,255,.12)",
+                      fontSize:11, fontWeight:800, cursor:"pointer",
+                      boxShadow:page===n?SHADOW_BTN:"none", fontFamily:"inherit",
+                    }}
+                  >{n}</button>
                 ))}
                 <button
                   disabled={page===totalPages}
                   onClick={()=>setPage(p=>p+1)}
-                  className="px-2 md:px-3 py-1.5 border border-slate-200 rounded-lg text-[10px] font-black text-slate-400 hover:bg-slate-50 disabled:opacity-30"
+                  className="stu-btn"
+                  style={{
+                    padding:"7px 14px", borderRadius:10,
+                    background:"#F5F9FF", border:"0.5px solid rgba(0,85,255,.12)",
+                    fontSize:11, fontWeight:800, color:T3, cursor:page===totalPages?"not-allowed":"pointer",
+                    opacity:page===totalPages?0.4:1, fontFamily:"inherit",
+                  }}
                 >Next</button>
               </div>
             </div>
@@ -768,98 +1015,130 @@ export default function StudentsIntelligence() {
           {/* ── Student Detail Panel ─────────────────── */}
           {selected && (()=>{
             const risk = getRisk(selected.score);
-            const isCritical = selected.score < 50;
+            const isCritical = selected.score > 0 && selected.score < 50;
+            const headerGrad = selected.score>=75 ? GRAD_GREEN : selected.score>=50 ? GRAD_GOLD : GRAD_RED;
             return (
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-lg overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
-                {/* Detail header */}
-                <div className="p-5 md:px-6 md:py-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-5">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center text-white font-black text-base md:text-lg shrink-0 ${getAvatarColor(selected.score)}`}>
+              <div
+                style={{
+                  background:"#fff", borderRadius:22,
+                  boxShadow:SHADOW_LG, border:"0.5px solid rgba(0,85,255,.10)",
+                  overflow:"hidden", marginBottom:24,
+                  animation:"slide-in-from-bottom .3s ease",
+                }}
+              >
+                <div style={{ padding:"22px 26px", borderBottom:"0.5px solid rgba(0,85,255,.08)", display:"flex", justifyContent:"space-between", alignItems:"center", gap:16, flexWrap:"wrap" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+                    <div style={{
+                      width:54, height:54, borderRadius:16, background:headerGrad,
+                      display:"flex", alignItems:"center", justifyContent:"center",
+                      color:"#fff", fontSize:16, fontWeight:800,
+                      boxShadow:"0 8px 20px rgba(0,85,255,.22)",
+                    }}>
                       {getInitials(selected.name)}
                     </div>
-                    <div className="min-w-0">
-                      <h2 className="text-base md:text-lg font-black text-[#1e294b] truncate">{selected.name}</h2>
-                      <p className="text-[10px] md:text-xs text-slate-400 font-bold uppercase tracking-tight truncate">
-                        {selected.grade} &bull; {selected.branch}
+                    <div>
+                      <h2 style={{ fontSize:22, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.5px" }}>{selected.name}</h2>
+                      <p style={{ fontSize:11, fontWeight:700, color:T4, margin:"4px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>
+                        {selected.grade} · {selected.branch}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto">
-                    <span className={`text-[10px] font-black px-3 py-1.5 rounded-lg text-white ${getAvatarColor(selected.score)} uppercase tracking-widest`}>
-                      {risk.label} Risk
-                    </span>
-                    <button className="flex-1 md:flex-none bg-[#1e3a8a] text-white text-[10px] font-black px-4 py-2 rounded-xl shadow-md">
-                      Contact Parent
+                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                    <span style={{
+                      fontSize:10, fontWeight:800, padding:"6px 12px", borderRadius:10,
+                      background:headerGrad, color:"#fff", letterSpacing:"0.12em", textTransform:"uppercase",
+                      boxShadow:"0 4px 10px rgba(0,85,255,.18)",
+                    }}>{risk.label} Risk</span>
+                    <button
+                      className="stu-btn"
+                      style={{
+                        display:"inline-flex", alignItems:"center", gap:6,
+                        padding:"9px 16px", borderRadius:11,
+                        background:GRAD_PRIMARY, color:"#fff",
+                        fontSize:10, fontWeight:800, letterSpacing:"0.10em", textTransform:"uppercase",
+                        border:"none", cursor:"pointer", boxShadow:SHADOW_BTN, fontFamily:"inherit",
+                      }}
+                    >
+                      <Mail size={13}/> Contact Parent
                     </button>
-                    <button onClick={()=>setSelected(null)} className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-400">
-                      <X className="w-4 h-4"/>
+                    <button onClick={()=>setSelected(null)}
+                      className="stu-btn"
+                      style={{
+                        width:36, height:36, borderRadius:11, border:"0.5px solid rgba(0,85,255,.12)",
+                        background:"#F5F9FF", display:"flex", alignItems:"center", justifyContent:"center",
+                        cursor:"pointer",
+                      }}
+                    >
+                      <X size={15} color={T3}/>
                     </button>
                   </div>
                 </div>
 
-                <div className="p-6 space-y-6">
-                  {/* 3 stat cards */}
+                <div style={{ padding:24 }}>
                   {(() => {
                     const attDisplay  = att30 !== null ? `${att30}%` : (selected.attendance > 0 ? `${selected.attendance}%` : "—");
                     const attSubText  = attDelta !== null
                       ? `${attDelta >= 0 ? "↑" : "↓"} ${Math.abs(attDelta)}% vs last month`
                       : "No comparison data";
-                    const attSubColor = attDelta === null ? "text-slate-400"
-                      : attDelta >= 0 ? "text-green-500" : "text-red-400";
-
+                    const attColor = attDelta === null ? T4 : attDelta >= 0 ? GREEN : RED;
                     const scoreDisplay = selected.score > 0 ? `${selected.score}/100` : "—";
                     const scoreSubText = scoreDelta !== null
                       ? `${scoreDelta >= 0 ? "↑" : "↓"} ${Math.abs(scoreDelta)} pts from last exam`
                       : "No previous exam";
-                    const scoreSubColor = scoreDelta === null ? "text-slate-400"
-                      : scoreDelta >= 0 ? "text-green-500" : "text-red-400";
+                    const scoreColor = scoreDelta === null ? T4 : scoreDelta >= 0 ? GREEN : RED;
 
                     return (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
-                          <p className="text-xs font-semibold text-slate-500 mb-2">Attendance (Last 30 Days)</p>
-                          <p className={`text-3xl font-extrabold ${isCritical ? "text-red-500" : "text-[#1e294b]"}`}>{attDisplay}</p>
-                          <p className={`text-xs font-semibold mt-1 ${attSubColor}`}>{attSubText}</p>
-                        </div>
-                        <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
-                          <p className="text-xs font-semibold text-slate-500 mb-2">Academic Score</p>
-                          <p className={`text-3xl font-extrabold ${isCritical ? "text-red-500" : "text-[#1e294b]"}`}>{scoreDisplay}</p>
-                          <p className={`text-xs font-semibold mt-1 ${scoreSubColor}`}>{scoreSubText}</p>
-                        </div>
-                        <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
-                          <p className="text-xs font-semibold text-slate-500 mb-2">Behavior Incidents</p>
-                          <p className="text-3xl font-extrabold text-[#1e294b]">{selected.incidents}</p>
-                          <p className="text-xs font-semibold mt-1 text-slate-400">This term</p>
-                        </div>
+                      <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:14, marginBottom:22 }}>
+                        {[
+                          { label:"Attendance (30d)", value:attDisplay, sub:attSubText, subColor:attColor, icon:Percent, grad:GRAD_GREEN },
+                          { label:"Academic Score", value:scoreDisplay, sub:scoreSubText, subColor:scoreColor, icon:Award, grad:GRAD_BLUE },
+                          { label:"Behavior Incidents", value:selected.incidents.toString(), sub:"This term", subColor:T4, icon:AlertTriangle, grad:selected.incidents>0?GRAD_RED:GRAD_VIOLET },
+                        ].map(c=>{
+                          const Icon = c.icon;
+                          return (
+                            <div key={c.label} className="stu3d"
+                              style={{
+                                background:"#F5F9FF", borderRadius:16, padding:"16px 18px",
+                                border:"0.5px solid rgba(0,85,255,.1)",
+                              }}
+                            >
+                              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
+                                <p style={{ fontSize:10, fontWeight:800, color:T4, letterSpacing:"0.12em", textTransform:"uppercase", margin:0 }}>{c.label}</p>
+                                <div style={{ width:30, height:30, borderRadius:10, background:c.grad, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 4px 10px rgba(0,85,255,.2)" }}>
+                                  <Icon size={14} color="#fff" strokeWidth={2.4}/>
+                                </div>
+                              </div>
+                              <p style={{ fontSize:26, fontWeight:800, color:isCritical?RED:T1, margin:0, letterSpacing:"-0.4px", lineHeight:1 }}>{c.value}</p>
+                              <p style={{ fontSize:11, fontWeight:700, color:c.subColor, margin:"6px 0 0 0" }}>{c.sub}</p>
+                            </div>
+                          );
+                        })}
                       </div>
                     );
                   })()}
 
-                  {/* Performance trend */}
                   <div>
-                    <h3 className="text-sm font-bold text-[#1e294b] mb-4">Performance Trend</h3>
+                    <h3 style={{ fontSize:14, fontWeight:700, color:T1, margin:"0 0 14px 0", letterSpacing:"-0.3px" }}>Performance Trend</h3>
                     {detailLoading ? (
-                      <div className="h-[200px] flex items-center justify-center">
-                        <Loader2 className="w-6 h-6 animate-spin text-[#1e3a8a]" />
+                      <div style={{ height:200, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                        <Loader2 className="animate-spin" size={24} color={B1}/>
                       </div>
                     ) : detailTrend.every(d => d.score === 0 && d.attendance === 0) ? (
-                      <div className="h-[200px] flex items-center justify-center text-sm text-slate-400 font-semibold">
+                      <div style={{ height:200, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:T4 }}>
                         No trend data available for this student
                       </div>
                     ) : (
-                      <div className="h-[200px]">
+                      <div style={{ height:220 }}>
                         <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={detailTrend} margin={{top:5,right:20,left:-20,bottom:5}}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
-                            <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fill:"#94a3b8",fontSize:11}}/>
-                            <YAxis axisLine={false} tickLine={false} tick={{fill:"#94a3b8",fontSize:11}} domain={[0,100]}/>
-                            <Tooltip contentStyle={{borderRadius:"12px",border:"none",boxShadow:"0 10px 15px rgba(0,0,0,0.1)"}}/>
-                            <Line type="monotone" dataKey="score" name="Score" stroke={isCritical?"#ef4444":"#1e3a8a"} strokeWidth={2.5}
-                              dot={{r:4,fill:isCritical?"#ef4444":"#1e3a8a",strokeWidth:2,stroke:"#fff"}}
-                              connectNulls={false}/>
-                            <Line type="monotone" dataKey="attendance" name="Attendance" stroke="#f59e0b" strokeWidth={2.5} strokeDasharray="5 5"
-                              dot={{r:4,fill:"#f59e0b",strokeWidth:2,stroke:"#fff"}}
-                              connectNulls={false}/>
+                          <LineChart data={detailTrend} margin={{top:5,right:20,left:-22,bottom:5}}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,85,255,.07)"/>
+                            <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fill:T3,fontSize:11,fontWeight:600}}/>
+                            <YAxis axisLine={false} tickLine={false} tick={{fill:T3,fontSize:11,fontWeight:600}} domain={[0,100]}/>
+                            <Tooltip contentStyle={{ borderRadius:12, border:"none", boxShadow:SHADOW_LG, fontSize:11, fontWeight:700 }}/>
+                            <Line type="monotone" dataKey="score" name="Score" stroke={isCritical?RED:B1} strokeWidth={3}
+                              dot={{r:4,fill:isCritical?RED:B1,strokeWidth:2,stroke:"#fff"}} activeDot={{r:6}} connectNulls={false}/>
+                            <Line type="monotone" dataKey="attendance" name="Attendance" stroke={GREEN} strokeWidth={3} strokeDasharray="5 5"
+                              dot={{r:4,fill:GREEN,strokeWidth:2,stroke:"#fff"}} activeDot={{r:6}} connectNulls={false}/>
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
@@ -869,8 +1148,45 @@ export default function StudentsIntelligence() {
               </div>
             );
           })()}
+
+          {/* ── AI Intelligence Card ─────────────────── */}
+          <div
+            style={{
+              background:GRAD_HERO, borderRadius:22, padding:"24px 26px", color:"#fff",
+              position:"relative", overflow:"hidden",
+              boxShadow:"0 14px 40px rgba(0,8,60,.32), 0 0 0 .5px rgba(255,255,255,.12)",
+            }}
+          >
+            <div style={{ position:"absolute", bottom:-50, left:-40, width:240, height:240, background:"radial-gradient(circle, rgba(123,63,244,.28) 0%, transparent 65%)", borderRadius:"50%", pointerEvents:"none" }}/>
+            <div style={{ display:"flex", alignItems:"flex-start", gap:14, position:"relative", zIndex:1, marginBottom:16 }}>
+              <div style={{ width:44, height:44, borderRadius:13, background:"rgba(255,255,255,.16)", border:"0.5px solid rgba(255,255,255,.26)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <Sparkles size={22} color="#fff" strokeWidth={2.2}/>
+              </div>
+              <div>
+                <div style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:999, background:"rgba(255,255,255,.14)", border:"0.5px solid rgba(255,255,255,.22)", fontSize:9, fontWeight:800, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:8 }}>
+                  AI Insights
+                </div>
+                <h3 style={{ fontSize:18, fontWeight:700, color:"#fff", margin:0, letterSpacing:"-0.4px" }}>Student Intelligence Summary</h3>
+              </div>
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:12, position:"relative", zIndex:1 }}>
+              {[
+                { label:"Performance Insight", value:highPerformers>0?`${((highPerformers/Math.max(totalEnrollment,1))*100).toFixed(0)}% high performers`:"Track top scorers", sub:atRisk>0?`${atRisk} need attention`:"All stable" },
+                { label:"Attendance Pulse", value:avgAttendance > 0 ? `${avgAttendance}% campus avg` : "Collecting data", sub:avgAttendance>=90?"Excellent":avgAttendance>=75?"Healthy":"Monitor closely" },
+                { label:"Enrollment Momentum", value:newThisTerm > 0 ? `+${newThisTerm} new this term` : "Steady state", sub:`${totalEnrollment} total scholars` },
+              ].map(c=>(
+                <div key={c.label} style={{ background:"rgba(255,255,255,.10)", borderRadius:14, padding:"14px 16px", border:"0.5px solid rgba(255,255,255,.14)" }}>
+                  <p style={{ fontSize:9, fontWeight:800, color:"rgba(255,255,255,.65)", letterSpacing:"0.14em", textTransform:"uppercase", margin:"0 0 8px 0" }}>{c.label}</p>
+                  <p style={{ fontSize:15, fontWeight:700, color:"#fff", margin:0, letterSpacing:"-0.3px" }}>{c.value}</p>
+                  <p style={{ fontSize:11, fontWeight:600, color:"rgba(255,255,255,.72)", margin:"6px 0 0 0" }}>{c.sub}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </>
       )}
-    </div>
+      </div>
+    </>
   );
+
 }

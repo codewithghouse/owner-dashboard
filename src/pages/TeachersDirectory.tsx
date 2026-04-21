@@ -8,12 +8,12 @@ import {
   ClipboardCheck, FileText, MessageSquare, Sparkles, Activity,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
-/* ── constants ───────────────────────────────────────── */
-const AVATAR_COLORS = [
-  "bg-[#1e3a8a]","bg-emerald-600","bg-orange-500","bg-purple-600",
-  "bg-pink-500","bg-teal-600","bg-amber-600","bg-red-600",
-];
+import {
+  B1, T1, T3, T4, GREEN, RED, GOLD, VIOLET, ORANGE,
+  GRAD_PRIMARY, GRAD_BLUE, GRAD_GREEN, GRAD_VIOLET, GRAD_GOLD, GRAD_RED,
+  SHADOW_SM, SHADOW_BTN, pageShellStyle,
+  DashGlobalStyles, PageHead, StatTile, DarkHero, Card3D, AIInsightCard,
+} from "@/lib/dashboardTokens";
 
 /* Performance thresholds on the 0-100 overall score */
 const TOP_SCORE_THRESHOLD = 75;
@@ -154,13 +154,9 @@ export default function TeachersDirectory() {
           }
         }
 
-        const teachersColored = rawTeachers.map((t, i) => ({
-          ...t,
-          _color: AVATAR_COLORS[i % AVATAR_COLORS.length],
-        }));
-        setTeachers(teachersColored);
+        setTeachers(rawTeachers);
 
-        const teacherIds = teachersColored.map(t => t._docId);
+        const teacherIds = rawTeachers.map(t => t._docId);
         if (teacherIds.length === 0) {
           setLoading(false);
           return;
@@ -506,316 +502,369 @@ export default function TeachersDirectory() {
   /* ─────────────────────────────────────────────── */
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-[#1e3a8a]" />
+      <div style={{ ...pageShellStyle, display:"flex", alignItems:"center", justifyContent:"center" }}>
+        <Loader2 className="animate-spin" size={32} color={B1}/>
       </div>
     );
   }
 
   /* ══════════════════════════════════════════════ */
+  const tabs: { key: TabKey; label: string; icon: any; count: number }[] = [
+    { key: "branch",    label: "By Branch",       icon: Building2,     count: byBranch.length      },
+    { key: "class",     label: "By Class",        icon: BookOpen,      count: byClass.length       },
+    { key: "top",       label: "Top Performers",  icon: Trophy,        count: topPerformers.length },
+    { key: "defaulter", label: "Needs Attention", icon: AlertTriangle, count: defaulters.length    },
+  ];
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-10">
-
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-[#1e294b] tracking-tight">Teachers Directory</h1>
-          <p className="text-slate-500 text-xs md:text-sm font-medium">
-            Branch &amp; class-wise faculty with activity-based performance scoring
-          </p>
-        </div>
-        {(search || branchFilter !== "All" || classFilter !== "All") && (
-          <button
-            onClick={resetFilters}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-wider transition-all self-start"
-          >
-            <X className="w-3.5 h-3.5" /> Clear Filters
-          </button>
-        )}
-      </div>
-
-      {/* Scoring explanation banner */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-4 flex items-start gap-3">
-        <div className="w-8 h-8 rounded-lg bg-[#1e3a8a] flex items-center justify-center shrink-0">
-          <Sparkles className="w-4 h-4 text-white" />
-        </div>
-        <div className="text-[11px] md:text-xs text-slate-600 font-medium leading-relaxed">
-          <span className="font-black text-[#1e3a8a]">Activity-Based Score</span> — weighted from
-          test scores (30%), own attendance (15%), attendance marking (15%), assignments (10%),
-          tests (10%), lesson plans (10%), parent notes (5%), reports (5%).
-        </div>
-      </div>
-
-      {/* Filters row */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 md:p-5">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter className="w-4 h-4 text-slate-400" />
-          <span className="text-[11px] font-black uppercase tracking-widest text-slate-500">Filters</span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search teacher name..."
-              className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[#1e3a8a]/10 bg-slate-50"
-            />
-          </div>
-          <div className="relative">
-            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-            <select
-              value={branchFilter}
-              onChange={e => setBranchFilter(e.target.value)}
-              className="w-full appearance-none border border-slate-200 rounded-xl pl-9 pr-10 py-2.5 text-sm font-semibold text-slate-600 bg-slate-50 outline-none focus:ring-2 focus:ring-[#1e3a8a]/10"
-            >
-              {branchList.map(b => (
-                <option key={b} value={b}>{b === "All" ? "All Branches" : b}</option>
-              ))}
-            </select>
-            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
-          <div className="relative">
-            <BookOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-            <select
-              value={classFilter}
-              onChange={e => setClassFilter(e.target.value)}
-              className="w-full appearance-none border border-slate-200 rounded-xl pl-9 pr-10 py-2.5 text-sm font-semibold text-slate-600 bg-slate-50 outline-none focus:ring-2 focus:ring-[#1e3a8a]/10"
-            >
-              {classList.map(c => (
-                <option key={c} value={c}>{c === "All" ? "All Classes" : c}</option>
-              ))}
-            </select>
-            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
-        </div>
-      </div>
-
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: "Total Teachers",   value: totalTeachers,   icon: Users,        color: "text-blue-600",    bg: "bg-blue-50",    note: `In ${branchFilter === "All" ? "all branches" : branchFilter}`,                                            route: "/teachers",          onClick: () => setTab("branch") },
-          { label: "Top Performers",   value: topCount,        icon: Trophy,       color: "text-emerald-600", bg: "bg-emerald-50", note: `${totalTeachers > 0 ? ((topCount/totalTeachers)*100).toFixed(0) : 0}% of staff`,                           route: null,                 onClick: () => setTab("top") },
-          { label: "Defaulters",       value: defCount,        icon: TrendingDown, color: "text-red-600",     bg: "bg-red-50",     note: `${totalTeachers > 0 ? ((defCount/totalTeachers)*100).toFixed(0) : 0}% need attention`,                    route: null,                 onClick: () => setTab("defaulter") },
-          { label: "Avg Performance",  value: `${avgOverall}%`,icon: Target,       color: "text-purple-600",  bg: "bg-purple-50",  note: "Activity-weighted score",                                                                                   route: "/teachers",          onClick: () => setTab("branch") },
-        ].map(s => (
-          <div
-            key={s.label}
-            onClick={() => { if (s.route) navigate(s.route); else s.onClick(); }}
-            role="button"
-            tabIndex={0}
-            className="clickable-card bg-white p-4 md:p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">{s.label}</p>
-              <div className={`w-8 h-8 rounded-lg ${s.bg} flex items-center justify-center`}>
-                <s.icon className={`w-4 h-4 ${s.color}`} />
-              </div>
-            </div>
-            <h3 className="text-2xl md:text-3xl font-extrabold text-[#1e294b] tracking-tight mb-1">{s.value}</h3>
-            <p className={`text-[10px] font-bold ${s.color}`}>{s.note}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Tabs */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="flex items-center gap-1 border-b border-slate-100 px-2 md:px-4 overflow-x-auto">
-          {[
-            { key: "branch",    label: "By Branch",       icon: Building2,     count: byBranch.length      },
-            { key: "class",     label: "By Class",        icon: BookOpen,      count: byClass.length       },
-            { key: "top",       label: "Top Performers",  icon: Trophy,        count: topPerformers.length },
-            { key: "defaulter", label: "Needs Attention", icon: AlertTriangle, count: defaulters.length    },
-          ].map(t => {
-            const active = tab === t.key;
-            return (
+    <>
+      <DashGlobalStyles />
+      <div style={pageShellStyle}>
+        <PageHead
+          icon={GraduationCap}
+          title="Teachers Directory"
+          subtitle="Branch & class-wise faculty with activity scoring"
+          right={
+            (search || branchFilter !== "All" || classFilter !== "All") ? (
               <button
-                key={t.key}
-                onClick={() => { setTab(t.key as TabKey); setExpanded(new Set()); }}
-                className={`flex items-center gap-2 px-3 md:px-4 py-3 text-xs font-bold whitespace-nowrap border-b-2 transition-all ${
-                  active
-                    ? "border-[#1e3a8a] text-[#1e3a8a]"
-                    : "border-transparent text-slate-400 hover:text-slate-600"
-                }`}
+                onClick={resetFilters}
+                className="dash-btn"
+                style={{
+                  display:"inline-flex", alignItems:"center", gap:7,
+                  padding:"10px 16px", borderRadius:12,
+                  background:"#fff", border:"0.5px solid rgba(0,85,255,.12)",
+                  fontSize:11, fontWeight:800, color:T3, letterSpacing:"0.08em", textTransform:"uppercase",
+                  cursor:"pointer", boxShadow:SHADOW_SM, fontFamily:"inherit",
+                }}
               >
-                <t.icon className="w-4 h-4" />
-                <span>{t.label}</span>
-                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
-                  active ? "bg-[#1e3a8a] text-white" : "bg-slate-100 text-slate-500"
-                }`}>
-                  {t.count}
-                </span>
+                <X size={13}/> Clear Filters
               </button>
-            );
-          })}
+            ) : null
+          }
+        />
+
+        <DarkHero
+          icon={Award}
+          eyebrow="Activity-Based Intelligence"
+          title={`${avgOverall}%`}
+          subtitle={`Weighted activity score across ${totalTeachers} teacher${totalTeachers !== 1 ? "s" : ""} · ${branchList.length-1} branch${branchList.length-1 !== 1 ? "es" : ""}`}
+          stats={[
+            { label:"Total", value:totalTeachers.toString() },
+            { label:"Top", value:topCount.toString() },
+            { label:"Needs Help", value:defCount.toString() },
+          ]}
+        />
+
+        {/* Scoring banner */}
+        <div
+          style={{
+            background:"#fff", borderRadius:18, padding:"14px 18px",
+            border:"0.5px solid rgba(0,85,255,.10)", boxShadow:SHADOW_SM,
+            marginBottom:24, display:"flex", alignItems:"flex-start", gap:12,
+          }}
+        >
+          <div style={{ width:36, height:36, borderRadius:11, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(0,85,255,.28)", flexShrink:0 }}>
+            <Sparkles size={18} color="#fff" strokeWidth={2.3}/>
+          </div>
+          <div style={{ fontSize:11, fontWeight:600, color:T3, lineHeight:1.5 }}>
+            <span style={{ fontWeight:800, color:B1 }}>Activity-Based Score</span> — weighted from test scores (30%),
+            own attendance (15%), attendance marking (15%), assignments (10%), tests (10%), lesson plans (10%),
+            parent notes (5%), reports (5%).
+          </div>
         </div>
 
-        {/* Tab content */}
-        <div className="p-4 md:p-6">
-
-          {/* ── BY BRANCH ────────────────────────── */}
-          {tab === "branch" && (
-            <div className="space-y-4">
-              <GroupControls
-                total={byBranch.length}
-                onExpandAll={() => expandAll(byBranch.map(([k]) => k))}
-                onCollapseAll={collapseAll}
+        {/* Filters row */}
+        <Card3D padding="16px 18px" style={{ marginBottom:24 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
+            <Filter size={14} color={T4}/>
+            <span style={{ fontSize:10, fontWeight:800, color:T4, letterSpacing:"0.14em", textTransform:"uppercase" }}>Filters</span>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:12 }}>
+            <div style={{ position:"relative" }}>
+              <Search size={14} color={T4} style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)" }}/>
+              <input
+                value={search}
+                onChange={e=>setSearch(e.target.value)}
+                placeholder="Search teacher name..."
+                style={{
+                  width:"100%", padding:"10px 12px 10px 36px", borderRadius:12,
+                  border:"0.5px solid rgba(0,85,255,.14)", background:"#F5F9FF",
+                  fontSize:13, fontWeight:500, color:T1, outline:"none", fontFamily:"inherit",
+                }}
               />
-              {byBranch.length === 0 ? (
-                <EmptyState message="No teachers match the current filters" />
-              ) : (
-                byBranch.map(([branchName, list]) => {
-                  const isOpen = expanded.has(branchName);
-                  const topInBranch = list.filter(t => t.category === "top").length;
-                  const defInBranch = list.filter(t => t.category === "defaulter").length;
-                  return (
-                    <div key={branchName} className="bg-slate-50 rounded-2xl border border-slate-100 overflow-hidden">
-                      <button
-                        onClick={() => toggleGroup(branchName)}
-                        className="w-full flex items-center justify-between px-4 md:px-5 py-4 hover:bg-slate-100 transition-all"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-10 h-10 rounded-xl bg-[#1e3a8a] flex items-center justify-center shrink-0">
-                            <Building2 className="w-5 h-5 text-white" />
-                          </div>
-                          <div className="text-left min-w-0">
-                            <h3 className="text-sm md:text-base font-extrabold text-[#1e294b] truncate">{branchName}</h3>
-                            <p className="text-[10px] md:text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                              {list.length} teacher{list.length !== 1 ? "s" : ""}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {topInBranch > 0 && (
-                            <span className="hidden sm:flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100">
-                              <Trophy className="w-3 h-3" /> {topInBranch}
-                            </span>
-                          )}
-                          {defInBranch > 0 && (
-                            <span className="hidden sm:flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-red-50 text-red-700 border border-red-100">
-                              <AlertTriangle className="w-3 h-3" /> {defInBranch}
-                            </span>
-                          )}
-                          <ChevronRight className={`w-5 h-5 text-slate-400 transition-transform ${isOpen ? "rotate-90" : ""}`} />
-                        </div>
-                      </button>
-                      {isOpen && (
-                        <div className="px-4 md:px-5 pb-5 pt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 animate-in fade-in duration-200">
-                          {list.map(t => (
-                            <TeacherCard key={t.id} teacher={t} onClick={() => navigate(`/teachers/${t.id}`)} />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
             </div>
-          )}
+            <div style={{ position:"relative" }}>
+              <Building2 size={14} color={T4} style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}/>
+              <select
+                value={branchFilter}
+                onChange={e=>setBranchFilter(e.target.value)}
+                style={{
+                  width:"100%", appearance:"none", padding:"10px 36px 10px 36px", borderRadius:12,
+                  border:"0.5px solid rgba(0,85,255,.14)", background:"#F5F9FF",
+                  fontSize:12, fontWeight:700, color:T3, outline:"none", fontFamily:"inherit", cursor:"pointer",
+                }}
+              >
+                {branchList.map(b => <option key={b} value={b}>{b === "All" ? "All Branches" : b}</option>)}
+              </select>
+              <ChevronDown size={14} color={T4} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}/>
+            </div>
+            <div style={{ position:"relative" }}>
+              <BookOpen size={14} color={T4} style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}/>
+              <select
+                value={classFilter}
+                onChange={e=>setClassFilter(e.target.value)}
+                style={{
+                  width:"100%", appearance:"none", padding:"10px 36px 10px 36px", borderRadius:12,
+                  border:"0.5px solid rgba(0,85,255,.14)", background:"#F5F9FF",
+                  fontSize:12, fontWeight:700, color:T3, outline:"none", fontFamily:"inherit", cursor:"pointer",
+                }}
+              >
+                {classList.map(c => <option key={c} value={c}>{c === "All" ? "All Classes" : c}</option>)}
+              </select>
+              <ChevronDown size={14} color={T4} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}/>
+            </div>
+          </div>
+        </Card3D>
 
-          {/* ── BY CLASS ────────────────────────── */}
-          {tab === "class" && (
-            <div className="space-y-4">
-              <GroupControls
-                total={byClass.length}
-                onExpandAll={() => expandAll(byClass.map(([k]) => k))}
-                onCollapseAll={collapseAll}
-              />
-              {byClass.length === 0 ? (
-                <EmptyState message="No classes found for the selected filters" />
-              ) : (
-                byClass.map(([className, { classInfo, teachers: list }]) => {
-                  const isOpen = expanded.has(className);
-                  return (
-                    <div key={className} className="bg-slate-50 rounded-2xl border border-slate-100 overflow-hidden">
-                      <button
-                        onClick={() => toggleGroup(className)}
-                        className="w-full flex items-center justify-between px-4 md:px-5 py-4 hover:bg-slate-100 transition-all"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center shrink-0">
-                            <BookOpen className="w-5 h-5 text-white" />
-                          </div>
-                          <div className="text-left min-w-0">
-                            <h3 className="text-sm md:text-base font-extrabold text-[#1e294b] truncate">{className}</h3>
-                            <p className="text-[10px] md:text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                              {list.length} teacher{list.length !== 1 ? "s" : ""}
-                              {classInfo?.subject ? ` · ${classInfo.subject}` : ""}
-                            </p>
-                          </div>
-                        </div>
-                        <ChevronRight className={`w-5 h-5 text-slate-400 transition-transform shrink-0 ${isOpen ? "rotate-90" : ""}`} />
-                      </button>
-                      {isOpen && (
-                        <div className="px-4 md:px-5 pb-5 pt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 animate-in fade-in duration-200">
-                          {list.map(t => (
-                            <TeacherCard key={t.id} teacher={t} onClick={() => navigate(`/teachers/${t.id}`)} />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          )}
-
-          {/* ── TOP PERFORMERS ──────────────────── */}
-          {tab === "top" && (
-            <div className="space-y-4">
-              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 rounded-2xl p-5 flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-emerald-600 flex items-center justify-center shrink-0">
-                  <Trophy className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-base font-extrabold text-emerald-900 mb-1">Top Performing Teachers</h3>
-                  <p className="text-xs text-emerald-800 font-semibold leading-relaxed">
-                    Teachers with overall activity score <b>≥ {TOP_SCORE_THRESHOLD}%</b>.
-                    Scoring blends test results, attendance discipline, assignments, lesson plans &amp; parent communication.
-                  </p>
-                </div>
-              </div>
-              {topPerformers.length === 0 ? (
-                <EmptyState message="No top performers yet — activity data will populate as teachers work" icon={Award} />
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {topPerformers.map((t, i) => (
-                    <TopCard key={t.id} teacher={t} rank={i + 1} onClick={() => navigate(`/teachers/${t.id}`)} />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── DEFAULTERS ──────────────────────── */}
-          {tab === "defaulter" && (
-            <div className="space-y-4">
-              <div className="bg-gradient-to-r from-red-50 to-orange-50 border border-red-100 rounded-2xl p-5 flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-red-600 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-base font-extrabold text-red-900 mb-1">Teachers Needing Attention</h3>
-                  <p className="text-xs text-red-800 font-semibold leading-relaxed">
-                    Teachers with overall activity score below <b>{LOW_SCORE_THRESHOLD}%</b>.
-                    Look at the reason tags to decide whether they need mentoring, training or a review.
-                  </p>
-                </div>
-              </div>
-              {defaulters.length === 0 ? (
-                <EmptyState message="Great news — no defaulters in this filter" icon={CheckCircle2} />
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {defaulters.map(t => (
-                    <DefaulterCard key={t.id} teacher={t} onClick={() => navigate(`/teachers/${t.id}`)} />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+        {/* Bright stat grid */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16, marginBottom:24 }}>
+          <StatTile label="Total Teachers"   value={totalTeachers.toString()}  sub={`In ${branchFilter === "All" ? "all branches" : branchFilter}`} grad={GRAD_BLUE}   icon={Users}        onClick={()=>{ setTab("branch"); }} />
+          <StatTile label="Top Performers"   value={topCount.toString()}       sub={`${totalTeachers > 0 ? ((topCount/totalTeachers)*100).toFixed(0) : 0}% of staff`} grad={GRAD_GREEN}  icon={Trophy}       onClick={()=>{ setTab("top"); }} />
+          <StatTile label="Defaulters"       value={defCount.toString()}       sub={`${totalTeachers > 0 ? ((defCount/totalTeachers)*100).toFixed(0) : 0}% need attention`} grad={defCount > 0 ? GRAD_RED : GRAD_GOLD} icon={TrendingDown} onClick={()=>{ setTab("defaulter"); }} />
+          <StatTile label="Avg Performance"  value={`${avgOverall}%`}          sub="Activity-weighted"                                 grad={GRAD_VIOLET} icon={Target}       onClick={()=>{ setTab("branch"); }} />
         </div>
+
+        {/* Tabs */}
+        <div
+          style={{
+            background:"#fff", borderRadius:22,
+            boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
+            overflow:"hidden", marginBottom:24,
+          }}
+        >
+          <div style={{ display:"flex", gap:4, borderBottom:"0.5px solid rgba(0,85,255,.08)", padding:"6px 8px", overflowX:"auto" }}>
+            {tabs.map(t => {
+              const active = tab === t.key;
+              return (
+                <button
+                  key={t.key}
+                  onClick={()=>{ setTab(t.key); setExpanded(new Set()); }}
+                  className="dash-btn"
+                  style={{
+                    display:"inline-flex", alignItems:"center", gap:8,
+                    padding:"10px 16px", borderRadius:12,
+                    background: active ? GRAD_PRIMARY : "transparent",
+                    color: active ? "#fff" : T3,
+                    fontSize:11, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
+                    border:"none", cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap",
+                    boxShadow: active ? SHADOW_BTN : "none",
+                  }}
+                >
+                  <t.icon size={14} strokeWidth={2.4}/>
+                  <span>{t.label}</span>
+                  <span style={{
+                    fontSize:10, fontWeight:800, padding:"2px 7px", borderRadius:999,
+                    background: active ? "rgba(255,255,255,.3)" : "rgba(0,85,255,.08)",
+                    color: active ? "#fff" : B1,
+                  }}>
+                    {t.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={{ padding:22 }}>
+            {tab === "branch" && (
+              <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+                <GroupControls
+                  total={byBranch.length}
+                  onExpandAll={() => expandAll(byBranch.map(([k]) => k))}
+                  onCollapseAll={collapseAll}
+                />
+                {byBranch.length === 0 ? (
+                  <EmptyState message="No teachers match the current filters" />
+                ) : (
+                  byBranch.map(([branchName, list]) => {
+                    const isOpen = expanded.has(branchName);
+                    const topInBranch = list.filter(t => t.category === "top").length;
+                    const defInBranch = list.filter(t => t.category === "defaulter").length;
+                    return (
+                      <div key={branchName} style={{ background:"#F5F9FF", borderRadius:18, border:"0.5px solid rgba(0,85,255,.08)", overflow:"hidden" }}>
+                        <button
+                          onClick={()=>toggleGroup(branchName)}
+                          className="dash-row"
+                          style={{
+                            width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between",
+                            padding:"14px 18px", background:"transparent", border:"none", cursor:"pointer",
+                            fontFamily:"inherit",
+                          }}
+                        >
+                          <div style={{ display:"flex", alignItems:"center", gap:12, minWidth:0 }}>
+                            <div style={{ width:42, height:42, borderRadius:13, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(0,85,255,.22)", flexShrink:0 }}>
+                              <Building2 size={20} color="#fff" strokeWidth={2.3}/>
+                            </div>
+                            <div style={{ textAlign:"left", minWidth:0 }}>
+                              <h3 style={{ fontSize:14, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.2px", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{branchName}</h3>
+                              <p style={{ fontSize:10, fontWeight:700, color:T4, margin:"2px 0 0 0", letterSpacing:"0.10em", textTransform:"uppercase" }}>
+                                {list.length} teacher{list.length !== 1 ? "s" : ""}
+                              </p>
+                            </div>
+                          </div>
+                          <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
+                            {topInBranch > 0 && (
+                              <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:10, fontWeight:800, padding:"4px 10px", borderRadius:999, background:"rgba(0,200,83,.12)", color:GREEN }}>
+                                <Trophy size={11}/> {topInBranch}
+                              </span>
+                            )}
+                            {defInBranch > 0 && (
+                              <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:10, fontWeight:800, padding:"4px 10px", borderRadius:999, background:"rgba(255,51,85,.12)", color:RED }}>
+                                <AlertTriangle size={11}/> {defInBranch}
+                              </span>
+                            )}
+                            <ChevronRight size={18} color={T4} style={{ transition:"transform .3s", transform: isOpen ? "rotate(90deg)" : "rotate(0)" }}/>
+                          </div>
+                        </button>
+                        {isOpen && (
+                          <div style={{ padding:"4px 18px 18px 18px", display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(260px, 1fr))", gap:12 }}>
+                            {list.map(t => (
+                              <TeacherCard key={t.id} teacher={t} onClick={() => navigate(`/teachers/${t.id}`)} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+
+            {tab === "class" && (
+              <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+                <GroupControls
+                  total={byClass.length}
+                  onExpandAll={() => expandAll(byClass.map(([k]) => k))}
+                  onCollapseAll={collapseAll}
+                />
+                {byClass.length === 0 ? (
+                  <EmptyState message="No classes found for the selected filters" />
+                ) : (
+                  byClass.map(([className, { classInfo, teachers: list }]) => {
+                    const isOpen = expanded.has(className);
+                    return (
+                      <div key={className} style={{ background:"#F5F9FF", borderRadius:18, border:"0.5px solid rgba(0,85,255,.08)", overflow:"hidden" }}>
+                        <button
+                          onClick={()=>toggleGroup(className)}
+                          className="dash-row"
+                          style={{
+                            width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between",
+                            padding:"14px 18px", background:"transparent", border:"none", cursor:"pointer",
+                            fontFamily:"inherit",
+                          }}
+                        >
+                          <div style={{ display:"flex", alignItems:"center", gap:12, minWidth:0 }}>
+                            <div style={{ width:42, height:42, borderRadius:13, background:GRAD_VIOLET, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(123,63,244,.22)", flexShrink:0 }}>
+                              <BookOpen size={20} color="#fff" strokeWidth={2.3}/>
+                            </div>
+                            <div style={{ textAlign:"left", minWidth:0 }}>
+                              <h3 style={{ fontSize:14, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.2px", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{className}</h3>
+                              <p style={{ fontSize:10, fontWeight:700, color:T4, margin:"2px 0 0 0", letterSpacing:"0.10em", textTransform:"uppercase" }}>
+                                {list.length} teacher{list.length !== 1 ? "s" : ""}{classInfo?.subject ? ` · ${classInfo.subject}` : ""}
+                              </p>
+                            </div>
+                          </div>
+                          <ChevronRight size={18} color={T4} style={{ flexShrink:0, transition:"transform .3s", transform: isOpen ? "rotate(90deg)" : "rotate(0)" }}/>
+                        </button>
+                        {isOpen && (
+                          <div style={{ padding:"4px 18px 18px 18px", display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(260px, 1fr))", gap:12 }}>
+                            {list.map(t => (
+                              <TeacherCard key={t.id} teacher={t} onClick={() => navigate(`/teachers/${t.id}`)} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+
+            {tab === "top" && (
+              <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+                <div
+                  style={{
+                    background:GRAD_GREEN, borderRadius:18, padding:"18px 22px",
+                    color:"#fff", display:"flex", gap:14, alignItems:"flex-start",
+                    boxShadow:"0 14px 38px rgba(0,200,83,.26)",
+                  }}
+                >
+                  <div style={{ width:44, height:44, borderRadius:13, background:"rgba(255,255,255,.22)", border:"0.5px solid rgba(255,255,255,.28)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                    <Trophy size={22} color="#fff" strokeWidth={2.2}/>
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize:16, fontWeight:800, color:"#fff", margin:0, letterSpacing:"-0.3px" }}>Top Performing Teachers</h3>
+                    <p style={{ fontSize:12, fontWeight:500, color:"rgba(255,255,255,.85)", margin:"6px 0 0 0", lineHeight:1.5 }}>
+                      Teachers with overall activity score ≥ <b>{TOP_SCORE_THRESHOLD}%</b>.
+                      Scoring blends test results, attendance discipline, assignments, lesson plans &amp; parent communication.
+                    </p>
+                  </div>
+                </div>
+                {topPerformers.length === 0 ? (
+                  <EmptyState message="No top performers yet — activity data will populate as teachers work" icon={Award} />
+                ) : (
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(280px, 1fr))", gap:14 }}>
+                    {topPerformers.map((t, i) => (
+                      <TopCard key={t.id} teacher={t} rank={i + 1} onClick={() => navigate(`/teachers/${t.id}`)} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {tab === "defaulter" && (
+              <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+                <div
+                  style={{
+                    background:GRAD_RED, borderRadius:18, padding:"18px 22px",
+                    color:"#fff", display:"flex", gap:14, alignItems:"flex-start",
+                    boxShadow:"0 14px 38px rgba(255,51,85,.26)",
+                  }}
+                >
+                  <div style={{ width:44, height:44, borderRadius:13, background:"rgba(255,255,255,.22)", border:"0.5px solid rgba(255,255,255,.28)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                    <AlertTriangle size={22} color="#fff" strokeWidth={2.2}/>
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize:16, fontWeight:800, color:"#fff", margin:0, letterSpacing:"-0.3px" }}>Teachers Needing Attention</h3>
+                    <p style={{ fontSize:12, fontWeight:500, color:"rgba(255,255,255,.85)", margin:"6px 0 0 0", lineHeight:1.5 }}>
+                      Teachers with overall activity score below <b>{LOW_SCORE_THRESHOLD}%</b>.
+                      Look at the reason tags to decide whether they need mentoring, training or a review.
+                    </p>
+                  </div>
+                </div>
+                {defaulters.length === 0 ? (
+                  <EmptyState message="Great news — no defaulters in this filter" icon={CheckCircle2} />
+                ) : (
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(280px, 1fr))", gap:14 }}>
+                    {defaulters.map(t => (
+                      <DefaulterCard key={t.id} teacher={t} onClick={() => navigate(`/teachers/${t.id}`)} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <AIInsightCard
+          title="Faculty Intelligence Summary"
+          items={[
+            { label:"Team Strength", value: `${topCount} top performer${topCount!==1?"s":""}`, sub: totalTeachers>0 ? `${((topCount/totalTeachers)*100).toFixed(0)}% of staff` : "Awaiting data" },
+            { label:"Attention Queue", value: defCount>0 ? `${defCount} need${defCount===1?"s":""} help` : "All stable", sub: defCount>0 ? "Recommend coaching" : "No intervention" },
+            { label:"Performance Pulse", value: `${avgOverall}% avg activity`, sub: avgOverall>=70?"Healthy":avgOverall>=50?"Average":"Needs focus" },
+          ]}
+        />
       </div>
-    </div>
+    </>
   );
 }
 
@@ -825,18 +874,30 @@ export default function TeachersDirectory() {
 function GroupControls({ total, onExpandAll, onCollapseAll }: { total: number; onExpandAll: () => void; onCollapseAll: () => void }) {
   if (total === 0) return null;
   return (
-    <div className="flex items-center justify-between">
-      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{total} group{total !== 1 ? "s" : ""}</p>
-      <div className="flex items-center gap-2">
+    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+      <p style={{ fontSize:10, fontWeight:800, color:T4, letterSpacing:"0.12em", textTransform:"uppercase", margin:0 }}>{total} group{total !== 1 ? "s" : ""}</p>
+      <div style={{ display:"flex", gap:6 }}>
         <button
           onClick={onExpandAll}
-          className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-600 transition-all"
+          className="dash-btn"
+          style={{
+            padding:"6px 12px", borderRadius:10,
+            background:"#F5F9FF", border:"0.5px solid rgba(0,85,255,.12)",
+            fontSize:10, fontWeight:800, color:T3, letterSpacing:"0.12em", textTransform:"uppercase",
+            cursor:"pointer", fontFamily:"inherit",
+          }}
         >
           Expand All
         </button>
         <button
           onClick={onCollapseAll}
-          className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-600 transition-all"
+          className="dash-btn"
+          style={{
+            padding:"6px 12px", borderRadius:10,
+            background:"#F5F9FF", border:"0.5px solid rgba(0,85,255,.12)",
+            fontSize:10, fontWeight:800, color:T3, letterSpacing:"0.12em", textTransform:"uppercase",
+            cursor:"pointer", fontFamily:"inherit",
+          }}
         >
           Collapse All
         </button>
@@ -847,124 +908,160 @@ function GroupControls({ total, onExpandAll, onCollapseAll }: { total: number; o
 
 function EmptyState({ message, icon: Icon = GraduationCap }: { message: string; icon?: any }) {
   return (
-    <div className="py-16 flex flex-col items-center gap-3">
-      <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
-        <Icon className="w-7 h-7 text-slate-300" />
+    <div style={{ padding:"50px 0", display:"flex", flexDirection:"column", alignItems:"center", gap:12 }}>
+      <div style={{ width:56, height:56, borderRadius:16, background:"#F5F9FF", border:"0.5px solid rgba(0,85,255,.1)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+        <Icon size={26} color={T4}/>
       </div>
-      <p className="text-sm text-slate-400 font-semibold">{message}</p>
+      <p style={{ fontSize:12, fontWeight:700, color:T4, margin:0, letterSpacing:"0.04em" }}>{message}</p>
     </div>
   );
 }
 
-/* Small activity row inside cards — icon + count + label */
+function tierFromScore(score: number): { label: string; grad: string; color: string; bg: string } {
+  if (score >= 75) return { label:"Excellent", grad:GRAD_GREEN, color:GREEN, bg:"rgba(0,200,83,.10)" };
+  if (score >= 60) return { label:"Good", grad:GRAD_BLUE, color:B1, bg:"rgba(0,85,255,.08)" };
+  if (score >= 45) return { label:"Average", grad:GRAD_GOLD, color:GOLD, bg:"rgba(255,170,0,.10)" };
+  if (score > 0)   return { label:"Needs Work", grad:GRAD_RED, color:RED, bg:"rgba(255,51,85,.10)" };
+  return             { label:"No Activity", grad:"linear-gradient(135deg,#99AACC,#5070B0)", color:T4, bg:"rgba(153,170,204,.10)" };
+}
+
 function ActivityChip({ icon: Icon, count, label, color }: { icon: any; count: number; label: string; color: string }) {
   return (
-    <div className="flex items-center gap-1.5" title={`${label}: ${count}`}>
-      <Icon className={`w-3 h-3 ${color}`} />
-      <span className="text-[10px] font-bold text-slate-600">{count}</span>
+    <div style={{ display:"flex", alignItems:"center", gap:5 }} title={`${label}: ${count}`}>
+      <Icon size={12} color={color} strokeWidth={2.3}/>
+      <span style={{ fontSize:10, fontWeight:800, color:T3 }}>{count}</span>
     </div>
   );
 }
 
 function TeacherCard({ teacher, onClick }: { teacher: any; onClick: () => void }) {
-  const sl = scoreLabel(teacher.overall);
+  const tr = tierFromScore(teacher.overall);
   return (
     <div
       onClick={onClick}
-      className="bg-white border border-slate-100 rounded-2xl p-4 hover:shadow-lg hover:border-[#1e3a8a]/20 cursor-pointer group transition-all"
+      className="dash-card"
+      style={{
+        background:"#fff", border:"0.5px solid rgba(0,85,255,.08)", borderRadius:18,
+        padding:"16px 18px", cursor:"pointer", boxShadow:SHADOW_SM,
+      }}
     >
-      <div className="flex items-center gap-3 mb-3">
-        <div className={`w-10 h-10 rounded-xl ${teacher._color} flex items-center justify-center text-white text-xs font-extrabold shrink-0`}>
+      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:12 }}>
+        <div style={{
+          width:40, height:40, borderRadius:12, background:tr.grad,
+          display:"flex", alignItems:"center", justifyContent:"center",
+          color:"#fff", fontSize:11, fontWeight:800,
+          boxShadow:"0 6px 14px rgba(0,85,255,.18)", flexShrink:0,
+        }}>
           {initials(teacher.name)}
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-[#1e294b] truncate group-hover:text-[#1e3a8a]">{teacher.name}</p>
-          <p className="text-[10px] text-slate-400 font-semibold truncate">{teacher.subject || "—"}</p>
+        <div style={{ flex:1, minWidth:0 }}>
+          <p style={{ fontSize:13, fontWeight:800, color:T1, margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", letterSpacing:"-0.2px" }}>{teacher.name}</p>
+          <p style={{ fontSize:10, fontWeight:700, color:T4, margin:"2px 0 0 0", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{teacher.subject || "—"}</p>
         </div>
-        <span className={`text-[9px] font-black px-2 py-1 rounded-lg border ${sl.bg} ${sl.color} shrink-0 uppercase tracking-wider`}>
-          {sl.label}
+        <span style={{
+          fontSize:9, fontWeight:800, padding:"3px 9px", borderRadius:999,
+          background:tr.bg, color:tr.color, flexShrink:0,
+          letterSpacing:"0.10em", textTransform:"uppercase",
+        }}>
+          {tr.label}
         </span>
       </div>
-
-      {/* overall + sub-scores */}
-      <div className="grid grid-cols-3 gap-2 text-center pt-3 border-t border-slate-100 mb-3">
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:6, textAlign:"center", padding:"10px 0", borderTop:"0.5px solid rgba(0,85,255,.08)", borderBottom:"0.5px solid rgba(0,85,255,.08)", marginBottom:10 }}>
         <div>
-          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Overall</p>
-          <p className={`text-sm font-extrabold ${sl.color}`}>{teacher.overall > 0 ? `${teacher.overall}%` : "—"}</p>
+          <p style={{ fontSize:8, fontWeight:800, color:T4, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 2px 0" }}>Overall</p>
+          <p style={{ fontSize:13, fontWeight:800, color:tr.color, margin:0 }}>{teacher.overall > 0 ? `${teacher.overall}%` : "—"}</p>
         </div>
         <div>
-          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Score</p>
-          <p className="text-sm font-extrabold text-[#1e294b]">{teacher.avgScore > 0 ? `${teacher.avgScore}%` : "—"}</p>
+          <p style={{ fontSize:8, fontWeight:800, color:T4, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 2px 0" }}>Score</p>
+          <p style={{ fontSize:13, fontWeight:800, color:T1, margin:0 }}>{teacher.avgScore > 0 ? `${teacher.avgScore}%` : "—"}</p>
         </div>
         <div>
-          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Classes</p>
-          <p className="text-sm font-extrabold text-[#1e294b]">{teacher.classCount}</p>
+          <p style={{ fontSize:8, fontWeight:800, color:T4, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 2px 0" }}>Classes</p>
+          <p style={{ fontSize:13, fontWeight:800, color:T1, margin:0 }}>{teacher.classCount}</p>
         </div>
       </div>
-
-      {/* activity strip */}
-      <div className="flex items-center justify-between bg-slate-50 rounded-lg px-2 py-1.5">
-        <ActivityChip icon={ClipboardCheck} count={teacher.attMarkCount} label="Attendance entries"   color="text-blue-500"    />
-        <ActivityChip icon={FileText}       count={teacher.assignCount}  label="Assignments created"  color="text-orange-500"  />
-        <ActivityChip icon={Activity}       count={teacher.testCount}    label="Tests created"        color="text-purple-500"  />
-        <ActivityChip icon={BookOpen}       count={teacher.lessonCount}  label="Lesson plans"         color="text-teal-500"    />
-        <ActivityChip icon={MessageSquare}  count={teacher.noteCount}    label="Parent notes"         color="text-pink-500"    />
+      <div style={{ display:"flex", justifyContent:"space-between", background:"#F5F9FF", borderRadius:10, padding:"6px 10px" }}>
+        <ActivityChip icon={ClipboardCheck} count={teacher.attMarkCount} label="Attendance" color={B1}/>
+        <ActivityChip icon={FileText}       count={teacher.assignCount}  label="Assignments" color={ORANGE}/>
+        <ActivityChip icon={Activity}       count={teacher.testCount}    label="Tests" color={VIOLET}/>
+        <ActivityChip icon={BookOpen}       count={teacher.lessonCount}  label="Lessons" color={GREEN}/>
+        <ActivityChip icon={MessageSquare}  count={teacher.noteCount}    label="Notes" color={GOLD}/>
       </div>
     </div>
   );
 }
 
 function TopCard({ teacher, rank, onClick }: { teacher: any; rank: number; onClick: () => void }) {
-  const medalColor =
-    rank === 1 ? "bg-gradient-to-br from-yellow-400 to-amber-500" :
-    rank === 2 ? "bg-gradient-to-br from-slate-300 to-slate-400" :
-    rank === 3 ? "bg-gradient-to-br from-orange-400 to-amber-600" :
-                 "bg-emerald-500";
+  const medalGrad =
+    rank === 1 ? "linear-gradient(135deg,#FFD700,#FFAA00)" :
+    rank === 2 ? "linear-gradient(135deg,#C0C0C0,#808080)" :
+    rank === 3 ? "linear-gradient(135deg,#CD7F32,#8B4513)" :
+                 GRAD_GREEN;
   return (
     <div
       onClick={onClick}
-      className="bg-white border border-emerald-100 rounded-2xl p-5 hover:shadow-xl hover:border-emerald-300 cursor-pointer group transition-all relative overflow-hidden"
+      className="dash-card"
+      style={{
+        background:"#fff", border:"0.5px solid rgba(0,200,83,.18)", borderRadius:20,
+        padding:"20px 22px", cursor:"pointer", boxShadow:SHADOW_SM,
+        position:"relative", overflow:"hidden",
+      }}
     >
-      <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-50 rounded-full blur-2xl opacity-60" />
-      <div className="relative">
-        <div className="flex items-center gap-3 mb-4">
-          <div className={`w-11 h-11 rounded-xl ${teacher._color} flex items-center justify-center text-white text-sm font-extrabold shrink-0`}>
+      <div style={{ position:"absolute", top:-30, right:-30, width:120, height:120, background:"radial-gradient(circle, rgba(0,200,83,.14) 0%, transparent 70%)", borderRadius:"50%", pointerEvents:"none" }}/>
+      <div style={{ position:"relative", zIndex:1 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:14 }}>
+          <div style={{
+            width:44, height:44, borderRadius:13, background:GRAD_GREEN,
+            display:"flex", alignItems:"center", justifyContent:"center",
+            color:"#fff", fontSize:12, fontWeight:800,
+            boxShadow:"0 6px 14px rgba(0,200,83,.22)", flexShrink:0,
+          }}>
             {initials(teacher.name)}
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-extrabold text-[#1e294b] truncate group-hover:text-emerald-700">{teacher.name}</p>
-            <p className="text-[10px] text-slate-400 font-semibold truncate">{teacher.subject || "—"} · {teacher.branchName}</p>
+          <div style={{ flex:1, minWidth:0 }}>
+            <p style={{ fontSize:14, fontWeight:800, color:T1, margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", letterSpacing:"-0.2px" }}>{teacher.name}</p>
+            <p style={{ fontSize:10, fontWeight:700, color:T4, margin:"2px 0 0 0", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{teacher.subject || "—"} · {teacher.branchName}</p>
           </div>
-          <div className={`w-9 h-9 rounded-xl ${medalColor} flex items-center justify-center shrink-0 shadow-md`}>
-            <Medal className="w-4 h-4 text-white" />
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-1.5 mb-4">
-          {teacher.reasons.map((r: string) => (
-            <span key={r} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase tracking-wider">
-              {r}
-            </span>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          <div className="text-center bg-emerald-50 rounded-xl py-2">
-            <p className="text-[9px] text-emerald-600 font-bold uppercase tracking-wider">Overall</p>
-            <p className="text-lg font-extrabold text-emerald-700">{teacher.overall}%</p>
-          </div>
-          <div className="text-center bg-blue-50 rounded-xl py-2">
-            <p className="text-[9px] text-blue-600 font-bold uppercase tracking-wider">Test Avg</p>
-            <p className="text-lg font-extrabold text-blue-700">{teacher.avgScore > 0 ? `${teacher.avgScore}%` : "—"}</p>
+          <div style={{
+            width:36, height:36, borderRadius:11, background:medalGrad,
+            display:"flex", alignItems:"center", justifyContent:"center",
+            boxShadow:"0 6px 14px rgba(0,0,0,.22)", flexShrink:0,
+          }}>
+            <Medal size={16} color="#fff" strokeWidth={2.3}/>
           </div>
         </div>
 
-        <div className="grid grid-cols-5 gap-1 pt-3 border-t border-slate-100">
-          <ActivityChip icon={ClipboardCheck} count={teacher.attMarkCount} label="Attendance" color="text-blue-500"/>
-          <ActivityChip icon={FileText}       count={teacher.assignCount}  label="Assignments" color="text-orange-500"/>
-          <ActivityChip icon={Activity}       count={teacher.testCount}    label="Tests" color="text-purple-500"/>
-          <ActivityChip icon={BookOpen}       count={teacher.lessonCount}  label="Lessons" color="text-teal-500"/>
-          <ActivityChip icon={MessageSquare}  count={teacher.noteCount}    label="Notes" color="text-pink-500"/>
+        {teacher.reasons.length > 0 && (
+          <div style={{ display:"flex", flexWrap:"wrap", gap:5, marginBottom:14 }}>
+            {teacher.reasons.map((r: string) => (
+              <span key={r} style={{
+                fontSize:9, fontWeight:800, padding:"3px 8px", borderRadius:999,
+                background:"rgba(0,200,83,.10)", color:GREEN,
+                letterSpacing:"0.10em", textTransform:"uppercase",
+              }}>
+                {r}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(2, 1fr)", gap:8, marginBottom:12 }}>
+          <div style={{ textAlign:"center", background:"rgba(0,200,83,.10)", borderRadius:12, padding:"8px 6px" }}>
+            <p style={{ fontSize:9, fontWeight:800, color:GREEN, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 2px 0" }}>Overall</p>
+            <p style={{ fontSize:18, fontWeight:800, color:GREEN, margin:0 }}>{teacher.overall}%</p>
+          </div>
+          <div style={{ textAlign:"center", background:"rgba(0,85,255,.08)", borderRadius:12, padding:"8px 6px" }}>
+            <p style={{ fontSize:9, fontWeight:800, color:B1, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 2px 0" }}>Test Avg</p>
+            <p style={{ fontSize:18, fontWeight:800, color:B1, margin:0 }}>{teacher.avgScore > 0 ? `${teacher.avgScore}%` : "—"}</p>
+          </div>
+        </div>
+
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(5, 1fr)", gap:4, paddingTop:10, borderTop:"0.5px solid rgba(0,85,255,.08)" }}>
+          <ActivityChip icon={ClipboardCheck} count={teacher.attMarkCount} label="Attendance" color={B1}/>
+          <ActivityChip icon={FileText}       count={teacher.assignCount}  label="Assignments" color={ORANGE}/>
+          <ActivityChip icon={Activity}       count={teacher.testCount}    label="Tests" color={VIOLET}/>
+          <ActivityChip icon={BookOpen}       count={teacher.lessonCount}  label="Lessons" color={GREEN}/>
+          <ActivityChip icon={MessageSquare}  count={teacher.noteCount}    label="Notes" color={GOLD}/>
         </div>
       </div>
     </div>
@@ -975,48 +1072,68 @@ function DefaulterCard({ teacher, onClick }: { teacher: any; onClick: () => void
   return (
     <div
       onClick={onClick}
-      className="bg-white border border-red-100 rounded-2xl p-5 hover:shadow-xl hover:border-red-300 cursor-pointer group transition-all relative overflow-hidden"
+      className="dash-card"
+      style={{
+        background:"#fff", border:"0.5px solid rgba(255,51,85,.18)", borderRadius:20,
+        padding:"20px 22px", cursor:"pointer", boxShadow:SHADOW_SM,
+        position:"relative", overflow:"hidden",
+      }}
     >
-      <div className="absolute top-0 right-0 w-24 h-24 bg-red-50 rounded-full blur-2xl opacity-60" />
-      <div className="relative">
-        <div className="flex items-center gap-3 mb-4">
-          <div className={`w-11 h-11 rounded-xl ${teacher._color} flex items-center justify-center text-white text-sm font-extrabold shrink-0`}>
+      <div style={{ position:"absolute", top:-30, right:-30, width:120, height:120, background:"radial-gradient(circle, rgba(255,51,85,.14) 0%, transparent 70%)", borderRadius:"50%", pointerEvents:"none" }}/>
+      <div style={{ position:"relative", zIndex:1 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:14 }}>
+          <div style={{
+            width:44, height:44, borderRadius:13, background:GRAD_RED,
+            display:"flex", alignItems:"center", justifyContent:"center",
+            color:"#fff", fontSize:12, fontWeight:800,
+            boxShadow:"0 6px 14px rgba(255,51,85,.22)", flexShrink:0,
+          }}>
             {initials(teacher.name)}
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-extrabold text-[#1e294b] truncate group-hover:text-red-700">{teacher.name}</p>
-            <p className="text-[10px] text-slate-400 font-semibold truncate">{teacher.subject || "—"} · {teacher.branchName}</p>
+          <div style={{ flex:1, minWidth:0 }}>
+            <p style={{ fontSize:14, fontWeight:800, color:T1, margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", letterSpacing:"-0.2px" }}>{teacher.name}</p>
+            <p style={{ fontSize:10, fontWeight:700, color:T4, margin:"2px 0 0 0", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{teacher.subject || "—"} · {teacher.branchName}</p>
           </div>
-          <div className="w-9 h-9 rounded-xl bg-red-600 flex items-center justify-center shrink-0 shadow-md">
-            <AlertTriangle className="w-4 h-4 text-white" />
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-1.5 mb-4">
-          {teacher.reasons.map((r: string) => (
-            <span key={r} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-red-50 text-red-700 border border-red-100 uppercase tracking-wider">
-              {r}
-            </span>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          <div className="text-center bg-red-50 rounded-xl py-2">
-            <p className="text-[9px] text-red-600 font-bold uppercase tracking-wider">Overall</p>
-            <p className="text-lg font-extrabold text-red-700">{teacher.overall > 0 ? `${teacher.overall}%` : "—"}</p>
-          </div>
-          <div className="text-center bg-orange-50 rounded-xl py-2">
-            <p className="text-[9px] text-orange-600 font-bold uppercase tracking-wider">Test Avg</p>
-            <p className="text-lg font-extrabold text-orange-700">{teacher.avgScore > 0 ? `${teacher.avgScore}%` : "—"}</p>
+          <div style={{
+            width:36, height:36, borderRadius:11, background:GRAD_RED,
+            display:"flex", alignItems:"center", justifyContent:"center",
+            boxShadow:"0 6px 14px rgba(255,51,85,.26)", flexShrink:0,
+          }}>
+            <AlertTriangle size={16} color="#fff" strokeWidth={2.3}/>
           </div>
         </div>
 
-        <div className="grid grid-cols-5 gap-1 pt-3 border-t border-slate-100">
-          <ActivityChip icon={ClipboardCheck} count={teacher.attMarkCount} label="Attendance" color="text-blue-500"/>
-          <ActivityChip icon={FileText}       count={teacher.assignCount}  label="Assignments" color="text-orange-500"/>
-          <ActivityChip icon={Activity}       count={teacher.testCount}    label="Tests" color="text-purple-500"/>
-          <ActivityChip icon={BookOpen}       count={teacher.lessonCount}  label="Lessons" color="text-teal-500"/>
-          <ActivityChip icon={MessageSquare}  count={teacher.noteCount}    label="Notes" color="text-pink-500"/>
+        {teacher.reasons.length > 0 && (
+          <div style={{ display:"flex", flexWrap:"wrap", gap:5, marginBottom:14 }}>
+            {teacher.reasons.map((r: string) => (
+              <span key={r} style={{
+                fontSize:9, fontWeight:800, padding:"3px 8px", borderRadius:999,
+                background:"rgba(255,51,85,.10)", color:RED,
+                letterSpacing:"0.10em", textTransform:"uppercase",
+              }}>
+                {r}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(2, 1fr)", gap:8, marginBottom:12 }}>
+          <div style={{ textAlign:"center", background:"rgba(255,51,85,.10)", borderRadius:12, padding:"8px 6px" }}>
+            <p style={{ fontSize:9, fontWeight:800, color:RED, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 2px 0" }}>Overall</p>
+            <p style={{ fontSize:18, fontWeight:800, color:RED, margin:0 }}>{teacher.overall > 0 ? `${teacher.overall}%` : "—"}</p>
+          </div>
+          <div style={{ textAlign:"center", background:"rgba(255,136,0,.10)", borderRadius:12, padding:"8px 6px" }}>
+            <p style={{ fontSize:9, fontWeight:800, color:ORANGE, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 2px 0" }}>Test Avg</p>
+            <p style={{ fontSize:18, fontWeight:800, color:ORANGE, margin:0 }}>{teacher.avgScore > 0 ? `${teacher.avgScore}%` : "—"}</p>
+          </div>
+        </div>
+
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(5, 1fr)", gap:4, paddingTop:10, borderTop:"0.5px solid rgba(0,85,255,.08)" }}>
+          <ActivityChip icon={ClipboardCheck} count={teacher.attMarkCount} label="Attendance" color={B1}/>
+          <ActivityChip icon={FileText}       count={teacher.assignCount}  label="Assignments" color={ORANGE}/>
+          <ActivityChip icon={Activity}       count={teacher.testCount}    label="Tests" color={VIOLET}/>
+          <ActivityChip icon={BookOpen}       count={teacher.lessonCount}  label="Lessons" color={GREEN}/>
+          <ActivityChip icon={MessageSquare}  count={teacher.noteCount}    label="Notes" color={GOLD}/>
         </div>
       </div>
     </div>

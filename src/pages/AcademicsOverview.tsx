@@ -2,25 +2,45 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, Legend, Cell,
 } from "recharts";
-import { X, BookOpen, Loader2 } from "lucide-react";
+import {
+  X, BookOpen, Loader2, Sparkles, GraduationCap, Award, Target,
+  AlertTriangle, TrendingUp, Users, BarChart3, Building2, ChevronDown,
+  ChevronRight, Layers,
+} from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useAcademicsOverview, useSubjectDetail } from "@/hooks/useAcademics";
+import {
+  B1, T1, T3, T4, GREEN, RED, GOLD, VIOLET,
+  GRAD_PRIMARY, GRAD_HERO, GRAD_BLUE, GRAD_GREEN, GRAD_VIOLET, GRAD_GOLD, GRAD_RED,
+  SHADOW_SM, SHADOW_LG, SHADOW_BTN, pageShellStyle,
+  DashGlobalStyles, PageHead, StatTile, DarkHero, Card3D, AIInsightCard,
+} from "@/lib/dashboardTokens";
 
 // ── skeleton ──────────────────────────────────────────────────────────────────
-function Skeleton({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse bg-slate-100 rounded-2xl ${className}`} />;
+function Skeleton({ height = 120 }: { height?: number }) {
+  return (
+    <div
+      style={{
+        background:"#F5F9FF", borderRadius:22, height,
+        border:"0.5px solid rgba(0,85,255,.08)",
+      }}
+      className="dash-tile"
+    />
+  );
 }
 
 // ── grade cell colour ─────────────────────────────────────────────────────────
 const getMatrixColor = (value: number) => {
-  if (!value) return "#f1f5f9";
-  if (value >= 90) return "#bef264";
-  if (value >= 80) return "#d9f99d";
-  if (value >= 70) return "#fef08a";
-  if (value >= 60) return "#fed7aa";
-  return "#fecaca";
+  if (!value) return "rgba(0,85,255,.06)";
+  if (value >= 90) return GREEN;
+  if (value >= 80) return "#33DD77";
+  if (value >= 70) return GOLD;
+  if (value >= 60) return "#FF8800";
+  return RED;
 };
+
+const getMatrixText = (value: number) => value >= 60 ? "#fff" : value > 0 ? "#fff" : T4;
 
 // ── main component ────────────────────────────────────────────────────────────
 export default function AcademicsOverview() {
@@ -30,6 +50,7 @@ export default function AcademicsOverview() {
 
   const { data: overview, loading: overviewLoading, error } = useAcademicsOverview();
   const { subject, loading: subjectLoading } = useSubjectDetail(id);
+  const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
 
   // ══════════════════════════════════════════════════════════════════════
   //  SUBJECT DETAIL VIEW
@@ -37,546 +58,627 @@ export default function AcademicsOverview() {
   if (id) {
     if (subjectLoading) {
       return (
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="w-8 h-8 animate-spin text-[#1e3a8a]" />
+        <div style={{ ...pageShellStyle, display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <Loader2 className="animate-spin" size={32} color={B1}/>
         </div>
       );
     }
     if (!subject) return null;
 
-    const statusColor =
-      subject.status === "Strong" ? "bg-[#22c55e]" :
-      subject.status === "Good"   ? "bg-[#3b82f6]" :
-      subject.status === "No Data"? "bg-slate-400"  : "bg-[#f59e0b]";
+    const statusGrad =
+      subject.status === "Strong" ? GRAD_GREEN :
+      subject.status === "Good" ? GRAD_BLUE :
+      subject.status === "No Data" ? "linear-gradient(135deg,#99AACC,#5070B0)" : GRAD_GOLD;
 
     return (
-      <div className="animate-in fade-in duration-700 space-y-8 pb-10">
+      <>
+        <DashGlobalStyles />
+        <div style={pageShellStyle}>
+          {/* Back nav */}
+          <button
+            onClick={()=>navigate("/academics")}
+            className="dash-btn"
+            style={{
+              display:"inline-flex", alignItems:"center", gap:7,
+              padding:"8px 14px", borderRadius:12,
+              background:"#fff", border:"0.5px solid rgba(0,85,255,.12)",
+              fontSize:11, fontWeight:700, color:T3,
+              letterSpacing:"0.06em", textTransform:"uppercase",
+              cursor:"pointer", marginBottom:18, boxShadow:SHADOW_SM, fontFamily:"inherit",
+            }}
+          >
+            <ChevronRight size={14} style={{ transform:"rotate(180deg)" }}/> Back to Academics
+          </button>
 
-        {/* Main Card */}
-        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-xl overflow-hidden">
-          <div className="p-6 md:p-10 lg:p-12">
+          <DarkHero
+            icon={BookOpen}
+            eyebrow={<><Sparkles size={11} style={{ display:"inline", marginRight:4 }}/> Subject Intelligence</> as any}
+            title={subject.name}
+            subtitle={`${subject.teachers} Teachers · ${subject.students.toLocaleString()} Students`}
+            stats={[
+              { label:"Status", value:subject.status },
+            ]}
+          />
 
-            {/* Header */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-10">
-              <div className="flex items-center gap-4 md:gap-8">
-                <div className="w-14 h-14 md:w-20 md:h-20 rounded-2xl bg-[#1e3a8a] flex items-center justify-center text-white shadow-lg border-2 md:border-4 border-white shrink-0">
-                  <BookOpen className="w-7 h-7 md:w-10 md:h-10" />
-                </div>
-                <div className="min-w-0">
-                  <h2 className="text-xl md:text-3xl lg:text-4xl font-black text-[#1e294b] tracking-tight uppercase truncate">
-                    {subject.name}
-                  </h2>
-                  <p className="text-slate-500 font-bold text-[10px] md:text-sm tracking-widest mt-1 uppercase opacity-70 truncate">
-                    {subject.teachers} Teachers • {subject.students.toLocaleString()} Students
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between lg:justify-end gap-3 w-full lg:w-auto">
-                <span className={`text-white text-[10px] font-black px-5 md:px-8 py-2 md:py-2.5 rounded-full shadow-lg h-9 md:h-10 flex items-center uppercase tracking-widest ${statusColor}`}>
-                  {subject.status}
-                </span>
-                <button
-                  onClick={() => navigate("/academics")}
-                  className="p-2 md:p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:bg-slate-100 transition-all border border-slate-100"
-                >
-                  <X className="w-5 h-5 md:w-6 md:h-6" />
-                </button>
-              </div>
-            </div>
-
-            {/* Tabs */}
-            <div className="flex items-center gap-2 md:gap-3 mb-10 overflow-x-auto pb-2 no-scrollbar">
-              {["Performance", "Topics", "Resources"].map(tab => (
+          {/* Tabs */}
+          <div style={{ display:"flex", gap:8, marginBottom:20, overflowX:"auto", paddingBottom:2 }}>
+            {["Performance", "Topics", "Resources"].map(tab => {
+              const active = activeTab === tab;
+              return (
                 <button
                   key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`whitespace-nowrap px-6 md:px-10 py-2.5 md:py-3 rounded-xl md:rounded-2xl text-[10px] md:text-[11px] font-black uppercase tracking-widest transition-all ${
-                    activeTab === tab
-                      ? "bg-[#1e3a8a] text-white shadow-xl"
-                      : "bg-slate-50 text-slate-400 hover:bg-slate-100"
-                  }`}
+                  onClick={()=>setActiveTab(tab)}
+                  className="dash-btn"
+                  style={{
+                    padding:"10px 20px", borderRadius:14,
+                    background: active ? GRAD_PRIMARY : "#fff",
+                    color: active ? "#fff" : T3,
+                    fontSize:11, fontWeight:800, letterSpacing:"0.10em", textTransform:"uppercase",
+                    border: active ? "none" : "0.5px solid rgba(0,85,255,.12)",
+                    boxShadow: active ? SHADOW_BTN : SHADOW_SM,
+                    cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap",
+                  }}
                 >
                   {tab}
                 </button>
-              ))}
-            </div>
-
-            {/* Metric Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-12">
-              {[
-                { label: "Average Score",       ...subject.metrics.avgScore,      type: "green",  route: "/academics" },
-                { label: "Pass Rate",           ...subject.metrics.passRate,      type: "green",  route: "/academics" },
-                { label: "Top Performers",      ...subject.metrics.topPerformers, type: "green",  route: "/students"  },
-                { label: "Areas Needing Focus", ...subject.metrics.focusAreas,    type: "yellow", route: "/risks"     },
-              ].map((stat, i) => (
-                <div
-                  key={i}
-                  onClick={() => navigate(stat.route)}
-                  role="button"
-                  tabIndex={0}
-                  className={`clickable-card p-5 md:p-8 rounded-2xl md:rounded-[1.5rem] border ${
-                  stat.type === "green" ? "bg-[#f0fdf4] border-emerald-100/50" : "bg-[#fffbeb] border-amber-100/50"
-                }`}>
-                  <p className={`text-[9px] md:text-[11px] font-black uppercase tracking-tight mb-3 md:mb-4 ${
-                    stat.type === "green" ? "text-[#059669]/60" : "text-[#d97706]/60"
-                  }`}>{stat.label}</p>
-                  <h3 className={`text-2xl md:text-4xl font-black tracking-tighter mb-1 md:mb-2 ${
-                    stat.type === "green" ? "text-[#059669]" : "text-[#d97706]"
-                  }`}>{stat.value}</h3>
-                  <p className={`text-[9px] md:text-[11px] font-black uppercase tracking-tight ${
-                    stat.type === "green" ? "text-[#059669]/80" : "text-[#d97706]/80"
-                  }`}>{stat.note}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-              {/* Topic-wise Performance */}
-              <div>
-                <h3 className="text-lg font-black text-[#1e294b] mb-10">Topic-wise Performance</h3>
-                {subject.topics.length === 0 ? (
-                  <div className="h-[280px] flex items-center justify-center border border-dashed border-slate-200 rounded-xl">
-                    <p className="text-sm text-slate-300 font-semibold">No topic data available</p>
-                  </div>
-                ) : (
-                  <div className="h-[280px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={subject.topics} layout="vertical" margin={{ left: -10, right: 40 }}>
-                        <XAxis type="number" domain={[0, 100]} hide />
-                        <YAxis dataKey="name" type="category" axisLine={false} tickLine={false}
-                          tick={{ fill: "#64748b", fontSize: 11, fontWeight: "bold" }} width={90} />
-                        <Tooltip cursor={{ fill: "transparent" }} />
-                        <Bar dataKey="score" radius={[0, 4, 4, 0]} barSize={16}>
-                          {subject.topics.map((entry, index) => (
-                            <Cell key={`cell-${index}`}
-                              fill={entry.score >= 80 ? "#22c55e" : entry.score >= 65 ? "#f59e0b" : "#ef4444"} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-              </div>
-
-              {/* Branch Comparison */}
-              <div>
-                <h3 className="text-lg font-black text-[#1e294b] mb-10">Branch Comparison</h3>
-                {subject.classComparison.length === 0 ? (
-                  <div className="h-[280px] flex items-center justify-center border border-dashed border-slate-200 rounded-xl">
-                    <p className="text-sm text-slate-300 font-semibold">No branch data available</p>
-                  </div>
-                ) : (
-                  <div className="h-[280px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={subject.classComparison} margin={{ bottom: 20 }}>
-                        <XAxis dataKey="grade" axisLine={false} tickLine={false}
-                          tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: "800" }} dy={10} />
-                        <YAxis hide domain={[0, 100]} />
-                        <Tooltip cursor={{ fill: "transparent" }} />
-                        {Object.keys(subject.classComparison[0] || {})
-                          .filter(k => k !== "grade")
-                          .map((key, i) => (
-                            <Bar key={key} dataKey={key} name={key}
-                              fill={["#1e3a8a","#3b82f6","#10b981","#f59e0b","#8b5cf6"][i % 5]}
-                              radius={[2, 2, 0, 0]} barSize={20} />
-                          ))}
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-              </div>
-            </div>
+              );
+            })}
           </div>
-        </div>
 
-        {/* Weak Areas */}
-        {subject.weakAreas.length > 0 && (
-          <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-6 md:p-10 lg:p-14">
-            <h3 className="text-lg md:text-xl font-extrabold text-[#111827] mb-8 md:mb-12 uppercase tracking-wide">
-              Weak Areas & Recommendations
-            </h3>
-            <div className="space-y-6 md:space-y-8">
-              {subject.weakAreas.map((area, idx) => (
-                <div key={idx} className={`p-6 md:p-10 rounded-2xl md:rounded-[2.5rem] relative overflow-hidden transition-all hover:translate-y-[-5px] duration-500 shadow-sm ${
-                  area.status === "Critical" ? "bg-[#fef2f2]" : "bg-[#fffbeb]"
-                }`}>
-                  <div className={`absolute top-0 left-0 w-1.5 md:w-2 h-full ${area.status === "Critical" ? "bg-red-500" : "bg-amber-400"}`} />
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 relative z-10">
-                    <div>
-                      <h4 className="text-xl md:text-2xl font-black text-[#1e294b] tracking-tight">{area.topic}</h4>
-                      <p className="text-slate-400 font-bold text-[10px] md:text-sm mt-1 uppercase tracking-tight">
-                         Avg: {area.avgScore} &bull; {area.affected}
-                      </p>
+          {/* Metric Tiles */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16, marginBottom:24 }}>
+            {[
+              { label:"Average Score", value:subject.metrics.avgScore.value, note:subject.metrics.avgScore.note, icon:Award, grad:GRAD_GREEN, route:"/academics" },
+              { label:"Pass Rate", value:subject.metrics.passRate.value, note:subject.metrics.passRate.note, icon:Target, grad:GRAD_BLUE, route:"/academics" },
+              { label:"Top Performers", value:subject.metrics.topPerformers.value, note:subject.metrics.topPerformers.note, icon:TrendingUp, grad:GRAD_VIOLET, route:"/students" },
+              { label:"Focus Areas", value:subject.metrics.focusAreas.value, note:subject.metrics.focusAreas.note, icon:AlertTriangle, grad:GRAD_GOLD, route:"/risks" },
+            ].map(m=>(
+              <StatTile key={m.label} label={m.label} value={m.value as any} sub={m.note as string} icon={m.icon} grad={m.grad} onClick={()=>navigate(m.route)} />
+            ))}
+          </div>
+
+          {/* Charts: Topic-wise + Branch Comparison */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(2, 1fr)", gap:16, marginBottom:24 }}>
+            <Card3D>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+                <div>
+                  <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Topic-wise Performance</h3>
+                  <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Per topic averages</p>
+                </div>
+                <div style={{ width:32, height:32, borderRadius:10, background:"rgba(0,85,255,.08)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  <BarChart3 size={16} color={B1} strokeWidth={2.3}/>
+                </div>
+              </div>
+              {subject.topics.length === 0 ? (
+                <div style={{ height:260, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:T4 }}>No topic data available</div>
+              ) : (
+                <div style={{ height:260 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={subject.topics} layout="vertical" margin={{ left:-10, right:40 }}>
+                      <XAxis type="number" domain={[0,100]} hide/>
+                      <YAxis dataKey="name" type="category" axisLine={false} tickLine={false}
+                        tick={{ fill:T3, fontSize:11, fontWeight:700 }} width={90}/>
+                      <Tooltip contentStyle={{ borderRadius:12, border:"none", boxShadow:SHADOW_LG, fontSize:11, fontWeight:700 }} cursor={{ fill:"rgba(0,85,255,.04)" }}/>
+                      <Bar dataKey="score" radius={[0,6,6,0]} barSize={18}>
+                        {subject.topics.map((e,i)=>(
+                          <Cell key={`c-${i}`} fill={e.score >= 80 ? GREEN : e.score >= 65 ? GOLD : RED}/>
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </Card3D>
+
+            <Card3D>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+                <div>
+                  <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Branch Comparison</h3>
+                  <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Grade × branch scores</p>
+                </div>
+                <div style={{ width:32, height:32, borderRadius:10, background:"rgba(0,200,83,.1)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  <Building2 size={16} color={GREEN} strokeWidth={2.3}/>
+                </div>
+              </div>
+              {subject.classComparison.length === 0 ? (
+                <div style={{ height:260, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:T4 }}>No branch data available</div>
+              ) : (
+                <div style={{ height:260 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={subject.classComparison} margin={{ bottom:20 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,85,255,.07)"/>
+                      <XAxis dataKey="grade" axisLine={false} tickLine={false} tick={{ fill:T3, fontSize:11, fontWeight:700 }} dy={8}/>
+                      <YAxis hide domain={[0,100]}/>
+                      <Tooltip contentStyle={{ borderRadius:12, border:"none", boxShadow:SHADOW_LG, fontSize:11, fontWeight:700 }} cursor={{ fill:"rgba(0,85,255,.04)" }}/>
+                      {Object.keys(subject.classComparison[0] || {})
+                        .filter(k => k !== "grade")
+                        .map((key, i) => (
+                          <Bar key={key} dataKey={key} name={key}
+                            fill={[B1, "#2277FF", GREEN, GOLD, VIOLET][i % 5]}
+                            radius={[4,4,0,0]} barSize={20}/>
+                        ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </Card3D>
+          </div>
+
+          {/* Weak Areas */}
+          {subject.weakAreas.length > 0 && (
+            <div style={{ marginBottom:24 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:14 }}>
+                <div style={{ width:36, height:36, borderRadius:11, background:GRAD_RED, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(255,51,85,.28)" }}>
+                  <AlertTriangle size={18} color="#fff" strokeWidth={2.3}/>
+                </div>
+                <div>
+                  <h3 style={{ fontSize:16, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Weak Areas &amp; Recommendations</h3>
+                  <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>{subject.weakAreas.length} flagged topics</p>
+                </div>
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(280px, 1fr))", gap:14 }}>
+                {subject.weakAreas.map((area, idx) => {
+                  const critical = area.status === "Critical";
+                  return (
+                    <div key={idx}
+                      className="dash-card"
+                      style={{
+                        background:"#fff", borderRadius:18, padding:"18px 20px",
+                        border:"0.5px solid rgba(0,85,255,.08)", boxShadow:SHADOW_SM,
+                        position:"relative", overflow:"hidden",
+                      }}
+                    >
+                      <div style={{ position:"absolute", left:0, top:0, bottom:0, width:5, background: critical ? GRAD_RED : GRAD_GOLD }}/>
+                      <div style={{ paddingLeft:8 }}>
+                        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
+                          <h4 style={{ fontSize:15, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.3px" }}>{area.topic}</h4>
+                          <span style={{
+                            fontSize:9, fontWeight:800, padding:"3px 9px", borderRadius:999,
+                            background: critical ? GRAD_RED : GRAD_GOLD,
+                            color:"#fff", letterSpacing:"0.10em", textTransform:"uppercase",
+                          }}>
+                            {area.status}
+                          </span>
+                        </div>
+                        <p style={{ fontSize:11, fontWeight:600, color:T3, margin:"0 0 10px 0", letterSpacing:"0.04em" }}>
+                          Avg: {area.avgScore} · {area.affected}
+                        </p>
+                        <div style={{ paddingTop:10, borderTop:"0.5px solid rgba(0,85,255,.08)" }}>
+                          <p style={{ fontSize:9, fontWeight:800, color:critical?RED:GOLD, margin:"0 0 4px 0", letterSpacing:"0.14em", textTransform:"uppercase" }}>Recommendation</p>
+                          <p style={{ fontSize:12, fontWeight:500, color:T1, margin:0, lineHeight:1.5 }}>{area.recommendation}</p>
+                        </div>
+                      </div>
                     </div>
-                    <span className={`self-start sm:self-center px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                      area.status === "Critical"
-                        ? "bg-[#ef4444] text-white border-red-200"
-                        : "bg-[#eab308] text-white border-amber-200"
-                    }`}>
-                      {area.status}
-                    </span>
-                  </div>
-                  <div className="relative z-10 flex flex-col md:flex-row md:items-start gap-2 md:gap-4">
-                    <span className="text-[#1e294b] font-black text-[10px] md:text-sm whitespace-nowrap uppercase tracking-widest">Recommendation:</span>
-                    <p className="text-slate-600 font-bold text-xs md:text-sm leading-relaxed">{area.recommendation}</p>
-                  </div>
-                </div>
-              ))}
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      </>
     );
   }
 
   // ══════════════════════════════════════════════════════════════════════
   //  OVERVIEW PAGE
   // ══════════════════════════════════════════════════════════════════════
-  const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
 
-  const branches     = overview?.branches ?? [];
-  // activeData: "all" → top-level fields, branch → perBranch[id]
-  const activeData   = selectedBranchId === "all"
+  const branches = overview?.branches ?? [];
+  const activeData = selectedBranchId === "all"
     ? overview
     : overview?.perBranch[selectedBranchId] != null
       ? { ...overview, ...overview.perBranch[selectedBranchId] }
       : overview;
   const gradeColumns = activeData?.gradeColumns ?? ["G6","G7","G8","G9","G10","G11","G12"];
-  const hasData      = (activeData?.gradeMatrix?.length ?? 0) > 0;
+  const hasData = (activeData?.gradeMatrix?.length ?? 0) > 0;
+
+  const overallPassRate = activeData?.stats.overallPassRate.value ?? "—";
+  const averageScore = activeData?.stats.averageScore.value ?? "—";
+  const distinctionRate = activeData?.stats.distinctionRate.value ?? "—";
+  const totalStudents = activeData?.stats.totalStudents.value ?? "—";
 
   return (
-    <div className="space-y-10 max-w-[1600px] mx-auto animate-in fade-in duration-500 pb-10">
-
-      {/* Header */}
-      <div className="flex flex-col gap-1 px-1">
-        <h1 className="text-2xl md:text-3xl font-extrabold text-[#111827] tracking-tight">Academics Overview</h1>
-        <p className="text-slate-400 font-bold text-[10px] md:text-sm uppercase tracking-tight">
-          {hasData ? "Branch-wise performance & learning outcomes" : "Grade-wise performance & learning outcomes"}
-        </p>
-      </div>
-
-      {/* Branch Dropdown */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-1">
-        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
-          Filter by Branch:
-        </label>
-        {overviewLoading ? (
-          <div className="h-10 w-full sm:w-48 rounded-xl bg-slate-100 animate-pulse" />
-        ) : (
-          <div className="relative w-full sm:w-64">
-            <span
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full pointer-events-none"
-              style={{
-                backgroundColor:
-                  selectedBranchId === "all"
-                    ? "#1e3272"
-                    : branches.find(b => b.id === selectedBranchId)?.color ?? "#1e3272",
-              }}
-            />
-            <select
-              value={selectedBranchId}
-              onChange={e => setSelectedBranchId(e.target.value)}
-              disabled={branches.length === 0}
-              className="w-full pl-8 pr-10 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-black text-[#1e294b] shadow-sm appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#1e3272]/20 focus:border-[#1e3272] transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-tight"
-            >
-              <option value="all">All Branches</option>
-              {branches.map(b => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
-            </select>
-            <svg
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
-              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </div>
-        )}
-        {selectedBranchId !== "all" && (
-          <button
-            onClick={() => setSelectedBranchId("all")}
-            className="text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors underline underline-offset-2"
-          >
-            Clear
-          </button>
-        )}
-      </div>
-
-      {error && (
-        <div className="bg-rose-50 border border-rose-200 rounded-2xl px-6 py-4 text-rose-600 text-sm font-semibold">
-          Error loading data: {error}
-        </div>
-      )}
-
-      {/* ── Stats Cards ─────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        {overviewLoading
-          ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 md:h-40" />)
-          : [
-              { label: "Overall Pass Rate",   ...activeData!.stats.overallPassRate, green: true,  route: "/academics" },
-              { label: "Average Score",       ...activeData!.stats.averageScore,    green: true,  route: "/academics" },
-              { label: "Distinction Rate",    ...activeData!.stats.distinctionRate, green: true,  route: "/academics" },
-              { label: "Total Students",      ...activeData!.stats.totalStudents,   green: false, route: "/students"  },
-            ].map((stat, i) => (
-              <div
-                key={i}
-                onClick={() => navigate(stat.route)}
-                role="button"
-                tabIndex={0}
-                className="clickable-card bg-white p-6 md:p-8 rounded-2xl md:rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-all"
-              >
-                <p className="text-slate-400 text-[10px] md:text-xs font-black uppercase tracking-widest mb-3 md:mb-4">{stat.label}</p>
-                <h3 className="text-3xl md:text-4xl font-black text-[#111827] tracking-tighter mb-1 md:mb-2">{stat.value}</h3>
-                <p className={`text-[10px] md:text-[11px] font-black uppercase ${stat.green ? "text-emerald-500" : "text-blue-500"}`}>
-                  {stat.change}
-                </p>
-              </div>
-            ))}
-      </div>
-
-      {/* ── Grade Matrix + Subject Comparison ───────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {/* Grade-wise Performance Matrix */}
-        <div className="bg-white rounded-2xl md:rounded-[2.5rem] border border-slate-100 p-6 md:p-8 shadow-sm overflow-hidden">
-          <h3 className="text-base md:text-lg font-black text-[#111827] mb-2 uppercase tracking-wide">Performance Matrix</h3>
-          <p className="text-[10px] md:text-xs text-slate-400 font-bold mb-6 uppercase tracking-tight">Grade-wise subject performance</p>
-          {overviewLoading ? (
-            <Skeleton className="h-64" />
-          ) : !hasData ? (
-            <div className="h-64 flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-xl gap-2">
-              <p className="text-sm text-slate-400 font-semibold">No results found yet</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto pb-4 no-scrollbar">
-              <div className="min-w-[460px]">
-                {/* Grade column headers */}
-                <div className="flex gap-1 mb-1 ml-14">
-                  {gradeColumns.map(g => (
-                    <div key={g} className="flex-1 h-8 flex items-center justify-center text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                      {g}
-                    </div>
-                  ))}
-                </div>
-                {/* Subject rows */}
-                {activeData!.gradeMatrix.map(row => (
-                  <div key={row.subject as string} className="flex gap-1 mb-1 items-center">
-                    <div className="w-14 shrink-0 text-right pr-2 text-[10px] font-black text-slate-500 truncate uppercase tracking-tighter">
-                      {(row.subject as string).slice(0, 7)}
-                    </div>
-                    {gradeColumns.map(g => {
-                      const val = (row[g] as number) || 0;
-                      return (
-                        <div
-                          key={g}
-                          className="flex-1 h-10 md:h-12 flex items-center justify-center text-[10px] font-black cursor-pointer hover:scale-105 transition-all rounded-lg shadow-sm"
-                          style={{ backgroundColor: getMatrixColor(val), color: "#1e293b" }}
-                          onClick={() => navigate(`/academics/${(row.subject as string).toLowerCase()}`)}
-                        >
-                          {val > 0 ? val : "—"}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Subject Performance Comparison (by Branch) */}
-        {(() => {
-          const subjPerf = activeData?.subjectPerformance ?? [];
-          // Check if any branch has real attribution data
-          const hasBranchData = branches.length > 0 && subjPerf.some(row =>
-            branches.some(b => (row[b.name] as number) > 0)
-          );
-          // Fall back to "Overall" aggregate bar when branch attribution is missing
-          const chartBranches: { id: string; name: string; color: string }[] = hasBranchData
-            ? branches
-            : [{ id: "overall", name: "Overall", color: "#1e3a8a" }];
-          const subLabel = hasBranchData ? "Average score per subject by branch" : "Average score per subject (all branches combined)";
-
-          return (
-            <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm">
-              <h3 className="text-lg font-bold text-[#111827] mb-2">Subject Performance Comparison</h3>
-              <p className="text-xs text-slate-400 font-medium mb-8">{subLabel}</p>
-              {overviewLoading ? (
-                <Skeleton className="h-[320px]" />
-              ) : subjPerf.length === 0 ? (
-                <div className="h-[320px] flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-xl gap-2">
-                  <p className="text-sm text-slate-400 font-semibold">No subject data yet</p>
-                  <p className="text-xs text-slate-300">Data appears once teachers record results</p>
-                </div>
-              ) : (
-                <div className="h-[320px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={subjPerf} margin={{ top: 0, bottom: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="subject" axisLine={false} tickLine={false}
-                        tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} dy={10} />
-                      <YAxis axisLine={false} tickLine={false}
-                        tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: "bold" }} domain={[0, 100]} />
-                      <Tooltip cursor={{ fill: "transparent" }} />
-                      <Legend verticalAlign="bottom" iconType="rect"
-                        wrapperStyle={{ paddingTop: "20px", fontSize: "11px", fontWeight: "bold" }} />
-                      {chartBranches.map(b => (
-                        <Bar key={b.id} dataKey={b.name} name={b.name}
-                          fill={b.color} radius={[2, 2, 0, 0]} barSize={18} />
-                      ))}
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </div>
-          );
-        })()}
-      </div>
-
-      {/* ── Exam Distribution + Learning Outcomes ───────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {/* Exam Results Distribution */}
-        <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-[#111827] mb-12">Exam Results Distribution</h3>
-          {overviewLoading ? (
-            <Skeleton className="h-[300px]" />
-          ) : (
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={activeData!.examDistribution} margin={{ bottom: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="range" axisLine={false} tickLine={false}
-                    tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: "bold" }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false}
-                    tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: "bold" }} />
-                  <Tooltip cursor={{ fill: "transparent" }} />
-                  <Bar dataKey="count" name="Students" radius={[4, 4, 0, 0]} barSize={34}>
-                    {activeData!.examDistribution.map((_, index) => (
-                      <Cell key={`cell-${index}`}
-                        fill={["#22c55e","#3b82f6","#1d4ed8","#f59e0b","#ef4444"][index % 5]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </div>
-
-        {/* Learning Outcome Trends */}
-        <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-[#111827] mb-12">Learning Outcome Trends</h3>
-          {overviewLoading ? (
-            <Skeleton className="h-[300px]" />
-          ) : !activeData!.learningOutcomes.some(o => o.knowledge > 0 || o.skills > 0 || o.application > 0) ? (
-            <div className="h-[300px] flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-xl gap-2">
-              <p className="text-sm text-slate-400 font-semibold">No quarterly trend data yet</p>
-              <p className="text-xs text-slate-300">Trends appear as results are recorded over time</p>
-            </div>
-          ) : (
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={activeData!.learningOutcomes} margin={{ top: 5, right: 30, left: -10, bottom: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="q" axisLine={{ stroke: "#94a3b8" }} tickLine={{ stroke: "#94a3b8" }}
-                    tick={{ fill: "#94a3b8", fontSize: 13, fontWeight: "800" }} dy={15} />
-                  <YAxis axisLine={false} tickLine={false}
-                    tick={{ fill: "#94a3b8", fontSize: 13, fontWeight: "800" }}
-                    domain={[0, 100]} ticks={[0, 20, 40, 60, 80, 100]} />
-                  <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} />
-                  <Legend
-                    verticalAlign="bottom" align="center"
-                    wrapperStyle={{ paddingTop: "40px" }}
-                    content={({ payload }) => (
-                      <div className="flex justify-center gap-8 mt-10">
-                        {payload?.map((entry: any, index: number) => (
-                          <div key={index} className="flex items-center gap-3">
-                            <div className="w-5 h-5 rounded-full border-[3px] bg-white" style={{ borderColor: entry.color }} />
-                            <span className="text-[13px] font-black text-slate-500">{entry.value}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+    <>
+      <DashGlobalStyles />
+      <div style={pageShellStyle}>
+        <PageHead
+          icon={GraduationCap}
+          title="Academics Overview"
+          subtitle={hasData ? "Branch-wise performance & learning outcomes" : "Grade-wise performance & learning outcomes"}
+          right={
+            overviewLoading ? (
+              <div style={{ width:200, height:42, borderRadius:14, background:"#F5F9FF" }}/>
+            ) : (
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                <div style={{ position:"relative" }}>
+                  <select
+                    value={selectedBranchId}
+                    onChange={e => setSelectedBranchId(e.target.value)}
+                    disabled={branches.length === 0}
+                    style={{
+                      appearance:"none", padding:"11px 40px 11px 38px",
+                      borderRadius:14, border:"0.5px solid rgba(0,85,255,.12)",
+                      background:"#fff", boxShadow:SHADOW_SM,
+                      fontSize:12, fontWeight:700, color:T3, letterSpacing:"0.04em",
+                      outline:"none", fontFamily:"inherit", cursor:"pointer", minWidth:180,
+                    }}
+                  >
+                    <option value="all">All Branches</option>
+                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                  <span
+                    style={{
+                      position:"absolute", left:14, top:"50%", transform:"translateY(-50%)",
+                      width:10, height:10, borderRadius:"50%",
+                      background: selectedBranchId === "all"
+                        ? B1
+                        : branches.find(b => b.id === selectedBranchId)?.color ?? B1,
+                      pointerEvents:"none",
+                    }}
                   />
-                  <Line type="monotone" dataKey="knowledge"   name="Knowledge"   stroke="#1e3a8a" strokeWidth={4}
-                    dot={{ r: 6, fill: "#fff", strokeWidth: 3, stroke: "#1e3a8a" }} />
-                  <Line type="monotone" dataKey="skills"      name="Skills"      stroke="#10b981" strokeWidth={4}
-                    dot={{ r: 6, fill: "#fff", strokeWidth: 3, stroke: "#10b981" }} />
-                  <Line type="monotone" dataKey="application" name="Application" stroke="#f59e0b" strokeWidth={4}
-                    dot={{ r: 6, fill: "#fff", strokeWidth: 3, stroke: "#f59e0b" }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Branch Performance Cards (bottom) ───────────────────────────────── */}
-      {!overviewLoading && branches.length > 0 && (
-        <div>
-          <h2 className="text-lg font-bold text-[#111827] mb-5">Branch-wise Breakdown</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {branches.map(b => (
-              <div
-                key={b.id}
-                onClick={() => navigate(`/branches/${b.id}`)}
-                role="button"
-                tabIndex={0}
-                className="clickable-card bg-white border border-slate-100 rounded-[2rem] p-7 shadow-sm hover:shadow-md transition-all"
-              >
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-11 h-11 rounded-xl flex items-center justify-center text-white text-sm font-black shadow-md shrink-0"
-                    style={{ backgroundColor: b.color }}>
-                    {b.name.charAt(0)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-base font-bold text-[#111827] truncate">{b.name}</h3>
-                    <p className="text-xs text-slate-400 font-medium">{b.students.toLocaleString()} students</p>
-                  </div>
-                  <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wide text-white shrink-0 ${
-                    b.passRate >= 80 ? "bg-emerald-500" : b.passRate >= 60 ? "bg-amber-500" : "bg-red-500"
-                  }`}>
-                    {b.passRate >= 80 ? "Strong" : b.passRate >= 60 ? "Average" : b.passRate > 0 ? "Weak" : "No Data"}
-                  </span>
+                  <ChevronDown size={14} color={T4} style={{ position:"absolute", right:14, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}/>
                 </div>
-                <div className="space-y-0 divide-y divide-slate-50">
-                  {[
-                    { label: "Avg Score",    value: b.avgScore > 0    ? `${b.avgScore}%`        : "—", color: b.avgScore >= 75    ? "text-emerald-500" : "text-amber-500" },
-                    { label: "Pass Rate",    value: b.passRate > 0    ? `${b.passRate}%`        : "—", color: b.passRate >= 80    ? "text-emerald-500" : "text-amber-500" },
-                    { label: "Distinction", value: b.distinctionRate > 0 ? `${b.distinctionRate}%` : "—", color: "text-blue-500"  },
-                    { label: "Attendance",  value: b.avgAttendance > 0 ? `${b.avgAttendance}%`  : "—", color: b.avgAttendance >= 85 ? "text-emerald-500" : "text-rose-500" },
-                  ].map(m => (
-                    <div key={m.label} className="flex justify-between items-center py-3">
-                      <span className="text-sm text-slate-500 font-medium">{m.label}</span>
-                      <span className={`text-sm font-black ${m.color}`}>{m.value}</span>
-                    </div>
-                  ))}
-                </div>
-                {Object.keys(b.subjectScores).length > 0 && (
-                  <div className="mt-5 pt-4 border-t border-slate-50">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-3">Top Subjects</p>
-                    <div className="flex flex-wrap gap-2">
-                      {Object.entries(b.subjectScores)
-                        .sort(([, a], [, bv]) => bv - a)
-                        .slice(0, 3)
-                        .map(([subj, score]) => (
-                          <span key={subj}
-                            className="px-3 py-1 rounded-lg text-[10px] font-bold text-white cursor-pointer hover:opacity-80"
-                            style={{ backgroundColor: b.color }}
-                            onClick={(e) => { e.stopPropagation(); navigate(`/academics/${subj.toLowerCase()}`); }}
-                          >
-                            {subj.slice(0, 8)} {score}%
-                          </span>
-                        ))}
-                    </div>
-                  </div>
+                {selectedBranchId !== "all" && (
+                  <button
+                    onClick={()=>setSelectedBranchId("all")}
+                    className="dash-btn"
+                    style={{
+                      padding:"10px 14px", borderRadius:12,
+                      background:"#fff", border:"0.5px solid rgba(0,85,255,.12)",
+                      fontSize:11, fontWeight:700, color:T3, cursor:"pointer",
+                      letterSpacing:"0.06em", textTransform:"uppercase", fontFamily:"inherit",
+                    }}
+                  >
+                    <X size={13}/>
+                  </button>
                 )}
               </div>
-            ))}
+            )
+          }
+        />
+
+        {/* Dark Hero with highlights */}
+        {!overviewLoading && (
+          <DarkHero
+            icon={BookOpen}
+            eyebrow="Academic Intelligence"
+            title={typeof averageScore === "string" ? averageScore : `${averageScore}%`}
+            subtitle={`Average score across ${typeof totalStudents === "number" ? totalStudents.toLocaleString() : totalStudents} students · ${branches.length} branch${branches.length !== 1 ? "es" : ""}`}
+            stats={[
+              { label:"Pass Rate", value: typeof overallPassRate === "string" ? overallPassRate : `${overallPassRate}%` },
+              { label:"Distinction", value: typeof distinctionRate === "string" ? distinctionRate : `${distinctionRate}%` },
+              { label:"Subjects", value:(activeData?.gradeMatrix?.length ?? 0).toString() },
+            ]}
+          />
+        )}
+
+        {error && (
+          <div
+            style={{
+              background:"rgba(255,51,85,.08)", border:"0.5px solid rgba(255,51,85,.22)",
+              borderRadius:16, padding:"12px 16px", color:RED, fontSize:12, fontWeight:700,
+              marginBottom:20,
+            }}
+          >
+            Error loading data: {error}
           </div>
+        )}
+
+        {/* Bright Stat Grid */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16, marginBottom:24 }}>
+          {overviewLoading
+            ? Array.from({ length:4 }).map((_,i) => <Skeleton key={i} height={140}/>)
+            : [
+                { label:"Overall Pass Rate", value:`${activeData!.stats.overallPassRate.value}${typeof activeData!.stats.overallPassRate.value === "number" ? "%" : ""}`, sub:activeData!.stats.overallPassRate.change, grad:GRAD_GREEN, icon:Target, route:"/academics" },
+                { label:"Average Score", value:`${activeData!.stats.averageScore.value}${typeof activeData!.stats.averageScore.value === "number" ? "%" : ""}`, sub:activeData!.stats.averageScore.change, grad:GRAD_BLUE, icon:Award, route:"/academics" },
+                { label:"Distinction Rate", value:`${activeData!.stats.distinctionRate.value}${typeof activeData!.stats.distinctionRate.value === "number" ? "%" : ""}`, sub:activeData!.stats.distinctionRate.change, grad:GRAD_VIOLET, icon:TrendingUp, route:"/academics" },
+                { label:"Total Students", value:activeData!.stats.totalStudents.value as any, sub:activeData!.stats.totalStudents.change, grad:GRAD_GOLD, icon:Users, route:"/students" },
+              ].map(s=>(
+                <StatTile key={s.label} label={s.label} value={s.value as any} sub={s.sub} icon={s.icon} grad={s.grad} onClick={()=>navigate(s.route)}/>
+              ))}
         </div>
-      )}
-    </div>
+
+        {/* Grade Matrix + Subject Comparison */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(2, 1fr)", gap:16, marginBottom:24 }}>
+          <Card3D>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+              <div>
+                <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Performance Matrix</h3>
+                <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Grade-wise subject performance</p>
+              </div>
+              <div style={{ width:32, height:32, borderRadius:10, background:"rgba(0,85,255,.08)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <Layers size={16} color={B1} strokeWidth={2.3}/>
+              </div>
+            </div>
+            {overviewLoading ? (
+              <div style={{ height:260, background:"rgba(0,85,255,.04)", borderRadius:12 }}/>
+            ) : !hasData ? (
+              <div style={{ height:260, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:T4 }}>No results found yet</div>
+            ) : (
+              <div style={{ overflowX:"auto", paddingBottom:4 }}>
+                <div style={{ minWidth:460 }}>
+                  <div style={{ display:"flex", gap:4, marginBottom:4, marginLeft:56 }}>
+                    {gradeColumns.map(g => (
+                      <div key={g} style={{ flex:1, height:26, display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, fontWeight:800, color:T4, letterSpacing:"0.14em", textTransform:"uppercase" }}>
+                        {g}
+                      </div>
+                    ))}
+                  </div>
+                  {activeData!.gradeMatrix.map(row => (
+                    <div key={row.subject as string} style={{ display:"flex", gap:4, marginBottom:4, alignItems:"center" }}>
+                      <div style={{ width:56, flexShrink:0, textAlign:"right", paddingRight:8, fontSize:10, fontWeight:800, color:T3, letterSpacing:"-0.02em", overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis", textTransform:"uppercase" }}>
+                        {(row.subject as string).slice(0,7)}
+                      </div>
+                      {gradeColumns.map(g => {
+                        const val = (row[g] as number) || 0;
+                        return (
+                          <div
+                            key={g}
+                            onClick={()=>navigate(`/academics/${(row.subject as string).toLowerCase()}`)}
+                            className="dash-btn"
+                            style={{
+                              flex:1, height:44, borderRadius:10,
+                              display:"flex", alignItems:"center", justifyContent:"center",
+                              fontSize:11, fontWeight:800,
+                              background: getMatrixColor(val),
+                              color: getMatrixText(val),
+                              cursor:"pointer",
+                              boxShadow: val>0 ? "0 3px 8px rgba(0,0,0,.08)" : "none",
+                            }}
+                          >
+                            {val > 0 ? val : "—"}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Card3D>
+
+          {/* Subject Performance Comparison */}
+          {(() => {
+            const subjPerf = activeData?.subjectPerformance ?? [];
+            const hasBranchData = branches.length > 0 && subjPerf.some(row =>
+              branches.some(b => (row[b.name] as number) > 0)
+            );
+            const chartBranches: { id: string; name: string; color: string }[] = hasBranchData
+              ? branches
+              : [{ id:"overall", name:"Overall", color:B1 }];
+
+            return (
+              <Card3D>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+                  <div>
+                    <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Subject Comparison</h3>
+                    <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>
+                      {hasBranchData ? "By branch" : "All branches combined"}
+                    </p>
+                  </div>
+                  <div style={{ width:32, height:32, borderRadius:10, background:"rgba(123,63,244,.1)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                    <BarChart3 size={16} color={VIOLET} strokeWidth={2.3}/>
+                  </div>
+                </div>
+                {overviewLoading ? (
+                  <div style={{ height:300, background:"rgba(0,85,255,.04)", borderRadius:12 }}/>
+                ) : subjPerf.length === 0 ? (
+                  <div style={{ height:300, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:6, fontSize:12, fontWeight:700, color:T4 }}>
+                    <p style={{ margin:0 }}>No subject data yet</p>
+                    <p style={{ margin:0, fontSize:11, color:T4, fontWeight:500 }}>Data appears once teachers record results</p>
+                  </div>
+                ) : (
+                  <div style={{ height:300 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={subjPerf} margin={{ top:0, bottom:20 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,85,255,.07)"/>
+                        <XAxis dataKey="subject" axisLine={false} tickLine={false} tick={{ fill:T3, fontSize:10, fontWeight:700 }} dy={8}/>
+                        <YAxis axisLine={false} tickLine={false} tick={{ fill:T3, fontSize:11, fontWeight:700 }} domain={[0,100]}/>
+                        <Tooltip contentStyle={{ borderRadius:12, border:"none", boxShadow:SHADOW_LG, fontSize:11, fontWeight:700 }} cursor={{ fill:"rgba(0,85,255,.04)" }}/>
+                        <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{ paddingTop:10, fontSize:11, fontWeight:700 }}/>
+                        {chartBranches.map((b,i) => (
+                          <Bar key={b.id} dataKey={b.name} name={b.name}
+                            fill={[B1, GREEN, GOLD, RED, VIOLET, "#2277FF"][i % 6]}
+                            radius={[4,4,0,0]} barSize={18}/>
+                        ))}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </Card3D>
+            );
+          })()}
+        </div>
+
+        {/* Exam Distribution + Learning Outcomes */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(2, 1fr)", gap:16, marginBottom:24 }}>
+          <Card3D>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+              <div>
+                <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Exam Results Distribution</h3>
+                <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>By score range</p>
+              </div>
+              <div style={{ width:32, height:32, borderRadius:10, background:"rgba(255,170,0,.12)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <Award size={16} color={GOLD} strokeWidth={2.3}/>
+              </div>
+            </div>
+            {overviewLoading ? (
+              <div style={{ height:300, background:"rgba(0,85,255,.04)", borderRadius:12 }}/>
+            ) : (
+              <div style={{ height:300 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={activeData!.examDistribution} margin={{ bottom:10 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,85,255,.07)"/>
+                    <XAxis dataKey="range" axisLine={false} tickLine={false} tick={{ fill:T3, fontSize:11, fontWeight:700 }} dy={8}/>
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill:T3, fontSize:11, fontWeight:700 }}/>
+                    <Tooltip contentStyle={{ borderRadius:12, border:"none", boxShadow:SHADOW_LG, fontSize:11, fontWeight:700 }} cursor={{ fill:"rgba(0,85,255,.04)" }}/>
+                    <Bar dataKey="count" name="Students" radius={[6,6,0,0]} barSize={36}>
+                      {activeData!.examDistribution.map((_,i)=>(
+                        <Cell key={`c-${i}`} fill={[GREEN, B1, "#2277FF", GOLD, RED][i % 5]}/>
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </Card3D>
+
+          <Card3D>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+              <div>
+                <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Learning Outcomes</h3>
+                <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Quarterly trend</p>
+              </div>
+              <div style={{ width:32, height:32, borderRadius:10, background:"rgba(0,200,83,.1)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <TrendingUp size={16} color={GREEN} strokeWidth={2.3}/>
+              </div>
+            </div>
+            {overviewLoading ? (
+              <div style={{ height:300, background:"rgba(0,85,255,.04)", borderRadius:12 }}/>
+            ) : !activeData!.learningOutcomes.some(o => o.knowledge > 0 || o.skills > 0 || o.application > 0) ? (
+              <div style={{ height:300, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:6, fontSize:12, fontWeight:700, color:T4 }}>
+                <p style={{ margin:0 }}>No quarterly trend data yet</p>
+                <p style={{ margin:0, fontSize:11, color:T4, fontWeight:500 }}>Trends appear as results are recorded over time</p>
+              </div>
+            ) : (
+              <div style={{ height:300 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={activeData!.learningOutcomes} margin={{ top:5, right:30, left:-10, bottom:20 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,85,255,.07)"/>
+                    <XAxis dataKey="q" axisLine={false} tickLine={false} tick={{ fill:T3, fontSize:12, fontWeight:800 }} dy={10}/>
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill:T3, fontSize:11, fontWeight:700 }} domain={[0,100]} ticks={[0,20,40,60,80,100]}/>
+                    <Tooltip contentStyle={{ borderRadius:12, border:"none", boxShadow:SHADOW_LG, fontSize:11, fontWeight:700 }}/>
+                    <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{ paddingTop:10, fontSize:11, fontWeight:700 }}/>
+                    <Line type="monotone" dataKey="knowledge" name="Knowledge" stroke={B1} strokeWidth={3}
+                      dot={{ r:5, fill:"#fff", strokeWidth:2, stroke:B1 }} activeDot={{ r:7 }}/>
+                    <Line type="monotone" dataKey="skills" name="Skills" stroke={GREEN} strokeWidth={3}
+                      dot={{ r:5, fill:"#fff", strokeWidth:2, stroke:GREEN }} activeDot={{ r:7 }}/>
+                    <Line type="monotone" dataKey="application" name="Application" stroke={GOLD} strokeWidth={3}
+                      dot={{ r:5, fill:"#fff", strokeWidth:2, stroke:GOLD }} activeDot={{ r:7 }}/>
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </Card3D>
+        </div>
+
+        {/* Branch Performance Cards */}
+        {!overviewLoading && branches.length > 0 && (
+          <div style={{ marginBottom:24 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:14 }}>
+              <div style={{ width:36, height:36, borderRadius:11, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(0,85,255,.28)" }}>
+                <Building2 size={18} color="#fff" strokeWidth={2.3}/>
+              </div>
+              <div>
+                <h2 style={{ fontSize:16, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Branch-wise Breakdown</h2>
+                <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>{branches.length} branches</p>
+              </div>
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(300px, 1fr))", gap:14 }}>
+              {branches.map(b => {
+                const statusGrad = b.passRate >= 80 ? GRAD_GREEN : b.passRate >= 60 ? GRAD_GOLD : b.passRate > 0 ? GRAD_RED : "linear-gradient(135deg,#99AACC,#5070B0)";
+                const statusLabel = b.passRate >= 80 ? "Strong" : b.passRate >= 60 ? "Average" : b.passRate > 0 ? "Weak" : "No Data";
+                return (
+                  <div
+                    key={b.id}
+                    onClick={()=>navigate(`/branches/${b.id}`)}
+                    className="dash-card"
+                    style={{
+                      background:"#fff", borderRadius:20, padding:"20px 22px",
+                      border:"0.5px solid rgba(0,85,255,.08)", boxShadow:SHADOW_SM,
+                      cursor:"pointer", position:"relative", overflow:"hidden",
+                    }}
+                  >
+                    <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16 }}>
+                      <div style={{
+                        width:44, height:44, borderRadius:13,
+                        background:b.color || GRAD_PRIMARY,
+                        display:"flex", alignItems:"center", justifyContent:"center",
+                        color:"#fff", fontSize:15, fontWeight:800,
+                        boxShadow:"0 6px 14px rgba(0,85,255,.2)", flexShrink:0,
+                      }}>
+                        {b.name.charAt(0)}
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <h3 style={{ fontSize:15, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.3px", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{b.name}</h3>
+                        <p style={{ fontSize:11, fontWeight:600, color:T4, margin:"2px 0 0 0" }}>{b.students.toLocaleString()} students</p>
+                      </div>
+                      <span style={{
+                        fontSize:9, fontWeight:800, padding:"4px 10px", borderRadius:999,
+                        background:statusGrad, color:"#fff",
+                        letterSpacing:"0.12em", textTransform:"uppercase",
+                        flexShrink:0, boxShadow:"0 4px 10px rgba(0,0,0,.1)",
+                      }}>
+                        {statusLabel}
+                      </span>
+                    </div>
+                    <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                      {[
+                        { label:"Avg Score", value:b.avgScore>0?`${b.avgScore}%`:"—", color: b.avgScore>=75?GREEN:GOLD },
+                        { label:"Pass Rate", value:b.passRate>0?`${b.passRate}%`:"—", color: b.passRate>=80?GREEN:GOLD },
+                        { label:"Distinction", value:b.distinctionRate>0?`${b.distinctionRate}%`:"—", color:B1 },
+                        { label:"Attendance", value:b.avgAttendance>0?`${b.avgAttendance}%`:"—", color: b.avgAttendance>=85?GREEN:RED },
+                      ].map(m => (
+                        <div key={m.label} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", paddingBottom:6, borderBottom:"0.5px solid rgba(0,85,255,.06)" }}>
+                          <span style={{ fontSize:11, fontWeight:600, color:T3 }}>{m.label}</span>
+                          <span style={{ fontSize:13, fontWeight:800, color:m.color }}>{m.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {Object.keys(b.subjectScores).length > 0 && (
+                      <div style={{ marginTop:14, paddingTop:10, borderTop:"0.5px solid rgba(0,85,255,.06)" }}>
+                        <p style={{ fontSize:9, fontWeight:800, color:T4, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 8px 0" }}>Top Subjects</p>
+                        <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                          {Object.entries(b.subjectScores)
+                            .sort(([, a], [, bv]) => bv - a)
+                            .slice(0, 3)
+                            .map(([subj, score]) => (
+                              <span key={subj}
+                                className="dash-btn"
+                                onClick={(e) => { e.stopPropagation(); navigate(`/academics/${subj.toLowerCase()}`); }}
+                                style={{
+                                  fontSize:10, fontWeight:800, padding:"4px 10px", borderRadius:999,
+                                  background: b.color || GRAD_PRIMARY, color:"#fff",
+                                  cursor:"pointer", letterSpacing:"0.04em",
+                                }}
+                              >
+                                {subj.slice(0,8)} {score}%
+                              </span>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* AI Insights */}
+        {!overviewLoading && hasData && (
+          <AIInsightCard
+            title="Academic Intelligence Summary"
+            items={[
+              {
+                label:"Performance Pulse",
+                value: typeof averageScore === "number" ? `${averageScore}% avg` : "Collecting",
+                sub: typeof overallPassRate === "number" && overallPassRate >= 80 ? "Healthy" : "Monitor closely",
+              },
+              {
+                label:"Subject Focus",
+                value: (activeData?.gradeMatrix?.length ?? 0) + " tracked subjects",
+                sub: subject ? subject.name : `${branches.length} branches active`,
+              },
+              {
+                label:"Student Reach",
+                value: typeof totalStudents === "number" ? totalStudents.toLocaleString() : totalStudents as string,
+                sub: "Across all branches",
+              },
+            ]}
+          />
+        )}
+      </div>
+    </>
   );
 }

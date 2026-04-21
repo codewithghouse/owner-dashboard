@@ -5,7 +5,14 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import {
   Search, Loader2, CheckCircle, XCircle, IndianRupee, ShieldAlert,
   TrendingDown, Brain, MessageCircle, Building2, ChevronDown, Filter,
+  Wallet, AlertTriangle,
 } from "lucide-react";
+import {
+  B1, T1, T3, T4, GREEN, RED, GOLD, VIOLET,
+  GRAD_PRIMARY, GRAD_BLUE, GRAD_GREEN, GRAD_VIOLET, GRAD_GOLD, GRAD_RED,
+  SHADOW_SM, SHADOW_BTN, pageShellStyle,
+  DashGlobalStyles, PageHead, StatTile, DarkHero, AIInsightCard,
+} from "@/lib/dashboardTokens";
 import { fetchFeePredictions, FeePrediction } from "@/lib/feePredictor";
 import { sendFeeReminderWA } from "@/lib/whatsappService";
 import { toast } from "sonner";
@@ -340,71 +347,87 @@ export default function FinanceFees() {
   ].filter(r => r.value > 0);
 
   return (
-    <div className="space-y-8 max-w-[1600px] mx-auto animate-in fade-in duration-500 pb-10">
+    <>
+      <DashGlobalStyles />
+      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap:24 }}>
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl md:text-3xl font-extrabold text-[#1e294b] tracking-tight">Finance & Fees</h1>
-          <p className="text-slate-400 text-xs md:text-sm font-medium">Live fee collection · Defaulter tracking · Default risk prediction</p>
-        </div>
+      <PageHead
+        icon={Wallet}
+        title="Finance & Fees"
+        subtitle="Live fee collection · defaulter tracking · risk prediction"
+        right={
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <div style={{ display:"inline-flex", alignItems:"center", gap:5, fontSize:10, fontWeight:800, color:T4, letterSpacing:"0.12em", textTransform:"uppercase" }}>
+              <Filter size={12}/> Branch
+            </div>
+            <div style={{ position:"relative" }}>
+              <Building2 size={13} color={T4} style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}/>
+              <select
+                value={branchFilter}
+                onChange={e => setBranchFilter(e.target.value)}
+                style={{
+                  appearance:"none", padding:"10px 34px 10px 34px",
+                  borderRadius:12, border:"0.5px solid rgba(0,85,255,.12)",
+                  background:"#fff", boxShadow:SHADOW_SM,
+                  fontSize:12, fontWeight:700, color:T3,
+                  outline:"none", fontFamily:"inherit", cursor:"pointer", minWidth:160,
+                }}
+              >
+                <option value="All">All Branches</option>
+                {branchNames.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+              <ChevronDown size={13} color={T4} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}/>
+            </div>
+          </div>
+        }
+      />
 
-        {/* Branch filter */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-            <Filter className="w-3 h-3" /> Branch
-          </div>
-          <div className="relative">
-            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-            <select
-              value={branchFilter}
-              onChange={e => setBranchFilter(e.target.value)}
-              className="appearance-none pl-8 pr-8 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-300"
-            >
-              <option value="All">All Branches</option>
-              {branchNames.map(b => <option key={b} value={b}>{b}</option>)}
-            </select>
-            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-          </div>
-        </div>
-      </div>
+      {!loading && (
+        <DarkHero
+          icon={IndianRupee}
+          eyebrow="Fee Intelligence"
+          title={`₹${(stats.collectedAmt/1000).toFixed(1)}K`}
+          subtitle={`Collected across ${branchNames.length} branches · ${stats.total} defaulter${stats.total!==1?"s":""} pending`}
+          stats={[
+            { label:"Outstanding", value:`₹${(stats.outstanding/1000).toFixed(1)}K` },
+            { label:"Critical", value:stats.critical.toString() },
+            { label:"Defaulters", value:stats.total.toString() },
+          ]}
+        />
+      )}
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-        {(["Defaulters", "History", "Risk Analysis", "Predictive Recovery"] as const).map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)}
-            className={`whitespace-nowrap px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm flex items-center gap-1.5 ${
-              activeTab === tab ? "bg-[#1e3a8a] text-white" : "bg-white text-slate-500 hover:bg-slate-50 border border-slate-100"
-            }`}>
-            {tab === "Predictive Recovery" && <Brain className="w-3 h-3" />}
-            {tab}
-          </button>
-        ))}
+      <div style={{ display:"flex", gap:8, overflowX:"auto", paddingBottom:2 }}>
+        {(["Defaulters", "History", "Risk Analysis", "Predictive Recovery"] as const).map(tab => {
+          const active = activeTab === tab;
+          return (
+            <button key={tab}
+              onClick={() => setActiveTab(tab)}
+              className="dash-btn"
+              style={{
+                display:"inline-flex", alignItems:"center", gap:6,
+                padding:"10px 18px", borderRadius:14,
+                background: active ? GRAD_PRIMARY : "#fff",
+                color: active ? "#fff" : T3,
+                fontSize:11, fontWeight:800, letterSpacing:"0.10em", textTransform:"uppercase",
+                border: active ? "none" : "0.5px solid rgba(0,85,255,.12)",
+                boxShadow: active ? SHADOW_BTN : SHADOW_SM,
+                cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap",
+              }}
+            >
+              {tab === "Predictive Recovery" && <Brain size={13}/>}
+              {tab}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: "Total Defaulters",  value: loading ? "—" : stats.total.toString(),              icon: XCircle,     color: "text-red-500",   bg: "bg-red-50"    },
-          { label: "Critical (>60d)",   value: loading ? "—" : stats.critical.toString(),           icon: ShieldAlert, color: "text-orange-500", bg: "bg-orange-50" },
-          { label: "Fee Collected (₹)", value: loading ? "—" : `₹${(stats.collectedAmt/1000).toFixed(1)}K`, icon: IndianRupee, color: "text-green-500",bg: "bg-green-50"},
-          { label: "Outstanding (₹)",   value: loading ? "—" : `₹${(stats.outstanding/1000).toFixed(1)}K`,  icon: TrendingDown,color:"text-amber-500",bg:"bg-amber-50"},
-        ].map(s => (
-          <div
-            key={s.label}
-            onClick={() => navigate("/fee-structure")}
-            role="button"
-            tabIndex={0}
-            className="clickable-card bg-white rounded-2xl border border-slate-100 p-5 shadow-sm"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs text-slate-500 font-semibold">{s.label}</span>
-              <div className={`p-2 rounded-lg ${s.bg}`}><s.icon className={`w-4 h-4 ${s.color}`} /></div>
-            </div>
-            {loading ? <Loader2 className="w-5 h-5 animate-spin text-slate-300" /> :
-              <div className="text-2xl font-bold text-[#1e294b]">{s.value}</div>}
-          </div>
-        ))}
+      {/* Bright Stat Grid */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16 }}>
+        <StatTile label="Total Defaulters" value={loading ? "—" : stats.total.toString()} sub="Pending fees" grad={stats.total > 0 ? GRAD_RED : GRAD_GOLD} icon={XCircle} onClick={() => navigate("/fee-structure")} />
+        <StatTile label="Critical (>60d)"  value={loading ? "—" : stats.critical.toString()} sub="Urgent attention" grad={stats.critical > 0 ? GRAD_RED : GRAD_GOLD} icon={ShieldAlert} onClick={() => navigate("/fee-structure")} />
+        <StatTile label="Fee Collected"    value={loading ? "—" : `₹${(stats.collectedAmt/1000).toFixed(1)}K`} sub="Healthy inflow" grad={GRAD_GREEN} icon={IndianRupee} onClick={() => navigate("/fee-structure")} />
+        <StatTile label="Outstanding"      value={loading ? "—" : `₹${(stats.outstanding/1000).toFixed(1)}K`} sub="To be recovered" grad={GRAD_GOLD} icon={TrendingDown} onClick={() => navigate("/fee-structure")} />
       </div>
 
       {/* ── Charts row: Branch-wise Revenue + Monthly Collection Trend ── */}
@@ -1059,6 +1082,18 @@ export default function FinanceFees() {
         </div>
       )}
 
-    </div>
+      {!loading && (
+        <AIInsightCard
+          title="Finance Intelligence Summary"
+          items={[
+            { label:"Collection Health", value: stats.collectedAmt > 0 ? `₹${(stats.collectedAmt/1000).toFixed(1)}K inflow` : "Awaiting data", sub: stats.outstanding > stats.collectedAmt ? "Recovery needed" : "Healthy" },
+            { label:"Risk Queue",        value: stats.critical > 0 ? `${stats.critical} critical` : "All under control", sub: stats.total > 0 ? `${stats.total} total defaulters` : "Zero defaulters" },
+            { label:"Recovery Focus",    value: stats.outstanding > 0 ? `₹${(stats.outstanding/1000).toFixed(1)}K pending` : "Clean books", sub: stats.outstanding > 0 ? "Trigger reminders" : "Keep monitoring" },
+          ]}
+        />
+      )}
+
+      </div>
+    </>
   );
 }

@@ -2,8 +2,9 @@ import { useState, useEffect, useMemo } from "react";
 import { db, auth } from "@/lib/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import {
-  Search, Star, X, Users, BookOpen, TrendingUp, Loader2,
-  Award, ChevronDown
+  Search, X, Users, BookOpen, TrendingUp, Loader2,
+  Award, ChevronDown, GraduationCap, Sparkles, ArrowUpRight,
+  BarChart3, Activity, Target, ChevronRight, ArrowLeft
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
@@ -14,21 +15,10 @@ import { useParams, useNavigate } from "react-router-dom";
 
 /* ── constants ────────────────────────────────────────── */
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const AVATAR_COLORS = [
-  "bg-[#1e3a8a]","bg-emerald-600","bg-orange-500","bg-purple-600",
-  "bg-pink-500","bg-teal-600","bg-amber-600","bg-red-600",
-];
 
 /* ── helpers ──────────────────────────────────────────── */
 function initials(name: string) {
   return (name || "?").split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
-}
-
-function scoreLabel(s: number): { label: string; color: string; bg: string } {
-  if (s >= 80) return { label: "Excellent",    color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-100"  };
-  if (s >= 60) return { label: "Good",         color: "text-blue-600",    bg: "bg-blue-50 border-blue-100"        };
-  if (s >= 40) return { label: "Average",      color: "text-amber-600",   bg: "bg-amber-50 border-amber-100"      };
-  return              { label: "Needs Work",   color: "text-red-600",     bg: "bg-red-50 border-red-100"          };
 }
 
 function last6Months() {
@@ -88,10 +78,9 @@ export default function TeacherPerformance() {
         const tSnap = await getDocs(
           query(collection(db, "teachers"), where("schoolId", "==", ownerUid))
         );
-        const rawTeachers = tSnap.docs.map((d, i) => ({
+        const rawTeachers = tSnap.docs.map((d) => ({
           _docId: d.id,
           ...d.data() as any,
-          _color: AVATAR_COLORS[i % AVATAR_COLORS.length],
         }));
         setTeachers(rawTeachers);
 
@@ -405,11 +394,75 @@ export default function TeacherPerformance() {
     fetchDetail();
   }, [id, selectedTeacher?.id]);
 
+  /* ─── Design tokens (principal/owner dashboard system) ─── */
+  const B1 = "#0055FF", B2 = "#1166FF";
+  const T1 = "#001040", T3 = "#5070B0", T4 = "#99AACC";
+  const GREEN = "#00C853", RED = "#FF3355", GOLD = "#FFAA00", VIOLET = "#7B3FF4";
+  const GRAD_PRIMARY = `linear-gradient(135deg, ${B1}, ${B2})`;
+  const GRAD_HERO = "linear-gradient(135deg,#001040 0%,#001888 35%,#0033CC 70%,#0055FF 100%)";
+  const GRAD_BLUE = "linear-gradient(135deg,#0055FF 0%,#2277FF 100%)";
+  const GRAD_GREEN = "linear-gradient(135deg,#00C853 0%,#33DD77 100%)";
+  const GRAD_VIOLET = "linear-gradient(135deg,#7B3FF4 0%,#A060FF 100%)";
+  const GRAD_GOLD = "linear-gradient(135deg,#FFAA00 0%,#FFCC33 100%)";
+  const GRAD_RED = "linear-gradient(135deg,#FF3355 0%,#FF6677 100%)";
+  const SHADOW_SM = "0 0 0 .5px rgba(0,85,255,.08), 0 2px 8px rgba(0,85,255,.08), 0 10px 26px rgba(0,85,255,.10)";
+  const SHADOW_LG = "0 0 0 .5px rgba(0,85,255,.10), 0 4px 16px rgba(0,85,255,.11), 0 18px 44px rgba(0,85,255,.13)";
+  const SHADOW_BTN = "0 6px 22px rgba(0,85,255,.40), 0 2px 5px rgba(0,85,255,.20)";
+
+  /* ─── Score tier helper (new design) ─── */
+  const tierStyle = (s: number) => {
+    if (s >= 80) return { label: "Excellent", grad: GRAD_GREEN, color: GREEN, bg: "rgba(0,200,83,.10)" };
+    if (s >= 60) return { label: "Good", grad: GRAD_BLUE, color: B1, bg: "rgba(0,85,255,.08)" };
+    if (s >= 40) return { label: "Average", grad: GRAD_GOLD, color: GOLD, bg: "rgba(255,170,0,.10)" };
+    if (s > 0) return { label: "Needs Work", grad: GRAD_RED, color: RED, bg: "rgba(255,51,85,.10)" };
+    return { label: "No Data", grad: "linear-gradient(135deg,#99AACC,#5070B0)", color: T4, bg: "rgba(153,170,204,.10)" };
+  };
+
+  const globalStyles = (
+    <style>{`
+      .tp3d {
+        transition: transform .45s cubic-bezier(.2,.9,.25,1.2), box-shadow .35s ease;
+        transform-style: preserve-3d;
+        will-change: transform;
+      }
+      .tp3d:hover {
+        transform: perspective(1000px) translateY(-6px) rotateX(3deg) rotateY(-3deg) scale(1.015);
+        box-shadow: 0 0 0 .5px rgba(0,85,255,.18), 0 22px 54px rgba(0,16,64,.22), 0 6px 18px rgba(0,85,255,.22) !important;
+      }
+      .tp-tile {
+        transition: transform .5s cubic-bezier(.2,.9,.25,1.2), box-shadow .35s ease;
+      }
+      .tp-tile:hover {
+        transform: perspective(1100px) translateY(-8px) rotateX(4deg) rotateY(-4deg) scale(1.025);
+      }
+      .tp-card {
+        transition: transform .45s cubic-bezier(.2,.9,.25,1.2), box-shadow .35s ease;
+      }
+      .tp-card:hover {
+        transform: perspective(900px) translateY(-8px) rotateX(3deg) scale(1.02);
+        box-shadow: 0 0 0 .5px rgba(0,85,255,.18), 0 22px 54px rgba(0,16,64,.22), 0 6px 18px rgba(0,85,255,.22) !important;
+      }
+      .tp-btn {
+        transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+      }
+      .tp-btn:hover {
+        transform: translateY(-1px);
+      }
+      .tp-row {
+        transition: transform .3s ease, background .2s ease;
+      }
+      .tp-row:hover {
+        transform: translateX(4px);
+        background: rgba(0,85,255,.04) !important;
+      }
+    `}</style>
+  );
+
   /* ─────────────────────────────────────────────────── */
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-[#1e3a8a]" />
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:260, background:"#EEF4FF", minHeight:"100vh", margin:"-16px -24px 0" }}>
+        <Loader2 className="animate-spin" size={32} color={B1}/>
       </div>
     );
   }
@@ -417,418 +470,733 @@ export default function TeacherPerformance() {
   /* ══════════════════════════════════════════════════ */
   /* ── DETAIL VIEW ─────────────────────────────────── */
   if (id && selectedTeacher) {
-    const sl = scoreLabel(selectedTeacher.avgScore);
+    const sl = tierStyle(selectedTeacher.avgScore);
     return (
-      <div className="space-y-6 animate-in fade-in duration-500 pb-10">
+      <>
+        {globalStyles}
+        <div
+          style={{
+            fontFamily:"'DM Sans', -apple-system, sans-serif",
+            background:"#EEF4FF", minHeight:"100vh",
+            margin:"-16px -24px 0", padding:"24px 32px 40px",
+          }}
+        >
+          {/* ── Back Nav ──────────────────────────────── */}
+          <button
+            onClick={()=>navigate("/teachers")}
+            className="tp-btn"
+            style={{
+              display:"inline-flex", alignItems:"center", gap:7,
+              padding:"8px 14px", borderRadius:12,
+              background:"#fff", border:"0.5px solid rgba(0,85,255,.12)",
+              fontSize:11, fontWeight:700, color:T3,
+              letterSpacing:"0.06em", textTransform:"uppercase",
+              cursor:"pointer", marginBottom:18, boxShadow:SHADOW_SM, fontFamily:"inherit",
+            }}
+          >
+            <ArrowLeft size={14}/> Back to Teachers
+          </button>
 
-        {/* Header card */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 md:p-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
-            <div className="flex items-center gap-4">
-              <div className={`w-12 h-12 md:w-16 md:h-16 rounded-xl ${selectedTeacher._color} flex items-center justify-center text-white font-extrabold text-lg md:text-xl shadow-md shrink-0`}>
-                {initials(selectedTeacher.name)}
+          {/* ── Hero Detail Card ──────────────────────── */}
+          <div
+            style={{
+              background:GRAD_HERO, borderRadius:24, padding:"24px 28px", color:"#fff",
+              marginBottom:24, position:"relative", overflow:"hidden",
+              boxShadow:"0 14px 40px rgba(0,8,60,.32), 0 0 0 .5px rgba(255,255,255,.12)",
+            }}
+          >
+            <div style={{ position:"absolute", top:-60, right:-40, width:280, height:280, background:"radial-gradient(circle, rgba(255,255,255,.12) 0%, transparent 65%)", borderRadius:"50%", pointerEvents:"none" }}/>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:20, flexWrap:"wrap", position:"relative", zIndex:1 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:16 }}>
+                <div
+                  style={{
+                    width:64, height:64, borderRadius:18, background:sl.grad,
+                    display:"flex", alignItems:"center", justifyContent:"center",
+                    color:"#fff", fontSize:22, fontWeight:800,
+                    boxShadow:"0 10px 28px rgba(0,0,0,.26), 0 0 0 2px rgba(255,255,255,.2)",
+                  }}
+                >
+                  {initials(selectedTeacher.name)}
+                </div>
+                <div>
+                  <div style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"3px 10px", borderRadius:999, background:"rgba(255,255,255,.14)", border:"0.5px solid rgba(255,255,255,.22)", fontSize:9, fontWeight:800, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:8 }}>
+                    <Sparkles size={10}/> Teacher Profile
+                  </div>
+                  <h2 style={{ fontSize:30, fontWeight:800, letterSpacing:"-0.8px", margin:0, color:"#fff", lineHeight:1 }}>
+                    {selectedTeacher.name}
+                  </h2>
+                  <p style={{ fontSize:12, color:"rgba(255,255,255,.72)", fontWeight:600, margin:"8px 0 0 0", letterSpacing:"0.06em", textTransform:"uppercase" }}>
+                    {selectedTeacher.subject || "—"} · {selectedTeacher.branchName}
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <h2 className="text-xl md:text-2xl font-extrabold text-[#1e294b] truncate">{selectedTeacher.name}</h2>
-                <p className="text-[10px] md:text-sm text-slate-400 font-bold md:font-semibold mt-0.5 truncate uppercase tracking-tight">
-                  {selectedTeacher.subject || "—"} &bull; {selectedTeacher.branchName}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto">
-              <div className="flex items-center gap-2">
-                <span className={`text-[10px] font-black px-3 py-1.5 rounded-lg border ${sl.bg} ${sl.color} uppercase tracking-tight`}>
+              <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+                <span style={{
+                  fontSize:10, fontWeight:800, padding:"8px 14px", borderRadius:10,
+                  background:sl.grad, color:"#fff", letterSpacing:"0.12em", textTransform:"uppercase",
+                  boxShadow:"0 4px 12px rgba(0,0,0,.24)",
+                }}>
                   {sl.label}
                 </span>
-                <span className={`text-[10px] font-bold px-3 py-1.5 rounded-lg ${selectedTeacher.status === "Active" ? "bg-green-50 text-green-600 border border-green-100" : "bg-slate-100 text-slate-500"} uppercase tracking-tight`}>
+                <span style={{
+                  fontSize:10, fontWeight:800, padding:"8px 14px", borderRadius:10,
+                  background:selectedTeacher.status === "Active" ? "rgba(0,200,83,.25)" : "rgba(255,255,255,.14)",
+                  color:"#fff", letterSpacing:"0.12em", textTransform:"uppercase",
+                  border:"0.5px solid rgba(255,255,255,.22)",
+                }}>
                   {selectedTeacher.status || "—"}
                 </span>
-              </div>
-              <button
-                onClick={() => navigate(`/teachers/profile/${id}`)}
-                className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1e3a8a] text-white text-[10px] font-black uppercase tracking-widest hover:bg-[#1e294b] transition-all ml-auto"
-              >
-                View Full Profile
-              </button>
-              <button
-                onClick={() => navigate("/teachers")}
-                className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-400 border border-slate-100 transition-all"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Stat cards */}
-        {detailLoading ? (
-          <div className="flex items-center justify-center h-32">
-            <Loader2 className="w-6 h-6 animate-spin text-[#1e3a8a]" />
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {[
-                {
-                  label: "Effectiveness Score",
-                  value: selectedTeacher.avgScore > 0 ? `${selectedTeacher.avgScore}%` : "—",
-                  note: selectedTeacher.avgScore > 0 ? sl.label : "No exam data",
-                  icon: Award,
-                  color: "text-emerald-600",
-                  route: `/teachers/profile/${id}`,
-                },
-                {
-                  label: "Class Attendance",
-                  value: detailAttPct !== null ? `${detailAttPct}%` : "—",
-                  note: detailAttPct !== null ? (detailAttPct >= 90 ? "Excellent" : detailAttPct >= 75 ? "Good" : "Needs attention") : "No data",
-                  icon: Users,
-                  color: detailAttPct !== null && detailAttPct >= 90 ? "text-emerald-600" : "text-amber-600",
-                  route: `/teachers/profile/${id}`,
-                },
-                {
-                  label: "Classes Assigned",
-                  value: detailClasses.length.toString(),
-                  note: `${detailClasses.filter(c => c.status === "Active").length} active`,
-                  icon: BookOpen,
-                  color: "text-blue-600",
-                  route: `/teachers/profile/${id}`,
-                },
-                {
-                  label: "Students Taught",
-                  value: detailStudents > 0 ? detailStudents.toString() : selectedTeacher.classCount > 0 ? "—" : "0",
-                  note: "Across all classes",
-                  icon: TrendingUp,
-                  color: "text-purple-600",
-                  route: `/students`,
-                },
-              ].map(s => (
-                <div
-                  key={s.label}
-                  onClick={() => navigate(s.route)}
-                  role="button"
-                  tabIndex={0}
-                  className="clickable-card bg-white rounded-2xl border border-slate-100 p-5 shadow-sm"
+                <button
+                  onClick={()=>navigate(`/teachers/profile/${id}`)}
+                  className="tp-btn"
+                  style={{
+                    padding:"10px 18px", borderRadius:12,
+                    background:"#fff", color:T1,
+                    fontSize:11, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
+                    border:"none", cursor:"pointer",
+                    boxShadow:"0 4px 12px rgba(0,0,0,.18)", fontFamily:"inherit",
+                  }}
                 >
-                  <div className="flex items-center justify-between mb-3 text-slate-400">
-                    <p className="text-[10px] md:text-[11px] font-bold uppercase tracking-widest">{s.label}</p>
-                    <s.icon className={`w-4 h-4 ${s.color}`} />
-                  </div>
-                  <p className="text-3xl md:text-3xl font-extrabold text-[#1e294b] mb-1">{s.value}</p>
-                  <p className={`text-[10px] font-bold ${s.color}`}>{s.note}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Charts row */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Performance Timeline */}
-              <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-                <h3 className="text-base font-bold text-[#1e294b] mb-4">Performance Timeline</h3>
-                {detailTimeline.every(d => d.score === 0) ? (
-                  <div className="h-[220px] flex items-center justify-center text-sm text-slate-400 font-semibold">No exam data yet</div>
-                ) : (
-                  <div className="h-[220px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={detailTimeline} margin={{ left: -20, right: 10, top: 5 }}>
-                        <defs>
-                          <linearGradient id="tlGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%"  stopColor="#1e3a8a" stopOpacity={0.12}/>
-                            <stop offset="95%" stopColor="#1e3a8a" stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
-                        <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill:"#94a3b8", fontSize:11, fontWeight:600 }} dy={8}/>
-                        <YAxis axisLine={false} tickLine={false} tick={{ fill:"#94a3b8", fontSize:11, fontWeight:600 }} domain={[0, 100]}/>
-                        <Tooltip contentStyle={{ borderRadius:"12px", border:"none", boxShadow:"0 10px 15px rgba(0,0,0,0.1)" }}/>
-                        <Area type="monotone" dataKey="score" name="Avg Score" stroke="#1e3a8a" strokeWidth={3}
-                          fill="url(#tlGrad)" dot={{ r:4, fill:"#1e3a8a", strokeWidth:2, stroke:"#fff" }} connectNulls={false}/>
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-              </div>
-
-              {/* vs Branch Average */}
-              <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-                <h3 className="text-base font-bold text-[#1e294b] mb-4">
-                  vs Branch Average
-                  <span className="ml-2 text-xs font-semibold text-slate-400">({selectedTeacher.branchName})</span>
-                </h3>
-                {detailVsBranch.length === 0 ? (
-                  <div className="h-[220px] flex items-center justify-center text-sm text-slate-400 font-semibold">No comparison data</div>
-                ) : (
-                  <div className="h-[220px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={detailVsBranch} margin={{ left: -20, right: 10, bottom: 10 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
-                        <XAxis dataKey="category" axisLine={false} tickLine={false} tick={{ fill:"#94a3b8", fontSize:11, fontWeight:600 }} dy={8}/>
-                        <YAxis axisLine={false} tickLine={false} tick={{ fill:"#94a3b8", fontSize:11, fontWeight:600 }}/>
-                        <Tooltip contentStyle={{ borderRadius:"12px", border:"none", boxShadow:"0 10px 15px rgba(0,0,0,0.1)" }} cursor={{ fill:"#f8fafc" }}/>
-                        <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{ fontSize:"11px", fontWeight:700, paddingTop:"8px" }}/>
-                        <Bar dataKey="teacher"   name="This Teacher" fill="#1e3a8a" radius={[4,4,0,0]} barSize={22}/>
-                        <Bar dataKey="branchAvg" name="Branch Avg"   fill="#94a3b8" radius={[4,4,0,0]} barSize={22} opacity={0.6}/>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
+                  Full Profile
+                </button>
               </div>
             </div>
+          </div>
 
-            {/* Current Classes */}
-            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-              <h3 className="text-base font-bold text-[#1e294b] mb-4">Current Classes</h3>
-              {detailClasses.length === 0 ? (
-                <p className="text-sm text-slate-400 font-semibold py-8 text-center">No classes assigned yet</p>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {detailClasses.map((cls, i) => (
-                    <div key={cls.id} className="bg-slate-50 rounded-xl p-4 border border-slate-100 hover:bg-white hover:shadow-md transition-all">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-sm font-bold text-[#1e294b]">{cls.name}</h4>
-                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${cls.status === "Active" ? "bg-green-50 text-green-600 border border-green-100" : "bg-slate-100 text-slate-500"}`}>
-                          {cls.status || "Active"}
-                        </span>
+          {detailLoading ? (
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:160 }}>
+              <Loader2 className="animate-spin" size={28} color={B1}/>
+            </div>
+          ) : (
+            <>
+              {/* ── Bright Stat Grid ─────────────────── */}
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16, marginBottom:24 }}>
+                {[
+                  {
+                    label:"Effectiveness Score",
+                    value:selectedTeacher.avgScore > 0 ? `${selectedTeacher.avgScore}%` : "—",
+                    sub:selectedTeacher.avgScore > 0 ? sl.label : "No exam data",
+                    icon:Award, grad:GRAD_BLUE,
+                    route:`/teachers/profile/${id}`,
+                    delta: selectedTeacher.avgScore >= 70 ? "up" : null,
+                  },
+                  {
+                    label:"Class Attendance",
+                    value:detailAttPct !== null ? `${detailAttPct}%` : "—",
+                    sub:detailAttPct !== null ? (detailAttPct >= 90 ? "Excellent" : detailAttPct >= 75 ? "Good" : "Needs attention") : "No data",
+                    icon:Users, grad:GRAD_GREEN,
+                    route:`/teachers/profile/${id}`,
+                    delta: detailAttPct !== null && detailAttPct >= 80 ? "up" : null,
+                  },
+                  {
+                    label:"Classes Assigned",
+                    value:detailClasses.length.toString(),
+                    sub:`${detailClasses.filter(c => c.status === "Active").length} active`,
+                    icon:BookOpen, grad:GRAD_VIOLET,
+                    route:`/teachers/profile/${id}`,
+                    delta:null,
+                  },
+                  {
+                    label:"Students Taught",
+                    value:detailStudents > 0 ? detailStudents.toString() : (selectedTeacher.classCount > 0 ? "—" : "0"),
+                    sub:"Across all classes",
+                    icon:GraduationCap, grad:GRAD_GOLD,
+                    route:`/students`,
+                    delta:null,
+                  },
+                ].map(s=>{
+                  const Icon = s.icon;
+                  return (
+                    <div
+                      key={s.label}
+                      onClick={()=>navigate(s.route)}
+                      role="button" tabIndex={0}
+                      className="tp-tile"
+                      style={{
+                        background:s.grad, borderRadius:22, padding:"20px 22px", color:"#fff",
+                        cursor:"pointer", position:"relative", overflow:"hidden",
+                        boxShadow:"0 0 0 .5px rgba(255,255,255,.15), 0 14px 38px rgba(0,85,255,.26), 0 4px 12px rgba(0,85,255,.18)",
+                      }}
+                    >
+                      <div style={{ position:"absolute", top:-30, right:-20, width:110, height:110, background:"radial-gradient(circle, rgba(255,255,255,.22) 0%, transparent 70%)", borderRadius:"50%", pointerEvents:"none" }}/>
+                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14, position:"relative", zIndex:1 }}>
+                        <div style={{ width:38, height:38, borderRadius:12, background:"rgba(255,255,255,.22)", border:"0.5px solid rgba(255,255,255,.28)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                          <Icon size={19} color="#fff" strokeWidth={2.3}/>
+                        </div>
+                        {s.delta && (
+                          <div style={{ display:"inline-flex", alignItems:"center", gap:3, padding:"4px 8px", borderRadius:8, background:"rgba(255,255,255,.22)" }}>
+                            <ArrowUpRight size={11} color="#fff"/>
+                          </div>
+                        )}
                       </div>
-                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">
-                        {cls.grade || "—"} {cls.section ? `· ${cls.section}` : ""} {cls.subject ? `· ${cls.subject}` : ""}
-                      </p>
+                      <p style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,.75)", letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 4px 0", position:"relative", zIndex:1 }}>{s.label}</p>
+                      <p style={{ fontSize:30, fontWeight:800, color:"#fff", letterSpacing:"-0.6px", margin:0, lineHeight:1.1, position:"relative", zIndex:1 }}>{s.value}</p>
+                      <p style={{ fontSize:11, fontWeight:600, color:"rgba(255,255,255,.78)", margin:"6px 0 0 0", position:"relative", zIndex:1 }}>{s.sub}</p>
                     </div>
-                  ))}
+                  );
+                })}
+              </div>
+
+              {/* ── Charts Row (2-col) ───────────────── */}
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(2, 1fr)", gap:16, marginBottom:24 }}>
+
+                {/* Performance Timeline */}
+                <div
+                  className="tp3d"
+                  style={{
+                    background:"#fff", borderRadius:22, padding:"22px 24px",
+                    boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
+                  }}
+                >
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
+                    <div>
+                      <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Performance Timeline</h3>
+                      <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Last 6 months</p>
+                    </div>
+                    <div style={{ width:34, height:34, borderRadius:11, background:"rgba(0,85,255,.08)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                      <Activity size={17} color={B1} strokeWidth={2.3}/>
+                    </div>
+                  </div>
+                  {detailTimeline.every(d => d.score === 0) ? (
+                    <div style={{ height:220, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:T4 }}>No exam data yet</div>
+                  ) : (
+                    <div style={{ height:220 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={detailTimeline} margin={{ left:-20, right:10, top:5 }}>
+                          <defs>
+                            <linearGradient id="tpTlGrad" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%"  stopColor={B1} stopOpacity={0.22}/>
+                              <stop offset="95%" stopColor={B1} stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,85,255,.07)"/>
+                          <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill:T3, fontSize:11, fontWeight:600 }} dy={8}/>
+                          <YAxis axisLine={false} tickLine={false} tick={{ fill:T3, fontSize:11, fontWeight:600 }} domain={[0, 100]}/>
+                          <Tooltip contentStyle={{ borderRadius:12, border:"none", boxShadow:SHADOW_LG, fontSize:11, fontWeight:700 }}/>
+                          <Area type="monotone" dataKey="score" name="Avg Score" stroke={B1} strokeWidth={3}
+                            fill="url(#tpTlGrad)" dot={{ r:4, fill:B1, strokeWidth:2, stroke:"#fff" }} activeDot={{r:6}} connectNulls={false}/>
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </>
-        )}
-      </div>
+
+                {/* vs Branch Average */}
+                <div
+                  className="tp3d"
+                  style={{
+                    background:"#fff", borderRadius:22, padding:"22px 24px",
+                    boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
+                  }}
+                >
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
+                    <div>
+                      <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>vs Branch Average</h3>
+                      <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>{selectedTeacher.branchName}</p>
+                    </div>
+                    <div style={{ width:34, height:34, borderRadius:11, background:"rgba(123,63,244,.1)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                      <Target size={17} color={VIOLET} strokeWidth={2.3}/>
+                    </div>
+                  </div>
+                  {detailVsBranch.length === 0 ? (
+                    <div style={{ height:220, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:T4 }}>No comparison data</div>
+                  ) : (
+                    <div style={{ height:220 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={detailVsBranch} margin={{ left:-20, right:10, bottom:10 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,85,255,.07)"/>
+                          <XAxis dataKey="category" axisLine={false} tickLine={false} tick={{ fill:T3, fontSize:11, fontWeight:600 }} dy={8}/>
+                          <YAxis axisLine={false} tickLine={false} tick={{ fill:T3, fontSize:11, fontWeight:600 }}/>
+                          <Tooltip contentStyle={{ borderRadius:12, border:"none", boxShadow:SHADOW_LG, fontSize:11, fontWeight:700 }} cursor={{ fill:"rgba(0,85,255,.04)" }}/>
+                          <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{ fontSize:11, fontWeight:700, paddingTop:8 }}/>
+                          <Bar dataKey="teacher"   name="This Teacher" fill={B1} radius={[6,6,0,0]} barSize={20}/>
+                          <Bar dataKey="branchAvg" name="Branch Avg"   fill={T4} radius={[6,6,0,0]} barSize={20} opacity={0.65}/>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Current Classes ──────────────────── */}
+              <div
+                style={{
+                  background:"#fff", borderRadius:22, padding:"22px 24px",
+                  boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
+                  marginBottom:24,
+                }}
+              >
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                    <div style={{ width:36, height:36, borderRadius:11, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(0,85,255,.28)" }}>
+                      <BookOpen size={18} color="#fff" strokeWidth={2.3}/>
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Current Classes</h3>
+                      <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>{detailClasses.length} total</p>
+                    </div>
+                  </div>
+                </div>
+                {detailClasses.length === 0 ? (
+                  <p style={{ padding:"30px 0", textAlign:"center", fontSize:12, fontWeight:700, color:T4, letterSpacing:"0.08em" }}>No classes assigned yet</p>
+                ) : (
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:14 }}>
+                    {detailClasses.map(cls => (
+                      <div key={cls.id}
+                        className="tp-card"
+                        style={{
+                          background:"#F5F9FF", borderRadius:16, padding:"16px 18px",
+                          border:"0.5px solid rgba(0,85,255,.1)", cursor:"pointer",
+                        }}
+                      >
+                        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
+                          <h4 style={{ fontSize:14, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.2px" }}>{cls.name}</h4>
+                          <span style={{
+                            fontSize:9, fontWeight:800, padding:"3px 9px", borderRadius:999,
+                            background: cls.status === "Active" ? "rgba(0,200,83,.12)" : "rgba(153,170,204,.16)",
+                            color: cls.status === "Active" ? GREEN : T4,
+                            letterSpacing:"0.10em", textTransform:"uppercase",
+                          }}>{cls.status || "Active"}</span>
+                        </div>
+                        <p style={{ fontSize:10, fontWeight:700, color:T3, margin:0, letterSpacing:"0.08em", textTransform:"uppercase" }}>
+                          {cls.grade || "—"}{cls.section ? ` · ${cls.section}` : ""}{cls.subject ? ` · ${cls.subject}` : ""}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </>
     );
   }
 
   /* ══════════════════════════════════════════════════ */
   /* ── LIST / OVERVIEW VIEW ────────────────────────── */
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-10">
-
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-[#1e294b] tracking-tight">Teacher Performance</h1>
-          <p className="text-slate-500 text-xs md:text-sm font-medium">Effectiveness metrics &amp; evaluation analytics</p>
-        </div>
-        {/* Branch filter */}
-        <div className="relative self-stretch sm:self-start">
-          <select
-            value={branchFilter}
-            onChange={e => setBranchFilter(e.target.value)}
-            className="w-full sm:w-auto appearance-none border border-slate-200 rounded-xl pl-4 pr-10 py-2.5 text-xs font-bold text-slate-600 bg-white outline-none focus:ring-2 focus:ring-[#1e3a8a]/10 shadow-sm"
-          >
-            {branchList.map(b => (
-              <option key={b} value={b}>{b === "All" ? "All Branches" : b}</option>
-            ))}
-          </select>
-          <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"/>
-        </div>
-      </div>
-
-      {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        {[
-          { label: "Total Teachers",             value: totalTeachers.toString(),      note: `In ${branchFilter === "All" ? "all branches" : branchFilter}`, color: "text-blue-600",    route: "/teachers-directory" },
-          { label: "Avg Effectiveness Score",    value: `${avgEffectiveness}%`,        note: "Across all exams",                                            color: "text-emerald-600", route: "/teachers" },
-          { label: "Top Performers",             value: topPerformers.toString(),      note: `${totalTeachers > 0 ? ((topPerformers/totalTeachers)*100).toFixed(1) : 0}% of staff`,    color: "text-emerald-600", route: "/teachers-directory" },
-          { label: "Needs Improvement",          value: needsImprovement.toString(),   note: `${totalTeachers > 0 ? ((needsImprovement/totalTeachers)*100).toFixed(1) : 0}% of staff`, color: "text-amber-600",   route: "/teachers-directory" },
-        ].map(s => (
-          <div
-            key={s.label}
-            onClick={() => navigate(s.route)}
-            role="button"
-            tabIndex={0}
-            className="clickable-card bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all"
-          >
-            <p className="text-slate-400 text-[10px] md:text-[11px] font-bold uppercase tracking-widest mb-1 md:mb-2">{s.label}</p>
-            <h3 className="text-3xl md:text-4xl font-extrabold text-[#1e294b] tracking-tight mb-1">{s.value}</h3>
-            <p className={`text-[10px] md:text-[11px] font-bold ${s.color}`}>{s.note}</p>
+    <>
+      {globalStyles}
+      <div
+        style={{
+          fontFamily:"'DM Sans', -apple-system, sans-serif",
+          background:"#EEF4FF", minHeight:"100vh",
+          margin:"-16px -24px 0", padding:"24px 32px 40px",
+        }}
+      >
+        {/* ── Page Head ─────────────────────────────── */}
+        <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:20, marginBottom:22, flexWrap:"wrap" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+            <div style={{ width:48, height:48, borderRadius:14, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 8px 22px rgba(0,85,255,.35)" }}>
+              <Award size={24} color="#fff" strokeWidth={2.2}/>
+            </div>
+            <div>
+              <h1 style={{ fontSize:32, fontWeight:700, color:T1, letterSpacing:"-0.8px", margin:0, lineHeight:1.1 }}>
+                Teacher Performance
+              </h1>
+              <p style={{ fontSize:12, color:T3, fontWeight:500, margin:"5px 0 0 0", letterSpacing:"0.10em", textTransform:"uppercase" }}>
+                Effectiveness metrics &amp; evaluation analytics
+              </p>
+            </div>
           </div>
-        ))}
-      </div>
+          <div style={{ position:"relative" }}>
+            <select
+              value={branchFilter}
+              onChange={e => setBranchFilter(e.target.value)}
+              style={{
+                appearance:"none", padding:"11px 40px 11px 16px",
+                borderRadius:14, border:"0.5px solid rgba(0,85,255,.12)",
+                background:"#fff", boxShadow:SHADOW_SM,
+                fontSize:12, fontWeight:700, color:T3, letterSpacing:"0.04em",
+                outline:"none", fontFamily:"inherit", cursor:"pointer", minWidth:160,
+              }}
+            >
+              {branchList.map(b => <option key={b} value={b}>{b === "All" ? "All Branches" : b}</option>)}
+            </select>
+            <ChevronDown size={14} color={T4} style={{ position:"absolute", right:14, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}/>
+          </div>
+        </div>
 
-      {/* Charts row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* ── Dark Hero Banner ───────────────────────── */}
+        <div
+          style={{
+            background:GRAD_HERO, borderRadius:24, padding:"24px 28px", color:"#fff",
+            marginBottom:24, position:"relative", overflow:"hidden",
+            boxShadow:"0 14px 40px rgba(0,8,60,.32), 0 0 0 .5px rgba(255,255,255,.12)",
+          }}
+        >
+          <div style={{ position:"absolute", top:-60, right:-40, width:280, height:280, background:"radial-gradient(circle, rgba(255,255,255,.12) 0%, transparent 65%)", borderRadius:"50%", pointerEvents:"none" }}/>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:24, flexWrap:"wrap", position:"relative", zIndex:1 }}>
+            <div style={{ display:"flex", alignItems:"flex-start", gap:16, flex:1, minWidth:300 }}>
+              <div style={{ width:52, height:52, borderRadius:15, background:"rgba(255,255,255,.16)", border:"0.5px solid rgba(255,255,255,.26)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                <Award size={26} color="#fff" strokeWidth={2.2}/>
+              </div>
+              <div>
+                <div style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"4px 10px", borderRadius:999, background:"rgba(255,255,255,.14)", border:"0.5px solid rgba(255,255,255,.22)", fontSize:10, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:10 }}>
+                  <Sparkles size={11}/> Teacher Intelligence
+                </div>
+                <h2 style={{ fontSize:38, fontWeight:800, letterSpacing:"-1px", margin:0, color:"#fff", lineHeight:1 }}>
+                  {avgEffectiveness}{typeof avgEffectiveness === "string" && avgEffectiveness !== "—" ? "%" : ""}
+                </h2>
+                <p style={{ fontSize:13, color:"rgba(255,255,255,.72)", fontWeight:500, margin:"8px 0 0 0" }}>
+                  Average effectiveness across {totalTeachers} teachers · {branchFilter === "All" ? "all branches" : branchFilter}
+                </p>
+              </div>
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(3, minmax(120px,1fr))", gap:10 }}>
+              {[
+                { label:"Total Teachers",     value:totalTeachers.toString() },
+                { label:"Top Performers",     value:topPerformers.toString() },
+                { label:"Needs Improvement",  value:needsImprovement.toString() },
+              ].map(s=>(
+                <div key={s.label} style={{ background:"rgba(255,255,255,.10)", borderRadius:14, padding:"12px 14px", border:"0.5px solid rgba(255,255,255,.14)" }}>
+                  <p style={{ fontSize:9, fontWeight:700, color:"rgba(255,255,255,.65)", letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 6px 0" }}>{s.label}</p>
+                  <p style={{ fontSize:20, fontWeight:800, color:"#fff", margin:0, letterSpacing:"-0.4px" }}>{s.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
 
-        {/* Performance Distribution Pie */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-          <h3 className="text-base font-bold text-[#1e294b] mb-4">Performance Distribution</h3>
-          <div className="h-[260px]">
+        {/* ── Bright Stat Grid ───────────────────────── */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16, marginBottom:24 }}>
+          {[
+            { label:"Total Teachers", value:totalTeachers.toString(), sub:`In ${branchFilter === "All" ? "all branches" : branchFilter}`, grad:GRAD_BLUE, icon:Users, route:"/teachers-directory" },
+            { label:"Avg Effectiveness", value:`${avgEffectiveness}${typeof avgEffectiveness === "string" && avgEffectiveness !== "—" ? "%" : ""}`, sub:"Across all exams", grad:GRAD_GREEN, icon:Award, route:"/teachers" },
+            { label:"Top Performers", value:topPerformers.toString(), sub:`${totalTeachers > 0 ? ((topPerformers/totalTeachers)*100).toFixed(1) : 0}% of staff`, grad:GRAD_VIOLET, icon:Sparkles, route:"/teachers-directory" },
+            { label:"Needs Improvement", value:needsImprovement.toString(), sub:`${totalTeachers > 0 ? ((needsImprovement/totalTeachers)*100).toFixed(1) : 0}% of staff`, grad:needsImprovement > 0 ? GRAD_RED : GRAD_GOLD, icon:TrendingUp, route:"/teachers-directory" },
+          ].map(s=>{
+            const Icon = s.icon;
+            return (
+              <div
+                key={s.label}
+                onClick={()=>navigate(s.route)}
+                role="button" tabIndex={0}
+                className="tp-tile"
+                style={{
+                  background:s.grad, borderRadius:22, padding:"20px 22px", color:"#fff",
+                  cursor:"pointer", position:"relative", overflow:"hidden",
+                  boxShadow:"0 0 0 .5px rgba(255,255,255,.15), 0 14px 38px rgba(0,85,255,.26), 0 4px 12px rgba(0,85,255,.18)",
+                }}
+              >
+                <div style={{ position:"absolute", top:-30, right:-20, width:110, height:110, background:"radial-gradient(circle, rgba(255,255,255,.22) 0%, transparent 70%)", borderRadius:"50%", pointerEvents:"none" }}/>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14, position:"relative", zIndex:1 }}>
+                  <div style={{ width:38, height:38, borderRadius:12, background:"rgba(255,255,255,.22)", border:"0.5px solid rgba(255,255,255,.28)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                    <Icon size={19} color="#fff" strokeWidth={2.3}/>
+                  </div>
+                </div>
+                <p style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,.75)", letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 4px 0", position:"relative", zIndex:1 }}>{s.label}</p>
+                <p style={{ fontSize:30, fontWeight:800, color:"#fff", letterSpacing:"-0.6px", margin:0, lineHeight:1.1, position:"relative", zIndex:1 }}>{s.value}</p>
+                <p style={{ fontSize:11, fontWeight:600, color:"rgba(255,255,255,.78)", margin:"6px 0 0 0", position:"relative", zIndex:1 }}>{s.sub}</p>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Charts Row (3-col) ────────────────────── */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:16, marginBottom:24 }}>
+
+          {/* Performance Distribution */}
+          <div
+            className="tp3d"
+            style={{
+              background:"#fff", borderRadius:22, padding:"22px 24px",
+              boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
+            }}
+          >
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+              <div>
+                <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Performance Distribution</h3>
+                <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>By tier</p>
+              </div>
+              <div style={{ width:32, height:32, borderRadius:10, background:"rgba(0,85,255,.08)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <BarChart3 size={16} color={B1} strokeWidth={2.3}/>
+              </div>
+            </div>
+            <div style={{ height:240 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={perfDist.length ? perfDist : [{ name:"No Data", value:1, fill:"#e2e8f0" }]}
+                    cx="50%" cy="50%"
+                    innerRadius={55} outerRadius={85}
+                    paddingAngle={4} dataKey="value"
+                    label={({ name, value, midAngle, cx, cy, outerRadius: or }) => {
+                      const R = Math.PI / 180;
+                      const x = cx + (or + 20) * Math.cos(-midAngle * R);
+                      const y = cy + (or + 20) * Math.sin(-midAngle * R);
+                      return (
+                        <text x={x} y={y} fill={T3} fontSize={10} fontWeight="700"
+                          textAnchor={x > cx ? "start" : "end"} dominantBaseline="central">
+                          {name} ({value})
+                        </text>
+                      );
+                    }}
+                  >
+                    {perfDist.map((e, i) => <Cell key={i} fill={e.fill} stroke="none"/>)}
+                  </Pie>
+                  <Tooltip contentStyle={{ borderRadius:12, border:"none", boxShadow:SHADOW_LG, fontSize:11, fontWeight:700 }}/>
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Subject Ratings */}
+          <div
+            className="tp3d"
+            style={{
+              background:"#fff", borderRadius:22, padding:"22px 24px",
+              boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
+            }}
+          >
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+              <div>
+                <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Subject-wise Scores</h3>
+                <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Average ratings</p>
+              </div>
+              <div style={{ width:32, height:32, borderRadius:10, background:"rgba(0,200,83,.1)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <BookOpen size={16} color={GREEN} strokeWidth={2.3}/>
+              </div>
+            </div>
+            <div style={{ height:240 }}>
+              {subjectRatings.length === 0 ? (
+                <div style={{ height:"100%", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:T4 }}>No exam data yet</div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={subjectRatings} layout="vertical" margin={{ left:0, right:46, top:8, bottom:8 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(0,85,255,.07)"/>
+                    <XAxis type="number" domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fill:T3, fontSize:10, fontWeight:600 }}/>
+                    <YAxis dataKey="subject" type="category" axisLine={false} tickLine={false} tick={{ fill:T3, fontSize:11, fontWeight:700 }} width={80}/>
+                    <Tooltip contentStyle={{ borderRadius:12, border:"none", boxShadow:SHADOW_LG, fontSize:11, fontWeight:700 }} cursor={{ fill:"rgba(0,85,255,.04)" }}/>
+                    <Bar dataKey="rating" radius={[0, 6, 6, 0]} barSize={16}
+                      label={{ position:"right", fill:T3, fontSize:11, fontWeight:700, formatter: (v: any) => `${v}%` }}>
+                      {subjectRatings.map((e, i) => (
+                        <Cell key={i} fill={e.rating >= 80 ? GREEN : e.rating >= 60 ? B1 : e.rating >= 40 ? GOLD : RED}/>
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </div>
+
+          {/* Top Performers */}
+          <div
+            className="tp3d"
+            style={{
+              background:"#fff", borderRadius:22, padding:"22px 24px",
+              boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
+              maxHeight:320, overflowY:"auto",
+            }}
+          >
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14, position:"sticky", top:0, background:"#fff", zIndex:2 }}>
+              <div>
+                <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Top Performers</h3>
+                <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Leaderboard</p>
+              </div>
+              <div style={{ width:32, height:32, borderRadius:10, background:"rgba(255,170,0,.12)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <Award size={16} color={GOLD} strokeWidth={2.3}/>
+              </div>
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              {filtered
+                .filter(t => t.avgScore > 0)
+                .sort((a, b) => b.avgScore - a.avgScore)
+                .slice(0, 6)
+                .map((t, i) => {
+                  const tr = tierStyle(t.avgScore);
+                  return (
+                    <div key={t.id}
+                      className="tp-row"
+                      style={{
+                        display:"flex", alignItems:"center", gap:10,
+                        padding:"10px 12px", borderRadius:12, cursor:"pointer",
+                      }}
+                      onClick={()=>navigate(`/teachers/${t.id}`)}
+                    >
+                      <span style={{ fontSize:14, fontWeight:800, color: i===0 ? GOLD : i===1 ? T3 : i===2 ? "#CD7F32" : T4, width:20, flexShrink:0 }}>{i + 1}</span>
+                      <div style={{
+                        width:34, height:34, borderRadius:10, background:tr.grad,
+                        display:"flex", alignItems:"center", justifyContent:"center",
+                        color:"#fff", fontSize:10, fontWeight:800, flexShrink:0,
+                      }}>
+                        {initials(t.name)}
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <p style={{ fontSize:12, fontWeight:700, color:T1, margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{t.name}</p>
+                        <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"2px 0 0 0", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{t.subject || "—"} · {t.branchName}</p>
+                      </div>
+                      <span style={{ fontSize:12, fontWeight:800, color:tr.color, flexShrink:0 }}>{t.avgScore}%</span>
+                    </div>
+                  );
+                })}
+              {filtered.filter(t => t.avgScore > 0).length === 0 && (
+                <p style={{ padding:"20px 0", textAlign:"center", fontSize:12, fontWeight:700, color:T4 }}>No exam data yet</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Performance vs Attendance Trend ────────── */}
+        <div
+          className="tp3d"
+          style={{
+            background:"#fff", borderRadius:22, padding:"22px 24px",
+            boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
+            marginBottom:24,
+          }}
+        >
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+              <div style={{ width:36, height:36, borderRadius:11, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(0,85,255,.28)" }}>
+                <TrendingUp size={18} color="#fff" strokeWidth={2.3}/>
+              </div>
+              <div>
+                <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Performance vs Attendance Trend</h3>
+                <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Last 6 months</p>
+              </div>
+            </div>
+          </div>
+          <div style={{ height:260 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={perfDist.length ? perfDist : [{ name:"No Data", value:1, fill:"#e2e8f0" }]}
-                  cx="50%" cy="50%"
-                  innerRadius={60} outerRadius={90}
-                  paddingAngle={4} dataKey="value"
-                  label={({ name, value, midAngle, cx, cy, outerRadius: or }) => {
-                    const R = Math.PI / 180;
-                    const x = cx + (or + 24) * Math.cos(-midAngle * R);
-                    const y = cy + (or + 24) * Math.sin(-midAngle * R);
-                    return (
-                      <text x={x} y={y} fill="#94a3b8" fontSize={10} fontWeight="bold"
-                        textAnchor={x > cx ? "start" : "end"} dominantBaseline="central">
-                        {name} ({value})
-                      </text>
-                    );
-                  }}
-                >
-                  {perfDist.map((e, i) => <Cell key={i} fill={e.fill} stroke="none"/>)}
-                </Pie>
-                <Tooltip contentStyle={{ borderRadius:"12px", border:"none", boxShadow:"0 10px 15px rgba(0,0,0,0.1)" }}/>
-              </PieChart>
+              <LineChart data={monthlyAgg} margin={{ top:5, right:30, left:-10, bottom:5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,85,255,.07)"/>
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill:T3, fontSize:11, fontWeight:600 }} dy={8}/>
+                <YAxis axisLine={false} tickLine={false} tick={{ fill:T3, fontSize:11, fontWeight:600 }} domain={[0, 100]}/>
+                <Tooltip contentStyle={{ borderRadius:12, border:"none", boxShadow:SHADOW_LG, fontSize:11, fontWeight:700 }}/>
+                <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{ fontSize:11, fontWeight:700, paddingTop:8 }}/>
+                <Line type="monotone" dataKey="performance" name="Avg Performance" stroke={B1} strokeWidth={3}
+                  dot={{ r:4, fill:B1, strokeWidth:2, stroke:"#fff" }} activeDot={{ r:6 }}/>
+                <Line type="monotone" dataKey="attendance" name="Avg Attendance" stroke={GREEN} strokeWidth={3} strokeDasharray="5 5"
+                  dot={{ r:4, fill:GREEN, strokeWidth:2, stroke:"#fff" }} activeDot={{ r:6 }}/>
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Subject-wise Ratings */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-          <h3 className="text-base font-bold text-[#1e294b] mb-4">Subject-wise Avg Score</h3>
-          <div className="h-[260px]">
-            {subjectRatings.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-sm text-slate-400 font-semibold">No exam data yet</div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={subjectRatings} layout="vertical" margin={{ left: 0, right: 48, top: 8, bottom: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9"/>
-                  <XAxis type="number" domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fill:"#94a3b8", fontSize:10, fontWeight:600 }}/>
-                  <YAxis dataKey="subject" type="category" axisLine={false} tickLine={false} tick={{ fill:"#64748b", fontSize:11, fontWeight:700 }} width={80}/>
-                  <Tooltip contentStyle={{ borderRadius:"12px", border:"none", boxShadow:"0 10px 15px rgba(0,0,0,0.1)" }} cursor={{ fill:"#f8fafc" }}/>
-                  <Bar dataKey="rating" fill="#1e3a8a" radius={[0, 5, 5, 0]} barSize={16}
-                    label={{ position:"right", fill:"#64748b", fontSize:11, fontWeight:700, formatter: (v: any) => `${v}%` }}/>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
+        {/* ── Teacher Cards Grid ────────────────────── */}
+        <div
+          style={{
+            background:"#fff", borderRadius:22,
+            boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
+            overflow:"hidden", marginBottom:24,
+          }}
+        >
+          <div style={{ padding:"18px 24px", borderBottom:"0.5px solid rgba(0,85,255,.08)", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+            <div style={{ position:"relative", flex:1, minWidth:220, maxWidth:360 }}>
+              <Search style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)" }} size={15} color={T4}/>
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search teachers by name..."
+                style={{
+                  width:"100%", padding:"10px 12px 10px 36px", borderRadius:12,
+                  border:"0.5px solid rgba(0,85,255,.14)", background:"#F5F9FF",
+                  fontSize:13, fontWeight:500, color:T1, outline:"none", fontFamily:"inherit",
+                }}
+              />
+            </div>
+            <p style={{ fontSize:10, fontWeight:700, color:T4, letterSpacing:"0.14em", textTransform:"uppercase", margin:0, marginLeft:"auto" }}>
+              {filtered.length} teachers
+            </p>
           </div>
-        </div>
 
-        {/* Top performers quick list */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm overflow-y-auto max-h-[320px]">
-          <h3 className="text-base font-bold text-[#1e294b] mb-4">Top Performers</h3>
-          <div className="space-y-3">
-            {filtered
-              .filter(t => t.avgScore > 0)
-              .sort((a, b) => b.avgScore - a.avgScore)
-              .slice(0, 6)
-              .map((t, i) => {
-                const sl2 = scoreLabel(t.avgScore);
-                return (
-                  <div key={t.id}
-                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 cursor-pointer transition-all group"
-                    onClick={() => navigate(`/teachers/${t.id}`)}
-                  >
-                    <span className="text-xs font-extrabold text-slate-300 w-5 shrink-0">{i + 1}</span>
-                    <div className={`w-9 h-9 rounded-xl ${t._color} flex items-center justify-center text-white text-xs font-extrabold shrink-0`}>
+          <div style={{ padding:22, display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:14 }}>
+            {filtered.map(t => {
+              const tr = tierStyle(t.avgScore);
+              return (
+                <div
+                  key={t.id}
+                  className="tp-card"
+                  style={{
+                    background:"#F5F9FF", borderRadius:18, padding:"18px 20px",
+                    border:"0.5px solid rgba(0,85,255,.1)", cursor:"pointer",
+                    position:"relative", overflow:"hidden",
+                  }}
+                  onClick={()=>navigate(`/teachers/${t.id}`)}
+                >
+                  <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:14 }}>
+                    <div style={{
+                      width:44, height:44, borderRadius:13, background:tr.grad,
+                      display:"flex", alignItems:"center", justifyContent:"center",
+                      color:"#fff", fontSize:12, fontWeight:800,
+                      boxShadow:"0 6px 14px rgba(0,85,255,.2)", flexShrink:0,
+                    }}>
                       {initials(t.name)}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-[#1e294b] truncate group-hover:text-[#1e3a8a]">{t.name}</p>
-                      <p className="text-[10px] text-slate-400 font-semibold truncate">{t.subject || "—"} · {t.branchName}</p>
+                    <div style={{ minWidth:0, flex:1 }}>
+                      <p style={{ fontSize:13, fontWeight:800, color:T1, margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", letterSpacing:"-0.2px" }}>{t.name}</p>
+                      <p style={{ fontSize:10, fontWeight:700, color:T4, margin:"2px 0 0 0", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", letterSpacing:"0.04em" }}>{t.subject || "—"}</p>
                     </div>
-                    <span className={`text-xs font-extrabold ${sl2.color} shrink-0`}>{t.avgScore}%</span>
                   </div>
-                );
-              })}
-            {filtered.filter(t => t.avgScore > 0).length === 0 && (
-              <p className="text-sm text-slate-400 font-semibold text-center py-4">No exam data yet</p>
+                  <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:14 }}>
+                    {[
+                      ["Branch", t.branchName],
+                      ["Avg Score", t.avgScore > 0 ? `${t.avgScore}%` : "—"],
+                      ["Attendance", t.attPct > 0 ? `${t.attPct}%` : "—"],
+                      ["Classes", t.classCount.toString()],
+                    ].map(([k, v]) => (
+                      <div key={k} style={{ display:"flex", justifyContent:"space-between", fontSize:10 }}>
+                        <span style={{ fontWeight:600, color:T4, letterSpacing:"0.06em" }}>{k}</span>
+                        <span style={{ fontWeight:800, color: k==="Avg Score" ? tr.color : T3, maxWidth:110, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{v}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", paddingTop:10, borderTop:"0.5px solid rgba(0,85,255,.08)" }}>
+                    <span style={{
+                      fontSize:9, fontWeight:800, padding:"3px 9px", borderRadius:999,
+                      background:tr.bg, color:tr.color,
+                      letterSpacing:"0.12em", textTransform:"uppercase",
+                    }}>{tr.label}</span>
+                    <ChevronRight size={14} color={T4}/>
+                  </div>
+                </div>
+              );
+            })}
+            {filtered.length === 0 && (
+              <div style={{ gridColumn:"1 / -1", padding:"60px 0", textAlign:"center", fontSize:12, fontWeight:700, color:T4, letterSpacing:"0.14em", textTransform:"uppercase" }}>
+                No teachers found
+              </div>
             )}
           </div>
         </div>
-      </div>
 
-      {/* Performance vs Attendance Trend */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-        <h3 className="text-base font-bold text-[#1e294b] mb-4">Performance vs Attendance Trend (Last 6 Months)</h3>
-        <div className="h-[260px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={monthlyAgg} margin={{ top: 5, right: 30, left: -10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
-              <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill:"#94a3b8", fontSize:11, fontWeight:600 }} dy={8}/>
-              <YAxis axisLine={false} tickLine={false} tick={{ fill:"#94a3b8", fontSize:11, fontWeight:600 }} domain={[0, 100]}/>
-              <Tooltip contentStyle={{ borderRadius:"12px", border:"none", boxShadow:"0 10px 15px rgba(0,0,0,0.1)" }}/>
-              <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{ fontSize:"11px", fontWeight:700, paddingTop:"8px" }}/>
-              <Line type="monotone" dataKey="performance" name="Avg Performance" stroke="#1e3a8a" strokeWidth={3}
-                dot={{ r:4, fill:"#1e3a8a", strokeWidth:2, stroke:"#fff" }}/>
-              <Line type="monotone" dataKey="attendance" name="Avg Attendance" stroke="#22c55e" strokeWidth={3}
-                dot={{ r:4, fill:"#22c55e", strokeWidth:2, stroke:"#fff" }}/>
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Teacher Cards Grid */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search teachers..."
-              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[#1e3a8a]/10 bg-slate-50"
-            />
-          </div>
-          <p className="text-xs font-semibold text-slate-400 ml-auto">{filtered.length} teachers</p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-6">
-          {filtered.map(t => {
-            const sl2 = scoreLabel(t.avgScore);
-            return (
-              <div
-                key={t.id}
-                className="bg-slate-50 border border-slate-100 rounded-2xl p-5 hover:bg-white hover:shadow-lg transition-all cursor-pointer group"
-                onClick={() => navigate(`/teachers/${t.id}`)}
-              >
-                <div className="flex items-center gap-3 mb-4">
-                  <div className={`w-11 h-11 rounded-xl ${t._color} flex items-center justify-center text-white text-sm font-extrabold shrink-0`}>
-                    {initials(t.name)}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-[#1e294b] truncate group-hover:text-[#1e3a8a] transition-colors">{t.name}</p>
-                    <p className="text-[10px] text-slate-400 font-semibold truncate">{t.subject || "—"}</p>
-                  </div>
-                </div>
-                <div className="space-y-2 text-[11px]">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400 font-semibold">Branch</span>
-                    <span className="font-bold text-slate-600 truncate max-w-[110px]">{t.branchName}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400 font-semibold">Avg Score</span>
-                    <span className={`font-bold ${sl2.color}`}>{t.avgScore > 0 ? `${t.avgScore}%` : "—"}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400 font-semibold">Attendance</span>
-                    <span className="font-bold text-slate-600">{t.attPct > 0 ? `${t.attPct}%` : "—"}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400 font-semibold">Classes</span>
-                    <span className="font-bold text-slate-600">{t.classCount}</span>
-                  </div>
-                </div>
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${sl2.bg} ${sl2.color}`}>
-                    {sl2.label}
-                  </span>
-                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${t.status === "Active" ? "bg-green-50 text-green-600 border border-green-100" : "bg-slate-100 text-slate-500"}`}>
-                    {t.status || "—"}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-          {filtered.length === 0 && (
-            <div className="col-span-full py-16 text-center text-sm text-slate-400 font-semibold">
-              No teachers found
+        {/* ── AI Intelligence Card ──────────────────── */}
+        <div
+          style={{
+            background:GRAD_HERO, borderRadius:22, padding:"24px 26px", color:"#fff",
+            position:"relative", overflow:"hidden",
+            boxShadow:"0 14px 40px rgba(0,8,60,.32), 0 0 0 .5px rgba(255,255,255,.12)",
+          }}
+        >
+          <div style={{ position:"absolute", bottom:-50, left:-40, width:240, height:240, background:"radial-gradient(circle, rgba(123,63,244,.28) 0%, transparent 65%)", borderRadius:"50%", pointerEvents:"none" }}/>
+          <div style={{ display:"flex", alignItems:"flex-start", gap:14, position:"relative", zIndex:1, marginBottom:16 }}>
+            <div style={{ width:44, height:44, borderRadius:13, background:"rgba(255,255,255,.16)", border:"0.5px solid rgba(255,255,255,.26)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+              <Sparkles size={22} color="#fff" strokeWidth={2.2}/>
             </div>
-          )}
+            <div>
+              <div style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:999, background:"rgba(255,255,255,.14)", border:"0.5px solid rgba(255,255,255,.22)", fontSize:9, fontWeight:800, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:8 }}>
+                AI Insights
+              </div>
+              <h3 style={{ fontSize:18, fontWeight:700, color:"#fff", margin:0, letterSpacing:"-0.4px" }}>Teacher Performance Summary</h3>
+            </div>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:12, position:"relative", zIndex:1 }}>
+            {[
+              { label:"Effectiveness Insight", value:typeof avgEffectiveness === "string" && avgEffectiveness !== "—" ? `${avgEffectiveness}% team avg` : "Collecting data", sub:topPerformers>0?`${topPerformers} top performers`:"Build evaluation base" },
+              { label:"Training Priority",     value:needsImprovement > 0 ? `${needsImprovement} teacher${needsImprovement>1?"s":""}` : "All stable", sub:needsImprovement > 0 ? "Recommend coaching" : "No intervention needed" },
+              { label:"Subject Strength",      value:subjectRatings.length > 0 ? subjectRatings[0].subject : "Pending data", sub:subjectRatings.length > 0 ? `${subjectRatings[0].rating}% avg rating` : "Upload exam scores" },
+            ].map(c=>(
+              <div key={c.label} style={{ background:"rgba(255,255,255,.10)", borderRadius:14, padding:"14px 16px", border:"0.5px solid rgba(255,255,255,.14)" }}>
+                <p style={{ fontSize:9, fontWeight:800, color:"rgba(255,255,255,.65)", letterSpacing:"0.14em", textTransform:"uppercase", margin:"0 0 8px 0" }}>{c.label}</p>
+                <p style={{ fontSize:15, fontWeight:700, color:"#fff", margin:0, letterSpacing:"-0.3px" }}>{c.value}</p>
+                <p style={{ fontSize:11, fontWeight:600, color:"rgba(255,255,255,.72)", margin:"6px 0 0 0" }}>{c.sub}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

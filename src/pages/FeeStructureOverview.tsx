@@ -5,8 +5,14 @@ import { collection, getDocs, query, where, addDoc, serverTimestamp } from "fire
 import {
   Download, Loader2, Building2, DollarSign, Calendar, Filter,
   ChevronDown, FileSpreadsheet, AlertCircle, TrendingUp, X, Users,
-  Bell, Megaphone, Send,
+  Bell, Megaphone, Send, Layers,
 } from "lucide-react";
+import {
+  B1, T1, T3, T4, GREEN, RED, GOLD, VIOLET,
+  GRAD_PRIMARY, GRAD_BLUE, GRAD_GREEN, GRAD_VIOLET, GRAD_GOLD, GRAD_RED,
+  SHADOW_SM, SHADOW_BTN, pageShellStyle,
+  DashGlobalStyles, PageHead, StatTile, DarkHero, AIInsightCard,
+} from "@/lib/dashboardTokens";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import {
@@ -348,106 +354,90 @@ export default function FeeStructureOverview() {
   /* ─────────────────────────────────────────────────────── */
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-[#1e3a8a]" />
+      <div style={{ ...pageShellStyle, display:"flex", alignItems:"center", justifyContent:"center" }}>
+        <Loader2 className="animate-spin" size={32} color={B1}/>
       </div>
     );
   }
 
   const branchOptions = ["All", ...[...new Set(structures.map(s => s.branchName || ""))].filter(Boolean).sort()];
-  const chartColors = ["#1e3a8a","#22c55e","#f59e0b","#ef4444","#8b5cf6","#14b8a6","#f97316","#ec4899"];
+  const chartColors = [B1, GREEN, GOLD, RED, VIOLET, "#14b8a6", "#f97316", "#ec4899"];
 
   return (
-    <div className="space-y-6 pb-10 animate-in fade-in duration-300">
+    <>
+      <DashGlobalStyles />
+      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap:24 }}>
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-[#1e294b] tracking-tight flex items-center gap-2">
-            <DollarSign className="w-7 h-7 text-[#1e3a8a]" /> Fee Structure
-          </h1>
-          <p className="text-slate-500 text-xs md:text-sm font-medium mt-0.5">
-            Branch-wise fee plans uploaded by principals &amp; DEOs
-          </p>
-        </div>
-        {structures.length > 0 && (
-          <button
-            onClick={exportCombined}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition-all self-start"
-          >
-            <Download className="w-3.5 h-3.5" /> Export All
-          </button>
-        )}
-      </div>
+      <PageHead
+        icon={DollarSign}
+        title="Fee Structure"
+        subtitle="Branch-wise fee plans uploaded by principals & DEOs"
+        right={
+          structures.length > 0 ? (
+            <button
+              onClick={exportCombined}
+              className="dash-btn"
+              style={{
+                display:"inline-flex", alignItems:"center", gap:7,
+                padding:"10px 16px", borderRadius:12,
+                background:GRAD_PRIMARY, color:"#fff",
+                fontSize:11, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
+                border:"none", cursor:"pointer", boxShadow:SHADOW_BTN, fontFamily:"inherit",
+              }}
+            >
+              <Download size={13}/> Export All
+            </button>
+          ) : null
+        }
+      />
 
-      {/* Empty state */}
       {structures.length === 0 ? (
-        <div className="bg-white border border-slate-100 rounded-2xl p-12 flex flex-col items-center gap-4 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center">
-            <FileSpreadsheet className="w-8 h-8 text-slate-300" />
+        <div
+          style={{
+            background:"#fff", borderRadius:22, padding:"48px 32px",
+            border:"0.5px solid rgba(0,85,255,.08)", boxShadow:SHADOW_SM,
+            display:"flex", flexDirection:"column", alignItems:"center", gap:16, textAlign:"center",
+          }}
+        >
+          <div style={{ width:72, height:72, borderRadius:20, background:"#F5F9FF", border:"0.5px solid rgba(0,85,255,.1)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <FileSpreadsheet size={34} color={T4}/>
           </div>
           <div>
-            <h3 className="text-base font-extrabold text-[#1e294b] mb-1">No fee structures published yet</h3>
-            <p className="text-sm text-slate-500 font-medium max-w-md">
+            <h3 style={{ fontSize:16, fontWeight:800, color:T1, margin:"0 0 6px 0", letterSpacing:"-0.3px" }}>No fee structures published yet</h3>
+            <p style={{ fontSize:13, fontWeight:500, color:T3, margin:0, maxWidth:420, lineHeight:1.5 }}>
               Ask your principal or DEO to upload the class-wise fee Excel from the Principal Dashboard → Fee Structure page.
             </p>
           </div>
         </div>
       ) : (
         <>
-          {/* Stat cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
-              { label: "Branches",        value: branchTotals.length,      icon: Building2, color: "text-blue-600",    bg: "bg-blue-50", note: "Active" },
-              { label: "Total Classes",   value: totalClasses,             icon: Calendar,  color: "text-purple-600",  bg: "bg-purple-50", note: "Active" },
-              { label: "Total Terms",     value: allTerms.length,          icon: TrendingUp, color: "text-teal-600",   bg: "bg-teal-50", note: "Active" },
-              { label: "Combined Annual", value: `₹ ${currency(grandTotal)}`, icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-50", note: "Across all branches" },
-            ].map(s => (
-              <div
-                key={s.label}
-                onClick={() => navigate("/fee-structure")}
-                role="button"
-                tabIndex={0}
-                className="clickable-card bg-white p-4 md:p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">{s.label}</p>
-                  <div className={`w-8 h-8 rounded-lg ${s.bg} flex items-center justify-center`}>
-                    <s.icon className={`w-4 h-4 ${s.color}`} />
-                  </div>
-                </div>
-                <h3 className="text-2xl md:text-3xl font-extrabold text-[#1e294b] tracking-tight mb-1">{s.value}</h3>
-                <p className={`text-[10px] font-bold ${s.color}`}>{s.note}</p>
-              </div>
-            ))}
+          <DarkHero
+            icon={DollarSign}
+            eyebrow="Fee Planner"
+            title={`₹${currency(grandTotal)}`}
+            subtitle={`Combined annual across ${branchTotals.length} branch${branchTotals.length!==1?"es":""} · ${totalClasses} classes · ${allTerms.length} term type${allTerms.length!==1?"s":""}`}
+            stats={[
+              { label:"Branches", value:branchTotals.length.toString() },
+              { label:"Classes",  value:totalClasses.toString() },
+              { label:"Terms",    value:allTerms.length.toString() },
+            ]}
+          />
+
+          {/* Bright Stat Grid */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16 }}>
+            <StatTile label="Branches"        value={branchTotals.length.toString()} sub="Active"             grad={GRAD_BLUE}   icon={Building2} onClick={()=>navigate("/fee-structure")} />
+            <StatTile label="Total Classes"   value={totalClasses.toString()}        sub="Across branches"    grad={GRAD_VIOLET} icon={Calendar}  onClick={()=>navigate("/fee-structure")} />
+            <StatTile label="Total Terms"     value={allTerms.length.toString()}     sub="Term types"         grad={GRAD_GOLD}   icon={Layers}    onClick={()=>navigate("/fee-structure")} />
+            <StatTile label="Combined Annual" value={`₹${currency(grandTotal)}`}     sub="All branches"       grad={GRAD_GREEN}  icon={DollarSign} onClick={()=>navigate("/fee-structure")} />
           </div>
 
-          {/* Student-level aggregates (only when any branch has student rows) */}
+          {/* Student-level aggregates */}
           {hasStudentData && (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {[
-                { label: "Total Students", value: studentAgg.totalStudents,                  icon: Users,       color: "text-indigo-600",  bg: "bg-indigo-50" },
-                { label: "Fees Collected", value: `₹ ${currency(studentAgg.totalPaid)}`,     icon: DollarSign,  color: "text-emerald-600", bg: "bg-emerald-50" },
-                { label: "Fees Pending",   value: `₹ ${currency(studentAgg.totalPending)}`,  icon: AlertCircle, color: "text-red-600",     bg: "bg-red-50" },
-                { label: "Defaulters",     value: studentAgg.defaulters,                     icon: TrendingUp,  color: "text-amber-600",   bg: "bg-amber-50" },
-              ].map(s => (
-                <div
-                  key={s.label}
-                  onClick={() => navigate("/finance")}
-                  role="button"
-                  tabIndex={0}
-                  className="clickable-card bg-white p-4 md:p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">{s.label}</p>
-                    <div className={`w-8 h-8 rounded-lg ${s.bg} flex items-center justify-center`}>
-                      <s.icon className={`w-4 h-4 ${s.color}`} />
-                    </div>
-                  </div>
-                  <h3 className="text-2xl md:text-3xl font-extrabold text-[#1e294b] tracking-tight mb-1">{s.value}</h3>
-                  <p className={`text-[10px] font-bold ${s.color}`}>Student-level data</p>
-                </div>
-              ))}
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16 }}>
+              <StatTile label="Total Students" value={studentAgg.totalStudents.toString()}              sub="Enrolled in plans"   grad={GRAD_VIOLET} icon={Users}       onClick={()=>navigate("/finance")} />
+              <StatTile label="Fees Collected" value={`₹${currency(studentAgg.totalPaid)}`}             sub="Paid to date"        grad={GRAD_GREEN}  icon={DollarSign}  onClick={()=>navigate("/finance")} />
+              <StatTile label="Fees Pending"   value={`₹${currency(studentAgg.totalPending)}`}          sub="Outstanding"         grad={GRAD_RED}    icon={AlertCircle} onClick={()=>navigate("/finance")} />
+              <StatTile label="Defaulters"     value={studentAgg.defaulters.toString()}                 sub="Need follow-up"      grad={studentAgg.defaulters > 0 ? GRAD_RED : GRAD_GOLD} icon={TrendingUp} onClick={()=>navigate("/finance")} />
             </div>
           )}
 
@@ -829,6 +819,17 @@ export default function FeeStructureOverview() {
           </div>
         );
       })()}
-    </div>
+
+      <AIInsightCard
+        title="Fee Structure Intelligence"
+        items={[
+          { label:"Plan Coverage",   value: `${branchTotals.length} branch${branchTotals.length!==1?"es":""} published`, sub: `${totalClasses} classes · ${allTerms.length} term types` },
+          { label:"Annual Footprint", value: `₹${currency(grandTotal)}`, sub: "Combined potential revenue" },
+          { label:"Student Reach",   value: hasStudentData ? `${studentAgg.totalStudents} scholars` : "Upload student rows", sub: hasStudentData ? `₹${currency(studentAgg.totalPaid)} collected` : "Unlock granular tracking" },
+        ]}
+      />
+
+      </div>
+    </>
   );
 }

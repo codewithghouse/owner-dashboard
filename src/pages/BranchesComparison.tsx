@@ -8,8 +8,15 @@ import {
   ArrowLeft, CheckCircle, AlertTriangle, Building2, Loader2,
   Plus, Pencil, Trash2, X, Save,
   BarChart3, CircleDollarSign, GraduationCap, CalendarCheck2,
+  Sparkles, FileText, Activity, TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  B1, T1, T3, T4, GREEN, RED, GOLD, VIOLET,
+  GRAD_PRIMARY, GRAD_BLUE, GRAD_GREEN, GRAD_VIOLET, GRAD_GOLD, GRAD_RED,
+  SHADOW_SM, SHADOW_LG, SHADOW_BTN, pageShellStyle,
+  DashGlobalStyles, PageHead, StatTile, DarkHero, Card3D, AIInsightCard,
+} from "@/lib/dashboardTokens";
 import {
   subscribeBranchesComparison, subscribeBranchDetail,
   BranchComparisonData, BranchDetailData,
@@ -614,9 +621,9 @@ export default function BranchesComparison() {
   // ── Loading state ─────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-[70vh] gap-4">
-        <Loader2 className="w-10 h-10 animate-spin text-[#1e3a8a]" />
-        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
+      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:14 }}>
+        <Loader2 className="animate-spin" size={38} color={B1}/>
+        <p style={{ fontSize:10, fontWeight:800, color:T4, letterSpacing:"0.14em", textTransform:"uppercase" }}>
           {id ? "Loading Branch Details..." : "Aggregating Branch Data..."}
         </p>
       </div>
@@ -650,63 +657,107 @@ export default function BranchesComparison() {
       { label: "Active Alerts",         value: summary.activeAlerts.toString(), note: kpiNotes.alerts, borderColor: "border-red-200",  bgColor: "bg-red-50/50",    textColor: summary.activeAlerts === 0 ? "text-emerald-500" : "text-red-500" },
     ];
 
+    // Build bright KPI tiles with gradient
+    const kpiTiles = [
+      { label:"Academic Health", value:`${summary.ahi}%`, sub:kpiNotes.ahi, grad: summary.ahi >= 85 ? GRAD_GREEN : summary.ahi >= 70 ? GRAD_BLUE : GRAD_RED, icon:Activity },
+      { label:"Fee Collection", value:summary.feeCollection > 0 ? `${summary.feeCollection}%` : "N/A", sub:kpiNotes.fee, grad: summary.feeCollection >= 90 ? GRAD_GREEN : summary.feeCollection > 0 ? GRAD_GOLD : GRAD_BLUE, icon:CircleDollarSign },
+      { label:"Pass Rate", value:summary.passRate > 0 ? `${summary.passRate}%` : "N/A", sub:kpiNotes.passRate, grad: summary.passRate >= 85 ? GRAD_GREEN : summary.passRate > 0 ? GRAD_GOLD : GRAD_BLUE, icon:GraduationCap },
+      { label:"Active Alerts", value:summary.activeAlerts.toString(), sub:kpiNotes.alerts, grad: summary.activeAlerts === 0 ? GRAD_GREEN : GRAD_RED, icon:AlertTriangle },
+    ];
+
     return (
-      <div className="space-y-8 max-w-[1400px] mx-auto animate-in fade-in duration-500 pb-16">
+      <>
+        <DashGlobalStyles />
+        <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap:24 }}>
 
-        {/* ── Profile Card ────────────────────────────────────────────────── */}
-        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm">
-          <div className="p-8 lg:p-12">
+          <button
+            onClick={() => navigate("/branches")}
+            className="dash-btn"
+            style={{
+              display:"inline-flex", alignItems:"center", gap:7, alignSelf:"flex-start",
+              padding:"8px 14px", borderRadius:12,
+              background:"#fff", border:"0.5px solid rgba(0,85,255,.12)",
+              fontSize:11, fontWeight:700, color:T3,
+              letterSpacing:"0.06em", textTransform:"uppercase",
+              cursor:"pointer", boxShadow:SHADOW_SM, fontFamily:"inherit",
+            }}
+          >
+            <ArrowLeft size={14}/> Back to Branches
+          </button>
 
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-10">
-              <div className="flex items-center gap-6">
-                <button
-                  onClick={() => navigate("/branches")}
-                  className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors shrink-0"
-                >
-                  <ArrowLeft className="w-5 h-5 text-slate-500" />
-                </button>
+          {/* Dark Hero */}
+          <div
+            style={{
+              background:"linear-gradient(135deg,#001040 0%,#001888 35%,#0033CC 70%,#0055FF 100%)",
+              borderRadius:24, padding:"24px 28px", color:"#fff",
+              position:"relative", overflow:"hidden",
+              boxShadow:"0 14px 40px rgba(0,8,60,.32), 0 0 0 .5px rgba(255,255,255,.12)",
+            }}
+          >
+            <div style={{ position:"absolute", top:-60, right:-40, width:280, height:280, background:"radial-gradient(circle, rgba(255,255,255,.12) 0%, transparent 65%)", borderRadius:"50%", pointerEvents:"none" }}/>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:20, flexWrap:"wrap", position:"relative", zIndex:1 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:16 }}>
                 <div
-                  className="w-16 h-16 rounded-2xl flex items-center justify-center text-white shadow-lg shrink-0"
-                  style={{ backgroundColor: summary.color }}
+                  style={{
+                    width:60, height:60, borderRadius:17,
+                    background:summary.color || GRAD_PRIMARY,
+                    display:"flex", alignItems:"center", justifyContent:"center",
+                    boxShadow:"0 10px 28px rgba(0,0,0,.26), 0 0 0 2px rgba(255,255,255,.2)",
+                    flexShrink:0,
+                  }}
                 >
-                  <Building2 className="w-8 h-8" />
+                  <Building2 size={30} color="#fff" strokeWidth={2.2}/>
                 </div>
                 <div>
-                  <h2 className="text-2xl lg:text-3xl font-bold text-[#111827] tracking-tight">{summary.name}</h2>
-                  <p className="text-slate-400 font-medium text-sm mt-1">
+                  <div style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"3px 10px", borderRadius:999, background:"rgba(255,255,255,.14)", border:"0.5px solid rgba(255,255,255,.22)", fontSize:9, fontWeight:800, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:8 }}>
+                    <Sparkles size={10}/> Branch Profile
+                  </div>
+                  <h2 style={{ fontSize:30, fontWeight:800, letterSpacing:"-0.8px", margin:0, color:"#fff", lineHeight:1 }}>{summary.name}</h2>
+                  <p style={{ fontSize:12, color:"rgba(255,255,255,.72)", fontWeight:500, margin:"8px 0 0 0", letterSpacing:"0.04em" }}>
                     {summary.studentCount.toLocaleString()} students
-                    {summary.teacherCount > 0 && ` • ${summary.teacherCount} teachers`}
-                    {summary.established !== "N/A" && ` • Established ${summary.established}`}
-                    {summary.location !== "—" && ` • ${summary.location}`}
+                    {summary.teacherCount > 0 && ` · ${summary.teacherCount} teachers`}
+                    {summary.established !== "N/A" && ` · Est. ${summary.established}`}
+                    {summary.location !== "—" && ` · ${summary.location}`}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <span className={`px-5 py-2 rounded-lg text-[11px] font-black uppercase tracking-widest text-white ${statusConfig(summary.status)}`}>
+              <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+                <span style={{
+                  fontSize:10, fontWeight:800, padding:"8px 14px", borderRadius:10,
+                  background: summary.status === "High Risk" ? GRAD_RED : summary.status === "Low Risk" ? GRAD_GREEN : GRAD_GOLD,
+                  color:"#fff", letterSpacing:"0.12em", textTransform:"uppercase",
+                  boxShadow:"0 4px 12px rgba(0,0,0,.24)",
+                }}>
                   {summary.status}
                 </span>
-                <Button
+                <button
                   onClick={() => navigate("/reports")}
-                  className="h-10 px-5 rounded-lg bg-[#1e294b] text-white text-[11px] font-bold hover:bg-[#1e3a8a] shadow-lg"
+                  className="dash-btn"
+                  style={{
+                    display:"inline-flex", alignItems:"center", gap:6,
+                    padding:"10px 18px", borderRadius:12,
+                    background:"#fff", color:T1,
+                    fontSize:11, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
+                    border:"none", cursor:"pointer", fontFamily:"inherit",
+                    boxShadow:"0 4px 12px rgba(0,0,0,.18)",
+                  }}
                 >
-                  Generate Report
-                </Button>
+                  <FileText size={13}/> Generate Report
+                </button>
               </div>
             </div>
+          </div>
 
-            {/* KPI Cards — matching screenshot: AHI, Fee Collection, Pass Rate, Active Alerts */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-12">
-              {kpiCards.map((kpi, i) => (
-                <div key={i} className={`p-6 rounded-[1.2rem] border ${kpi.borderColor} ${kpi.bgColor} transition-all hover:bg-white hover:shadow-lg`}>
-                  <p className="text-slate-400 text-[11px] font-bold uppercase tracking-tight mb-3">{kpi.label}</p>
-                  <h3 className={`text-3xl font-black tracking-tighter mb-1.5 ${kpi.textColor}`}>
-                    {kpi.value}
-                  </h3>
-                  <p className={`text-[11px] font-bold ${kpi.textColor}`}>{kpi.note}</p>
-                </div>
-              ))}
-            </div>
+          {/* Bright KPI Grid */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16 }}>
+            {kpiTiles.map(k => (
+              <StatTile key={k.label} label={k.label} value={k.value} sub={k.sub} grad={k.grad} icon={k.icon} />
+            ))}
+          </div>
+
+        {/* Wrapper for remaining legacy content */}
+        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm">
+          <div className="p-8 lg:p-12">
 
             {/* Charts — only render if at least one has data */}
             {(hasTrendData || benchmarkFiltered.length > 0) && (
@@ -836,7 +887,17 @@ export default function BranchesComparison() {
             ))}
           </div>
         </div>
-      </div>
+
+          <AIInsightCard
+            title={`${summary.name} — Branch Intelligence`}
+            items={[
+              { label:"Health Pulse", value: `AHI ${summary.ahi}%`, sub: summary.ahi >= 85 ? "Excellent" : summary.ahi >= 70 ? "Healthy" : "Needs Focus" },
+              { label:"Alert Queue", value: summary.activeAlerts > 0 ? `${summary.activeAlerts} active` : "All clear", sub: summary.activeAlerts > 0 ? "Review action plan" : "No intervention needed" },
+              { label:"Enrollment Reach", value: `${summary.studentCount.toLocaleString()} students`, sub: summary.teacherCount > 0 ? `${summary.teacherCount} teachers` : "Staff pending" },
+            ]}
+          />
+        </div>
+      </>
     );
   }
 
@@ -860,8 +921,17 @@ export default function BranchesComparison() {
     branches.some((_, i) => (row[`b${i}`] as number) > 0)
   );
 
+  // Compute list-view AHI avg for hero
+  const listAhiAvg = branches.length > 0
+    ? Math.round(branches.reduce((a, b) => a + (b.ahi || 0), 0) / branches.length)
+    : 0;
+  const totalAlertsList = branches.reduce((a, b) => a + (b.activeAlerts || 0), 0);
+  const totalStudentsList = branches.reduce((a, b) => a + (b.studentCount || 0), 0);
+
   return (
-    <div className="space-y-10 max-w-[1600px] mx-auto animate-in fade-in duration-500 pb-10">
+    <>
+      <DashGlobalStyles />
+      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap:24 }}>
 
       {/* CRUD Modals */}
       <BranchModal
@@ -880,19 +950,40 @@ export default function BranchesComparison() {
         onConfirm={handleDeleteBranch} deleting={crudSaving}
       />
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-extrabold text-[#111827] tracking-tight">Branches Comparison</h1>
-          <p className="text-slate-400 font-medium text-sm">Side-by-side performance analysis</p>
-        </div>
-        <button
-          onClick={() => { setCrudForm(EMPTY_FORM); setAddOpen(true); }}
-          className="flex items-center gap-2 h-11 px-5 rounded-2xl bg-[#1e294b] text-white text-sm font-black hover:bg-[#1e3a8a] transition-all shadow-lg shadow-slate-900/10 hover:scale-105 active:scale-95 shrink-0"
-        >
-          <Plus className="w-4 h-4" /> Add Branch
-        </button>
-      </div>
+      <PageHead
+        icon={Building2}
+        title="Branches Comparison"
+        subtitle="Side-by-side performance analysis"
+        right={
+          <button
+            onClick={() => { setCrudForm(EMPTY_FORM); setAddOpen(true); }}
+            className="dash-btn"
+            style={{
+              display:"inline-flex", alignItems:"center", gap:7,
+              padding:"11px 18px", borderRadius:14,
+              background:GRAD_PRIMARY, color:"#fff",
+              fontSize:12, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
+              border:"none", cursor:"pointer", boxShadow:SHADOW_BTN, fontFamily:"inherit",
+            }}
+          >
+            <Plus size={15} strokeWidth={2.4}/> Add Branch
+          </button>
+        }
+      />
+
+      {branches.length > 0 && (
+        <DarkHero
+          icon={BarChart3}
+          eyebrow="Branch Intelligence"
+          title={`${listAhiAvg}%`}
+          subtitle={`Average academic health across ${branches.length} branch${branches.length!==1?"es":""} · ${totalStudentsList.toLocaleString()} students`}
+          stats={[
+            { label:"Branches", value: branches.length.toString() },
+            { label:"Students", value: totalStudentsList.toLocaleString() },
+            { label:"Alerts",   value: totalAlertsList.toString() },
+          ]}
+        />
+      )}
 
       {/* Branch Cards */}
       {branches.length === 0 ? (
@@ -1245,6 +1336,18 @@ export default function BranchesComparison() {
           </div>
         </div>
       )}
-    </div>
+
+      {branches.length > 0 && (
+        <AIInsightCard
+          title="Network Intelligence Summary"
+          items={[
+            { label:"Portfolio Health", value: `AHI ${listAhiAvg}%`, sub: listAhiAvg >= 80 ? "Strong network" : listAhiAvg >= 60 ? "Stable" : "Needs focus" },
+            { label:"Risk Watch",       value: totalAlertsList > 0 ? `${totalAlertsList} alert${totalAlertsList!==1?"s":""}` : "All clear", sub: totalAlertsList > 0 ? "Investigate per branch" : "No immediate action" },
+            { label:"Scale",            value: `${branches.length} branch${branches.length!==1?"es":""}`, sub: `${totalStudentsList.toLocaleString()} scholars total` },
+          ]}
+        />
+      )}
+      </div>
+    </>
   );
 }
