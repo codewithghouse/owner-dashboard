@@ -17,6 +17,22 @@ import BenchmarkCard from "@/components/BenchmarkCard";
 
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
+/* ── responsive breakpoint hook ──────────────────────── */
+function useBreakpoint() {
+  const get = () => {
+    if (typeof window === "undefined") return "desktop" as const;
+    const w = window.innerWidth;
+    return w < 768 ? ("mobile" as const) : w < 1024 ? ("tablet" as const) : ("desktop" as const);
+  };
+  const [bp, setBp] = useState<"mobile" | "tablet" | "desktop">(get);
+  useEffect(() => {
+    const onResize = () => setBp(get());
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return bp;
+}
+
 /* ── helpers ─────────────────────────────────────────── */
 function timeAgo(ts: any): string {
   if (!ts) return "";
@@ -29,6 +45,9 @@ function timeAgo(ts: any): string {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const bp = useBreakpoint();
+  const isMobile = bp === "mobile";
+  const isTablet = bp === "tablet";
 
   /* ── stat state ─────────────────────────────────── */
   const [ahi,           setAhi]           = useState<number>(0);
@@ -412,32 +431,33 @@ export default function Dashboard() {
         fontFamily: "'DM Sans', -apple-system, sans-serif",
         background: "#EEF4FF",
         minHeight: "100vh",
-        margin: "-16px -24px 0",
-        padding: "24px 32px 40px",
+        margin: isMobile ? "-16px -16px 0" : "-16px -24px 0",
+        padding: isMobile ? "16px 16px 32px" : "24px 32px 40px",
       }}
     >
       {/* ── Page Head ─────────────────────────────────────── */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 20, marginBottom: 22, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: isMobile ? 12 : 20, marginBottom: isMobile ? 16 : 22, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 14, minWidth: 0 }}>
           <div
             style={{
-              width: 48,
-              height: 48,
-              borderRadius: 14,
+              width: isMobile ? 40 : 48,
+              height: isMobile ? 40 : 48,
+              borderRadius: isMobile ? 12 : 14,
               background: GRAD_PRIMARY,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               boxShadow: "0 8px 22px rgba(0,85,255,.35)",
+              flexShrink: 0,
             }}
           >
-            <Activity size={24} color="#fff" strokeWidth={2.2} />
+            <Activity size={isMobile ? 20 : 24} color="#fff" strokeWidth={2.2} />
           </div>
-          <div>
-            <h1 style={{ fontSize: 32, fontWeight: 700, color: T1, letterSpacing: "-0.8px", margin: 0, lineHeight: 1.1 }}>
+          <div style={{ minWidth: 0 }}>
+            <h1 style={{ fontSize: isMobile ? 22 : 32, fontWeight: 700, color: T1, letterSpacing: "-0.8px", margin: 0, lineHeight: 1.1 }}>
               Executive Dashboard
             </h1>
-            <p style={{ fontSize: 12, color: T3, fontWeight: 500, margin: "5px 0 0 0", letterSpacing: "0.10em", textTransform: "uppercase" }}>
+            <p style={{ fontSize: isMobile ? 10 : 12, color: T3, fontWeight: 500, margin: "5px 0 0 0", letterSpacing: "0.10em", textTransform: "uppercase" }}>
               Real-time overview of all school operations
             </p>
           </div>
@@ -479,10 +499,10 @@ export default function Dashboard() {
         <div
           style={{
             background: GRAD_HERO,
-            borderRadius: 24,
-            padding: "28px 32px",
+            borderRadius: isMobile ? 20 : 24,
+            padding: isMobile ? "22px 20px" : "28px 32px",
             color: "#fff",
-            marginBottom: 24,
+            marginBottom: isMobile ? 18 : 24,
             position: "relative",
             overflow: "hidden",
             boxShadow: "0 14px 40px rgba(0,8,60,.32), 0 0 0 .5px rgba(255,255,255,.12)",
@@ -511,12 +531,12 @@ export default function Dashboard() {
               zIndex: 1,
             }}
           >
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 16, flex: 1, minWidth: 300 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: isMobile ? 12 : 16, flex: 1, minWidth: isMobile ? 0 : 300 }}>
               <div
                 style={{
-                  width: 52,
-                  height: 52,
-                  borderRadius: 15,
+                  width: isMobile ? 44 : 52,
+                  height: isMobile ? 44 : 52,
+                  borderRadius: isMobile ? 13 : 15,
                   background: "rgba(255,255,255,.16)",
                   border: "0.5px solid rgba(255,255,255,.26)",
                   display: "flex",
@@ -525,18 +545,18 @@ export default function Dashboard() {
                   flexShrink: 0,
                 }}
               >
-                <GraduationCap size={26} color="#fff" strokeWidth={2.2} />
+                <GraduationCap size={isMobile ? 22 : 26} color="#fff" strokeWidth={2.2} />
               </div>
-              <div>
-                <h2 style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.5px", margin: 0, color: "#fff" }}>
+              <div style={{ minWidth: 0 }}>
+                <h2 style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, letterSpacing: "-0.5px", margin: 0, color: "#fff" }}>
                   Welcome to Edullent!
                 </h2>
-                <p style={{ fontSize: 13, color: "rgba(255,255,255,.72)", fontWeight: 400, margin: "6px 0 0 0", lineHeight: 1.6 }}>
+                <p style={{ fontSize: isMobile ? 12 : 13, color: "rgba(255,255,255,.72)", fontWeight: 400, margin: "6px 0 0 0", lineHeight: 1.6 }}>
                   Your dashboard is ready. Set up branches, invite principals, and start adding data to see live analytics here.
                 </p>
               </div>
             </div>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", width: isMobile ? "100%" : "auto" }}>
               <button
                 onClick={() => navigate("/branches")}
                 style={{
@@ -552,6 +572,7 @@ export default function Dashboard() {
                   cursor: "pointer",
                   boxShadow: "0 4px 12px rgba(0,0,0,.18)",
                   fontFamily: "inherit",
+                  flex: isMobile ? 1 : "0 0 auto",
                 }}
               >
                 Add First Branch
@@ -570,6 +591,7 @@ export default function Dashboard() {
                   border: "0.5px solid rgba(255,255,255,.22)",
                   cursor: "pointer",
                   fontFamily: "inherit",
+                  flex: isMobile ? 1 : "0 0 auto",
                 }}
               >
                 Invite Principal
@@ -579,9 +601,9 @@ export default function Dashboard() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(4, 1fr)",
+              gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)",
               gap: 12,
-              marginTop: 24,
+              marginTop: isMobile ? 18 : 24,
               position: "relative",
               zIndex: 1,
             }}
@@ -635,12 +657,12 @@ export default function Dashboard() {
         <div
           style={{
             background: GRAD_HERO,
-            borderRadius: 24,
-            padding: "22px 28px",
+            borderRadius: isMobile ? 20 : 24,
+            padding: isMobile ? "18px 20px" : "22px 28px",
             position: "relative",
             overflow: "hidden",
             boxShadow: "0 12px 36px rgba(0,8,60,.28), 0 0 0 .5px rgba(255,255,255,.12)",
-            marginBottom: 18,
+            marginBottom: isMobile ? 14 : 18,
           }}
         >
           <div
@@ -665,27 +687,28 @@ export default function Dashboard() {
               pointerEvents: "none",
             }}
           />
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24, flexWrap: "wrap", position: "relative", zIndex: 1 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: isMobile ? 14 : 24, flexWrap: "wrap", position: "relative", zIndex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 12 : 16 }}>
               <div
                 style={{
-                  width: 54,
-                  height: 54,
-                  borderRadius: 16,
+                  width: isMobile ? 46 : 54,
+                  height: isMobile ? 46 : 54,
+                  borderRadius: isMobile ? 14 : 16,
                   background: "rgba(255,255,255,.16)",
                   border: "0.5px solid rgba(255,255,255,.24)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
+                  flexShrink: 0,
                 }}
               >
-                <Activity size={26} color="rgba(255,255,255,.92)" strokeWidth={2.1} />
+                <Activity size={isMobile ? 22 : 26} color="rgba(255,255,255,.92)" strokeWidth={2.1} />
               </div>
               <div>
                 <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,.50)", marginBottom: 4 }}>
                   Academic Health Index
                 </div>
-                <div style={{ fontSize: 40, fontWeight: 700, color: "#fff", letterSpacing: "-1.2px", lineHeight: 1 }}>
+                <div style={{ fontSize: isMobile ? 32 : 40, fontWeight: 700, color: "#fff", letterSpacing: "-1.2px", lineHeight: 1 }}>
                   {loading ? "—" : ahi}
                 </div>
               </div>
@@ -693,19 +716,20 @@ export default function Dashboard() {
 
             <div
               style={{
-                display: "flex",
+                display: "inline-flex",
+                alignSelf: isMobile ? "flex-start" : "center",
                 alignItems: "center",
                 gap: 6,
-                padding: "8px 18px",
+                padding: isMobile ? "6px 14px" : "8px 18px",
                 borderRadius: 100,
                 background: ahiTier.bg,
                 border: `0.5px solid ${ahiTier.border}`,
-                fontSize: 13,
+                fontSize: isMobile ? 11 : 13,
                 fontWeight: 700,
                 color: ahiTier.color,
               }}
             >
-              <TrendingUp size={14} strokeWidth={2.5} />
+              <TrendingUp size={isMobile ? 12 : 14} strokeWidth={2.5} />
               {ahiTier.label} tier
             </div>
 
@@ -717,7 +741,8 @@ export default function Dashboard() {
                 background: "rgba(255,255,255,.12)",
                 borderRadius: 14,
                 overflow: "hidden",
-                minWidth: 340,
+                minWidth: isMobile ? 0 : 340,
+                width: isMobile ? "100%" : "auto",
               }}
             >
               {[
@@ -725,8 +750,8 @@ export default function Dashboard() {
                 { v: totalStudents.toLocaleString(), l: "Students", c: "#AACCFF" },
                 { v: `${feeRate}%`, l: "Fee Rate", c: "#66EE88" },
               ].map((s, i) => (
-                <div key={i} style={{ background: "rgba(255,255,255,.08)", padding: "14px 18px", textAlign: "center", minWidth: 100 }}>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: s.c, letterSpacing: "-0.5px", lineHeight: 1, marginBottom: 4 }}>
+                <div key={i} style={{ background: "rgba(255,255,255,.08)", padding: isMobile ? "12px 10px" : "14px 18px", textAlign: "center", minWidth: isMobile ? 0 : 100 }}>
+                  <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, color: s.c, letterSpacing: "-0.5px", lineHeight: 1, marginBottom: 4 }}>
                     {s.v}
                   </div>
                   <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,.40)" }}>
@@ -740,7 +765,7 @@ export default function Dashboard() {
       )}
 
       {/* ── Bright Stat Grid (4 cards) ───────────────────── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : isTablet ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: isMobile ? 10 : 14, marginBottom: isMobile ? 16 : 20 }}>
         {[
           {
             title: "Academic Health Index",
@@ -801,8 +826,8 @@ export default function Dashboard() {
             role="button"
             tabIndex={0}
             style={{
-              borderRadius: 20,
-              padding: 20,
+              borderRadius: isMobile ? 16 : 20,
+              padding: isMobile ? 14 : 20,
               position: "relative",
               overflow: "hidden",
               background: s.bg,
@@ -813,22 +838,22 @@ export default function Dashboard() {
             }}
           >
             <div style={{ position: "absolute", top: -24, right: -20, width: 110, height: 110, borderRadius: "50%", background: "radial-gradient(circle, rgba(255,255,255,.65) 0%, transparent 70%)", pointerEvents: "none" }} />
-            <div style={{ position: "absolute", top: 16, right: 16, width: 38, height: 38, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,.75)", border: "0.5px solid rgba(255,255,255,.95)", boxShadow: "0 2px 6px rgba(0,0,0,.05)" }}>
+            <div style={{ position: "absolute", top: isMobile ? 12 : 16, right: isMobile ? 12 : 16, width: isMobile ? 32 : 38, height: isMobile ? 32 : 38, borderRadius: isMobile ? 10 : 12, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,.75)", border: "0.5px solid rgba(255,255,255,.95)", boxShadow: "0 2px 6px rgba(0,0,0,.05)" }}>
               {s.icon}
             </div>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: s.lblColor, marginBottom: 12, position: "relative", zIndex: 1 }}>
+            <div style={{ fontSize: isMobile ? 9 : 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: s.lblColor, marginBottom: isMobile ? 8 : 12, position: "relative", zIndex: 1, paddingRight: isMobile ? 40 : 0 }}>
               {s.title}
             </div>
             {loading ? (
-              <Loader2 size={24} color={s.valColor} style={{ animation: "spin 1s linear infinite" }} />
+              <Loader2 size={isMobile ? 20 : 24} color={s.valColor} style={{ animation: "spin 1s linear infinite" }} />
             ) : (
               <>
-                <div style={{ fontSize: 32, fontWeight: 700, color: s.valColor, letterSpacing: "-1px", lineHeight: 1, marginBottom: 6, position: "relative", zIndex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <div style={{ fontSize: isMobile ? 22 : 32, fontWeight: 700, color: s.valColor, letterSpacing: "-1px", lineHeight: 1, marginBottom: 6, position: "relative", zIndex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {s.value}
                 </div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: s.subColor, position: "relative", zIndex: 1, display: "flex", alignItems: "center", gap: 4 }}>
+                <div style={{ fontSize: isMobile ? 10 : 11, fontWeight: 600, color: s.subColor, position: "relative", zIndex: 1, display: "flex", alignItems: "center", gap: 4 }}>
                   {s.up ? <ArrowUpRight size={12} strokeWidth={2.5} /> : <ArrowDownRight size={12} strokeWidth={2.5} />}
-                  {s.sub}
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.sub}</span>
                 </div>
               </>
             )}
@@ -838,10 +863,10 @@ export default function Dashboard() {
       </div>
 
       {/* ── Middle Row ───────────────────────────────────── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 14, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : isTablet ? "repeat(2, 1fr)" : "repeat(12, 1fr)", gap: isMobile ? 12 : 14, marginBottom: isMobile ? 16 : 20 }}>
 
         {/* Branch Overview */}
-        <div style={{ gridColumn: "span 4", background: "#fff", borderRadius: 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: "22px 24px" }}>
+        <div style={{ gridColumn: isMobile ? "span 1" : isTablet ? "span 1" : "span 4", background: "#fff", borderRadius: isMobile ? 20 : 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: isMobile ? "18px 18px" : "22px 24px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
             <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: 0 }}>Branch Overview</h3>
             {branches.length > 0 && (
@@ -889,7 +914,7 @@ export default function Dashboard() {
         </div>
 
         {/* Risk Distribution */}
-        <div style={{ gridColumn: "span 4", background: "#fff", borderRadius: 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: "22px 24px" }}>
+        <div style={{ gridColumn: isMobile ? "span 1" : isTablet ? "span 1" : "span 4", background: "#fff", borderRadius: isMobile ? 20 : 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: isMobile ? "18px 18px" : "22px 24px" }}>
           <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: "0 0 18px 0" }}>Risk Distribution</h3>
           {riskData.every(r => r.value === 0) ? (
             <div style={{ height: 220, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, borderRadius: 18, border: "0.5px dashed rgba(0,85,255,.2)", background: "rgba(0,200,83,.03)" }}>
@@ -932,7 +957,7 @@ export default function Dashboard() {
         </div>
 
         {/* Revenue Trend */}
-        <div style={{ gridColumn: "span 4", background: "#fff", borderRadius: 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: "22px 24px" }}>
+        <div style={{ gridColumn: isMobile ? "span 1" : isTablet ? "span 2" : "span 4", background: "#fff", borderRadius: isMobile ? 20 : 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: isMobile ? "18px 18px" : "22px 24px" }}>
           <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: "0 0 18px 0" }}>Revenue Trend</h3>
           {revenueTrend.every(r => r.revenue === 0) ? (
             <div style={{ height: 220, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, borderRadius: 18, border: "0.5px dashed rgba(0,85,255,.2)", background: "rgba(0,85,255,.03)" }}>
@@ -945,7 +970,7 @@ export default function Dashboard() {
               </div>
             </div>
           ) : (
-            <div style={{ height: 220, width: "100%" }}>
+            <div style={{ height: isMobile ? 180 : 220, width: "100%" }}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={revenueTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
@@ -967,10 +992,10 @@ export default function Dashboard() {
       </div>
 
       {/* ── Bottom Row ───────────────────────────────────── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 12 : 14, marginBottom: isMobile ? 16 : 20 }}>
 
         {/* Critical Alerts */}
-        <div style={{ background: "#fff", borderRadius: 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: "22px 24px" }}>
+        <div style={{ background: "#fff", borderRadius: isMobile ? 20 : 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: isMobile ? "18px 18px" : "22px 24px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
             <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: 0 }}>Critical Alerts</h3>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1037,12 +1062,12 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div style={{ background: "#fff", borderRadius: 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: "22px 24px" }}>
+        <div style={{ background: "#fff", borderRadius: isMobile ? 20 : 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: isMobile ? "18px 18px" : "22px 24px" }}>
           <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: "0 0 16px 0" }}>Quick Actions</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: isMobile ? 10 : 12 }}>
             <button
               onClick={() => navigate("/reports")}
-              style={{ display: "flex", alignItems: "center", gap: 12, padding: 18, borderRadius: 16, background: GRAD_PRIMARY, color: "#fff", border: "none", boxShadow: SHADOW_BTN, cursor: "pointer", textAlign: "left", fontFamily: "inherit", position: "relative", overflow: "hidden" }}
+              style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 12, padding: isMobile ? 14 : 18, borderRadius: 16, background: GRAD_PRIMARY, color: "#fff", border: "none", boxShadow: SHADOW_BTN, cursor: "pointer", textAlign: "left", fontFamily: "inherit", position: "relative", overflow: "hidden" }}
             >
               <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, rgba(255,255,255,.14) 0%, transparent 52%)", pointerEvents: "none" }} />
               <div style={{ padding: 10, borderRadius: 11, background: "rgba(255,255,255,.18)", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", zIndex: 1 }}>
@@ -1052,7 +1077,7 @@ export default function Dashboard() {
             </button>
             <button
               onClick={() => navigate("/branches")}
-              style={{ display: "flex", alignItems: "center", gap: 12, padding: 18, borderRadius: 16, background: "rgba(0,200,83,.06)", color: "#005A20", border: "0.5px solid rgba(0,200,83,.22)", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}
+              style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 12, padding: isMobile ? 14 : 18, borderRadius: 16, background: "rgba(0,200,83,.06)", color: "#005A20", border: "0.5px solid rgba(0,200,83,.22)", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}
             >
               <div style={{ padding: 10, borderRadius: 11, background: "rgba(0,200,83,.10)", border: "0.5px solid rgba(0,200,83,.22)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <Mail size={18} color={GREEN} strokeWidth={2.4} />
@@ -1061,7 +1086,7 @@ export default function Dashboard() {
             </button>
             <button
               onClick={() => navigate("/principals")}
-              style={{ display: "flex", alignItems: "center", gap: 12, padding: 18, borderRadius: 16, background: "rgba(123,63,244,.06)", color: "#3A1580", border: "0.5px solid rgba(123,63,244,.22)", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}
+              style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 12, padding: isMobile ? 14 : 18, borderRadius: 16, background: "rgba(123,63,244,.06)", color: "#3A1580", border: "0.5px solid rgba(123,63,244,.22)", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}
             >
               <div style={{ padding: 10, borderRadius: 11, background: "rgba(123,63,244,.10)", border: "0.5px solid rgba(123,63,244,.22)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <Calendar size={18} color="#7B3FF4" strokeWidth={2.4} />
@@ -1070,7 +1095,7 @@ export default function Dashboard() {
             </button>
             <button
               onClick={() => navigate("/settings")}
-              style={{ display: "flex", alignItems: "center", gap: 12, padding: 18, borderRadius: 16, background: "rgba(255,136,0,.06)", color: "#663300", border: "0.5px solid rgba(255,136,0,.22)", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}
+              style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 12, padding: isMobile ? 14 : 18, borderRadius: 16, background: "rgba(255,136,0,.06)", color: "#663300", border: "0.5px solid rgba(255,136,0,.22)", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}
             >
               <div style={{ padding: 10, borderRadius: 11, background: "rgba(255,136,0,.10)", border: "0.5px solid rgba(255,136,0,.22)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <Settings size={18} color="#FF8800" strokeWidth={2.4} />
@@ -1083,7 +1108,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Improvement Timeline ─────────────────────────── */}
-      <div style={{ background: "#fff", borderRadius: 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: "22px 24px", marginBottom: 20 }}>
+      <div style={{ background: "#fff", borderRadius: isMobile ? 20 : 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: isMobile ? "18px 18px" : "22px 24px", marginBottom: isMobile ? 16 : 20 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
           <div>
             <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: 0 }}>School Improvement Timeline</h3>
@@ -1121,7 +1146,7 @@ export default function Dashboard() {
           </div>
         ) : (
           <>
-            <div style={{ height: 240, width: "100%" }}>
+            <div style={{ height: isMobile ? 200 : 240, width: "100%" }}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={improvementTimeline} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
