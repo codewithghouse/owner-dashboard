@@ -11,9 +11,10 @@ import { useNavigate } from "react-router-dom";
 import {
   B1, T1, T3, T4, GREEN, RED, GOLD, VIOLET, ORANGE,
   GRAD_PRIMARY, GRAD_BLUE, GRAD_GREEN, GRAD_VIOLET, GRAD_GOLD, GRAD_RED,
-  SHADOW_SM, SHADOW_BTN, pageShellStyle,
+  SHADOW_SM, SHADOW_BTN, usePageShellStyle,
   DashGlobalStyles, PageHead, StatTile, DarkHero, Card3D, AIInsightCard,
 } from "@/lib/dashboardTokens";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 /* Performance thresholds on the 0-100 overall score */
 const TOP_SCORE_THRESHOLD = 75;
@@ -77,6 +78,8 @@ type TabKey = "branch" | "class" | "top" | "defaulter";
 /* ══════════════════════════════════════════════════════ */
 export default function TeachersDirectory() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
+  const pageShellStyle = usePageShellStyle();
 
   /* ── raw state ──────────────────────────────────── */
   const [loading,   setLoading]   = useState(true);
@@ -530,11 +533,12 @@ export default function TeachersDirectory() {
                 onClick={resetFilters}
                 className="dash-btn"
                 style={{
-                  display:"inline-flex", alignItems:"center", gap:7,
-                  padding:"10px 16px", borderRadius:12,
+                  display:"inline-flex", alignItems:"center", justifyContent:"center", gap:7,
+                  padding: isMobile ? "9px 14px" : "10px 16px", borderRadius:12,
                   background:"#fff", border:"0.5px solid rgba(0,85,255,.12)",
-                  fontSize:11, fontWeight:800, color:T3, letterSpacing:"0.08em", textTransform:"uppercase",
+                  fontSize: isMobile ? 10 : 11, fontWeight:800, color:T3, letterSpacing:"0.08em", textTransform:"uppercase",
                   cursor:"pointer", boxShadow:SHADOW_SM, fontFamily:"inherit",
+                  width: isMobile ? "100%" : "auto",
                 }}
               >
                 <X size={13}/> Clear Filters
@@ -558,15 +562,15 @@ export default function TeachersDirectory() {
         {/* Scoring banner */}
         <div
           style={{
-            background:"#fff", borderRadius:18, padding:"14px 18px",
+            background:"#fff", borderRadius: isMobile ? 14 : 18, padding: isMobile ? "12px 14px" : "14px 18px",
             border:"0.5px solid rgba(0,85,255,.10)", boxShadow:SHADOW_SM,
-            marginBottom:24, display:"flex", alignItems:"flex-start", gap:12,
+            marginBottom: isMobile ? 16 : 24, display:"flex", alignItems:"flex-start", gap: isMobile ? 10 : 12,
           }}
         >
-          <div style={{ width:36, height:36, borderRadius:11, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(0,85,255,.28)", flexShrink:0 }}>
-            <Sparkles size={18} color="#fff" strokeWidth={2.3}/>
+          <div style={{ width: isMobile ? 30 : 36, height: isMobile ? 30 : 36, borderRadius: isMobile ? 10 : 11, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(0,85,255,.28)", flexShrink:0 }}>
+            <Sparkles size={isMobile ? 15 : 18} color="#fff" strokeWidth={2.3}/>
           </div>
-          <div style={{ fontSize:11, fontWeight:600, color:T3, lineHeight:1.5 }}>
+          <div style={{ fontSize: isMobile ? 10 : 11, fontWeight:600, color:T3, lineHeight:1.5 }}>
             <span style={{ fontWeight:800, color:B1 }}>Activity-Based Score</span> — weighted from test scores (30%),
             own attendance (15%), attendance marking (15%), assignments (10%), tests (10%), lesson plans (10%),
             parent notes (5%), reports (5%).
@@ -574,12 +578,12 @@ export default function TeachersDirectory() {
         </div>
 
         {/* Filters row */}
-        <Card3D padding="16px 18px" style={{ marginBottom:24 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
+        <Card3D padding={isMobile ? "14px 14px" : "16px 18px"} style={{ marginBottom: isMobile ? 16 : 24 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom: isMobile ? 10 : 12 }}>
             <Filter size={14} color={T4}/>
             <span style={{ fontSize:10, fontWeight:800, color:T4, letterSpacing:"0.14em", textTransform:"uppercase" }}>Filters</span>
           </div>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:12 }}>
+          <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: isMobile ? 10 : 12 }}>
             <div style={{ position:"relative" }}>
               <Search size={14} color={T4} style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)" }}/>
               <input
@@ -627,7 +631,7 @@ export default function TeachersDirectory() {
         </Card3D>
 
         {/* Bright stat grid */}
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16, marginBottom:24 }}>
+        <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: isMobile ? 10 : 16, marginBottom: isMobile ? 16 : 24 }}>
           <StatTile label="Total Teachers"   value={totalTeachers.toString()}  sub={`In ${branchFilter === "All" ? "all branches" : branchFilter}`} grad={GRAD_BLUE}   icon={Users}        onClick={()=>{ setTab("branch"); }} />
           <StatTile label="Top Performers"   value={topCount.toString()}       sub={`${totalTeachers > 0 ? ((topCount/totalTeachers)*100).toFixed(0) : 0}% of staff`} grad={GRAD_GREEN}  icon={Trophy}       onClick={()=>{ setTab("top"); }} />
           <StatTile label="Defaulters"       value={defCount.toString()}       sub={`${totalTeachers > 0 ? ((defCount/totalTeachers)*100).toFixed(0) : 0}% need attention`} grad={defCount > 0 ? GRAD_RED : GRAD_GOLD} icon={TrendingDown} onClick={()=>{ setTab("defaulter"); }} />
@@ -637,12 +641,12 @@ export default function TeachersDirectory() {
         {/* Tabs */}
         <div
           style={{
-            background:"#fff", borderRadius:22,
+            background:"#fff", borderRadius: isMobile ? 16 : 22,
             boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
-            overflow:"hidden", marginBottom:24,
+            overflow:"hidden", marginBottom: isMobile ? 16 : 24,
           }}
         >
-          <div style={{ display:"flex", gap:4, borderBottom:"0.5px solid rgba(0,85,255,.08)", padding:"6px 8px", overflowX:"auto" }}>
+          <div style={{ display:"flex", gap:4, borderBottom:"0.5px solid rgba(0,85,255,.08)", padding: isMobile ? "6px 6px" : "6px 8px", overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
             {tabs.map(t => {
               const active = tab === t.key;
               return (
@@ -651,16 +655,17 @@ export default function TeachersDirectory() {
                   onClick={()=>{ setTab(t.key); setExpanded(new Set()); }}
                   className="dash-btn"
                   style={{
-                    display:"inline-flex", alignItems:"center", gap:8,
-                    padding:"10px 16px", borderRadius:12,
+                    display:"inline-flex", alignItems:"center", gap: isMobile ? 6 : 8,
+                    padding: isMobile ? "8px 12px" : "10px 16px", borderRadius:12,
                     background: active ? GRAD_PRIMARY : "transparent",
                     color: active ? "#fff" : T3,
-                    fontSize:11, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
+                    fontSize: isMobile ? 10 : 11, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
                     border:"none", cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap",
                     boxShadow: active ? SHADOW_BTN : "none",
+                    flexShrink:0,
                   }}
                 >
-                  <t.icon size={14} strokeWidth={2.4}/>
+                  <t.icon size={isMobile ? 12 : 14} strokeWidth={2.4}/>
                   <span>{t.label}</span>
                   <span style={{
                     fontSize:10, fontWeight:800, padding:"2px 7px", borderRadius:999,
@@ -674,7 +679,7 @@ export default function TeachersDirectory() {
             })}
           </div>
 
-          <div style={{ padding:22 }}>
+          <div style={{ padding: isMobile ? 14 : 22 }}>
             {tab === "branch" && (
               <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
                 <GroupControls
@@ -690,45 +695,45 @@ export default function TeachersDirectory() {
                     const topInBranch = list.filter(t => t.category === "top").length;
                     const defInBranch = list.filter(t => t.category === "defaulter").length;
                     return (
-                      <div key={branchName} style={{ background:"#F5F9FF", borderRadius:18, border:"0.5px solid rgba(0,85,255,.08)", overflow:"hidden" }}>
+                      <div key={branchName} style={{ background:"#F5F9FF", borderRadius: isMobile ? 14 : 18, border:"0.5px solid rgba(0,85,255,.08)", overflow:"hidden" }}>
                         <button
                           onClick={()=>toggleGroup(branchName)}
                           className="dash-row"
                           style={{
-                            width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between",
-                            padding:"14px 18px", background:"transparent", border:"none", cursor:"pointer",
+                            width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", gap: isMobile ? 8 : 12,
+                            padding: isMobile ? "12px 14px" : "14px 18px", background:"transparent", border:"none", cursor:"pointer",
                             fontFamily:"inherit",
                           }}
                         >
-                          <div style={{ display:"flex", alignItems:"center", gap:12, minWidth:0 }}>
-                            <div style={{ width:42, height:42, borderRadius:13, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(0,85,255,.22)", flexShrink:0 }}>
-                              <Building2 size={20} color="#fff" strokeWidth={2.3}/>
+                          <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 12, minWidth:0, flex:1 }}>
+                            <div style={{ width: isMobile ? 36 : 42, height: isMobile ? 36 : 42, borderRadius: isMobile ? 11 : 13, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(0,85,255,.22)", flexShrink:0 }}>
+                              <Building2 size={isMobile ? 17 : 20} color="#fff" strokeWidth={2.3}/>
                             </div>
                             <div style={{ textAlign:"left", minWidth:0 }}>
-                              <h3 style={{ fontSize:14, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.2px", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{branchName}</h3>
-                              <p style={{ fontSize:10, fontWeight:700, color:T4, margin:"2px 0 0 0", letterSpacing:"0.10em", textTransform:"uppercase" }}>
+                              <h3 style={{ fontSize: isMobile ? 13 : 14, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.2px", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{branchName}</h3>
+                              <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:700, color:T4, margin:"2px 0 0 0", letterSpacing:"0.10em", textTransform:"uppercase" }}>
                                 {list.length} teacher{list.length !== 1 ? "s" : ""}
                               </p>
                             </div>
                           </div>
-                          <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
+                          <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 4 : 8, flexShrink:0 }}>
                             {topInBranch > 0 && (
-                              <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:10, fontWeight:800, padding:"4px 10px", borderRadius:999, background:"rgba(0,200,83,.12)", color:GREEN }}>
-                                <Trophy size={11}/> {topInBranch}
+                              <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize: isMobile ? 9 : 10, fontWeight:800, padding: isMobile ? "3px 7px" : "4px 10px", borderRadius:999, background:"rgba(0,200,83,.12)", color:GREEN }}>
+                                <Trophy size={isMobile ? 10 : 11}/> {topInBranch}
                               </span>
                             )}
                             {defInBranch > 0 && (
-                              <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:10, fontWeight:800, padding:"4px 10px", borderRadius:999, background:"rgba(255,51,85,.12)", color:RED }}>
-                                <AlertTriangle size={11}/> {defInBranch}
+                              <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize: isMobile ? 9 : 10, fontWeight:800, padding: isMobile ? "3px 7px" : "4px 10px", borderRadius:999, background:"rgba(255,51,85,.12)", color:RED }}>
+                                <AlertTriangle size={isMobile ? 10 : 11}/> {defInBranch}
                               </span>
                             )}
-                            <ChevronRight size={18} color={T4} style={{ transition:"transform .3s", transform: isOpen ? "rotate(90deg)" : "rotate(0)" }}/>
+                            <ChevronRight size={isMobile ? 16 : 18} color={T4} style={{ transition:"transform .3s", transform: isOpen ? "rotate(90deg)" : "rotate(0)" }}/>
                           </div>
                         </button>
                         {isOpen && (
-                          <div style={{ padding:"4px 18px 18px 18px", display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(260px, 1fr))", gap:12 }}>
+                          <div style={{ padding: isMobile ? "4px 12px 14px 12px" : "4px 18px 18px 18px", display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(260px, 1fr))", gap: isMobile ? 10 : 12 }}>
                             {list.map(t => (
-                              <TeacherCard key={t.id} teacher={t} onClick={() => navigate(`/teachers/${t.id}`)} />
+                              <TeacherCard key={t.id} teacher={t} onClick={() => navigate(`/teachers/${t.id}`)} isMobile={isMobile} />
                             ))}
                           </div>
                         )}
@@ -752,33 +757,33 @@ export default function TeachersDirectory() {
                   byClass.map(([className, { classInfo, teachers: list }]) => {
                     const isOpen = expanded.has(className);
                     return (
-                      <div key={className} style={{ background:"#F5F9FF", borderRadius:18, border:"0.5px solid rgba(0,85,255,.08)", overflow:"hidden" }}>
+                      <div key={className} style={{ background:"#F5F9FF", borderRadius: isMobile ? 14 : 18, border:"0.5px solid rgba(0,85,255,.08)", overflow:"hidden" }}>
                         <button
                           onClick={()=>toggleGroup(className)}
                           className="dash-row"
                           style={{
-                            width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between",
-                            padding:"14px 18px", background:"transparent", border:"none", cursor:"pointer",
+                            width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", gap: isMobile ? 8 : 12,
+                            padding: isMobile ? "12px 14px" : "14px 18px", background:"transparent", border:"none", cursor:"pointer",
                             fontFamily:"inherit",
                           }}
                         >
-                          <div style={{ display:"flex", alignItems:"center", gap:12, minWidth:0 }}>
-                            <div style={{ width:42, height:42, borderRadius:13, background:GRAD_VIOLET, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(123,63,244,.22)", flexShrink:0 }}>
-                              <BookOpen size={20} color="#fff" strokeWidth={2.3}/>
+                          <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 12, minWidth:0, flex:1 }}>
+                            <div style={{ width: isMobile ? 36 : 42, height: isMobile ? 36 : 42, borderRadius: isMobile ? 11 : 13, background:GRAD_VIOLET, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(123,63,244,.22)", flexShrink:0 }}>
+                              <BookOpen size={isMobile ? 17 : 20} color="#fff" strokeWidth={2.3}/>
                             </div>
                             <div style={{ textAlign:"left", minWidth:0 }}>
-                              <h3 style={{ fontSize:14, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.2px", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{className}</h3>
-                              <p style={{ fontSize:10, fontWeight:700, color:T4, margin:"2px 0 0 0", letterSpacing:"0.10em", textTransform:"uppercase" }}>
+                              <h3 style={{ fontSize: isMobile ? 13 : 14, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.2px", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{className}</h3>
+                              <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:700, color:T4, margin:"2px 0 0 0", letterSpacing:"0.10em", textTransform:"uppercase", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                                 {list.length} teacher{list.length !== 1 ? "s" : ""}{classInfo?.subject ? ` · ${classInfo.subject}` : ""}
                               </p>
                             </div>
                           </div>
-                          <ChevronRight size={18} color={T4} style={{ flexShrink:0, transition:"transform .3s", transform: isOpen ? "rotate(90deg)" : "rotate(0)" }}/>
+                          <ChevronRight size={isMobile ? 16 : 18} color={T4} style={{ flexShrink:0, transition:"transform .3s", transform: isOpen ? "rotate(90deg)" : "rotate(0)" }}/>
                         </button>
                         {isOpen && (
-                          <div style={{ padding:"4px 18px 18px 18px", display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(260px, 1fr))", gap:12 }}>
+                          <div style={{ padding: isMobile ? "4px 12px 14px 12px" : "4px 18px 18px 18px", display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(260px, 1fr))", gap: isMobile ? 10 : 12 }}>
                             {list.map(t => (
-                              <TeacherCard key={t.id} teacher={t} onClick={() => navigate(`/teachers/${t.id}`)} />
+                              <TeacherCard key={t.id} teacher={t} onClick={() => navigate(`/teachers/${t.id}`)} isMobile={isMobile} />
                             ))}
                           </div>
                         )}
@@ -790,20 +795,20 @@ export default function TeachersDirectory() {
             )}
 
             {tab === "top" && (
-              <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+              <div style={{ display:"flex", flexDirection:"column", gap: isMobile ? 12 : 16 }}>
                 <div
                   style={{
-                    background:GRAD_GREEN, borderRadius:18, padding:"18px 22px",
-                    color:"#fff", display:"flex", gap:14, alignItems:"flex-start",
+                    background:GRAD_GREEN, borderRadius: isMobile ? 14 : 18, padding: isMobile ? "14px 16px" : "18px 22px",
+                    color:"#fff", display:"flex", gap: isMobile ? 12 : 14, alignItems:"flex-start",
                     boxShadow:"0 14px 38px rgba(0,200,83,.26)",
                   }}
                 >
-                  <div style={{ width:44, height:44, borderRadius:13, background:"rgba(255,255,255,.22)", border:"0.5px solid rgba(255,255,255,.28)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                    <Trophy size={22} color="#fff" strokeWidth={2.2}/>
+                  <div style={{ width: isMobile ? 38 : 44, height: isMobile ? 38 : 44, borderRadius: isMobile ? 11 : 13, background:"rgba(255,255,255,.22)", border:"0.5px solid rgba(255,255,255,.28)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                    <Trophy size={isMobile ? 18 : 22} color="#fff" strokeWidth={2.2}/>
                   </div>
-                  <div>
-                    <h3 style={{ fontSize:16, fontWeight:800, color:"#fff", margin:0, letterSpacing:"-0.3px" }}>Top Performing Teachers</h3>
-                    <p style={{ fontSize:12, fontWeight:500, color:"rgba(255,255,255,.85)", margin:"6px 0 0 0", lineHeight:1.5 }}>
+                  <div style={{ minWidth:0 }}>
+                    <h3 style={{ fontSize: isMobile ? 14 : 16, fontWeight:800, color:"#fff", margin:0, letterSpacing:"-0.3px" }}>Top Performing Teachers</h3>
+                    <p style={{ fontSize: isMobile ? 11 : 12, fontWeight:500, color:"rgba(255,255,255,.85)", margin:"6px 0 0 0", lineHeight:1.5 }}>
                       Teachers with overall activity score ≥ <b>{TOP_SCORE_THRESHOLD}%</b>.
                       Scoring blends test results, attendance discipline, assignments, lesson plans &amp; parent communication.
                     </p>
@@ -812,9 +817,9 @@ export default function TeachersDirectory() {
                 {topPerformers.length === 0 ? (
                   <EmptyState message="No top performers yet — activity data will populate as teachers work" icon={Award} />
                 ) : (
-                  <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(280px, 1fr))", gap:14 }}>
+                  <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(280px, 1fr))", gap: isMobile ? 10 : 14 }}>
                     {topPerformers.map((t, i) => (
-                      <TopCard key={t.id} teacher={t} rank={i + 1} onClick={() => navigate(`/teachers/${t.id}`)} />
+                      <TopCard key={t.id} teacher={t} rank={i + 1} onClick={() => navigate(`/teachers/${t.id}`)} isMobile={isMobile} />
                     ))}
                   </div>
                 )}
@@ -822,20 +827,20 @@ export default function TeachersDirectory() {
             )}
 
             {tab === "defaulter" && (
-              <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+              <div style={{ display:"flex", flexDirection:"column", gap: isMobile ? 12 : 16 }}>
                 <div
                   style={{
-                    background:GRAD_RED, borderRadius:18, padding:"18px 22px",
-                    color:"#fff", display:"flex", gap:14, alignItems:"flex-start",
+                    background:GRAD_RED, borderRadius: isMobile ? 14 : 18, padding: isMobile ? "14px 16px" : "18px 22px",
+                    color:"#fff", display:"flex", gap: isMobile ? 12 : 14, alignItems:"flex-start",
                     boxShadow:"0 14px 38px rgba(255,51,85,.26)",
                   }}
                 >
-                  <div style={{ width:44, height:44, borderRadius:13, background:"rgba(255,255,255,.22)", border:"0.5px solid rgba(255,255,255,.28)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                    <AlertTriangle size={22} color="#fff" strokeWidth={2.2}/>
+                  <div style={{ width: isMobile ? 38 : 44, height: isMobile ? 38 : 44, borderRadius: isMobile ? 11 : 13, background:"rgba(255,255,255,.22)", border:"0.5px solid rgba(255,255,255,.28)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                    <AlertTriangle size={isMobile ? 18 : 22} color="#fff" strokeWidth={2.2}/>
                   </div>
-                  <div>
-                    <h3 style={{ fontSize:16, fontWeight:800, color:"#fff", margin:0, letterSpacing:"-0.3px" }}>Teachers Needing Attention</h3>
-                    <p style={{ fontSize:12, fontWeight:500, color:"rgba(255,255,255,.85)", margin:"6px 0 0 0", lineHeight:1.5 }}>
+                  <div style={{ minWidth:0 }}>
+                    <h3 style={{ fontSize: isMobile ? 14 : 16, fontWeight:800, color:"#fff", margin:0, letterSpacing:"-0.3px" }}>Teachers Needing Attention</h3>
+                    <p style={{ fontSize: isMobile ? 11 : 12, fontWeight:500, color:"rgba(255,255,255,.85)", margin:"6px 0 0 0", lineHeight:1.5 }}>
                       Teachers with overall activity score below <b>{LOW_SCORE_THRESHOLD}%</b>.
                       Look at the reason tags to decide whether they need mentoring, training or a review.
                     </p>
@@ -844,9 +849,9 @@ export default function TeachersDirectory() {
                 {defaulters.length === 0 ? (
                   <EmptyState message="Great news — no defaulters in this filter" icon={CheckCircle2} />
                 ) : (
-                  <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(280px, 1fr))", gap:14 }}>
+                  <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(280px, 1fr))", gap: isMobile ? 10 : 14 }}>
                     {defaulters.map(t => (
-                      <DefaulterCard key={t.id} teacher={t} onClick={() => navigate(`/teachers/${t.id}`)} />
+                      <DefaulterCard key={t.id} teacher={t} onClick={() => navigate(`/teachers/${t.id}`)} isMobile={isMobile} />
                     ))}
                   </div>
                 )}
@@ -934,20 +939,20 @@ function ActivityChip({ icon: Icon, count, label, color }: { icon: any; count: n
   );
 }
 
-function TeacherCard({ teacher, onClick }: { teacher: any; onClick: () => void }) {
+function TeacherCard({ teacher, onClick, isMobile = false }: { teacher: any; onClick: () => void; isMobile?: boolean }) {
   const tr = tierFromScore(teacher.overall);
   return (
     <div
       onClick={onClick}
       className="dash-card"
       style={{
-        background:"#fff", border:"0.5px solid rgba(0,85,255,.08)", borderRadius:18,
-        padding:"16px 18px", cursor:"pointer", boxShadow:SHADOW_SM,
+        background:"#fff", border:"0.5px solid rgba(0,85,255,.08)", borderRadius: isMobile ? 14 : 18,
+        padding: isMobile ? "14px 14px" : "16px 18px", cursor:"pointer", boxShadow:SHADOW_SM,
       }}
     >
-      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:12 }}>
+      <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 12, marginBottom: isMobile ? 10 : 12 }}>
         <div style={{
-          width:40, height:40, borderRadius:12, background:tr.grad,
+          width: isMobile ? 36 : 40, height: isMobile ? 36 : 40, borderRadius: isMobile ? 11 : 12, background:tr.grad,
           display:"flex", alignItems:"center", justifyContent:"center",
           color:"#fff", fontSize:11, fontWeight:800,
           boxShadow:"0 6px 14px rgba(0,85,255,.18)", flexShrink:0,
@@ -966,7 +971,7 @@ function TeacherCard({ teacher, onClick }: { teacher: any; onClick: () => void }
           {tr.label}
         </span>
       </div>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:6, textAlign:"center", padding:"10px 0", borderTop:"0.5px solid rgba(0,85,255,.08)", borderBottom:"0.5px solid rgba(0,85,255,.08)", marginBottom:10 }}>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:6, textAlign:"center", padding: isMobile ? "8px 0" : "10px 0", borderTop:"0.5px solid rgba(0,85,255,.08)", borderBottom:"0.5px solid rgba(0,85,255,.08)", marginBottom: isMobile ? 8 : 10 }}>
         <div>
           <p style={{ fontSize:8, fontWeight:800, color:T4, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 2px 0" }}>Overall</p>
           <p style={{ fontSize:13, fontWeight:800, color:tr.color, margin:0 }}>{teacher.overall > 0 ? `${teacher.overall}%` : "—"}</p>
@@ -980,7 +985,7 @@ function TeacherCard({ teacher, onClick }: { teacher: any; onClick: () => void }
           <p style={{ fontSize:13, fontWeight:800, color:T1, margin:0 }}>{teacher.classCount}</p>
         </div>
       </div>
-      <div style={{ display:"flex", justifyContent:"space-between", background:"#F5F9FF", borderRadius:10, padding:"6px 10px" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", background:"#F5F9FF", borderRadius:10, padding: isMobile ? "6px 8px" : "6px 10px", gap:4 }}>
         <ActivityChip icon={ClipboardCheck} count={teacher.attMarkCount} label="Attendance" color={B1}/>
         <ActivityChip icon={FileText}       count={teacher.assignCount}  label="Assignments" color={ORANGE}/>
         <ActivityChip icon={Activity}       count={teacher.testCount}    label="Tests" color={VIOLET}/>
@@ -991,7 +996,7 @@ function TeacherCard({ teacher, onClick }: { teacher: any; onClick: () => void }
   );
 }
 
-function TopCard({ teacher, rank, onClick }: { teacher: any; rank: number; onClick: () => void }) {
+function TopCard({ teacher, rank, onClick, isMobile = false }: { teacher: any; rank: number; onClick: () => void; isMobile?: boolean }) {
   const medalGrad =
     rank === 1 ? "linear-gradient(135deg,#FFD700,#FFAA00)" :
     rank === 2 ? "linear-gradient(135deg,#C0C0C0,#808080)" :
@@ -1002,16 +1007,16 @@ function TopCard({ teacher, rank, onClick }: { teacher: any; rank: number; onCli
       onClick={onClick}
       className="dash-card"
       style={{
-        background:"#fff", border:"0.5px solid rgba(0,200,83,.18)", borderRadius:20,
-        padding:"20px 22px", cursor:"pointer", boxShadow:SHADOW_SM,
+        background:"#fff", border:"0.5px solid rgba(0,200,83,.18)", borderRadius: isMobile ? 16 : 20,
+        padding: isMobile ? "16px 16px" : "20px 22px", cursor:"pointer", boxShadow:SHADOW_SM,
         position:"relative", overflow:"hidden",
       }}
     >
       <div style={{ position:"absolute", top:-30, right:-30, width:120, height:120, background:"radial-gradient(circle, rgba(0,200,83,.14) 0%, transparent 70%)", borderRadius:"50%", pointerEvents:"none" }}/>
       <div style={{ position:"relative", zIndex:1 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:14 }}>
+        <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 12, marginBottom: isMobile ? 12 : 14 }}>
           <div style={{
-            width:44, height:44, borderRadius:13, background:GRAD_GREEN,
+            width: isMobile ? 38 : 44, height: isMobile ? 38 : 44, borderRadius: isMobile ? 11 : 13, background:GRAD_GREEN,
             display:"flex", alignItems:"center", justifyContent:"center",
             color:"#fff", fontSize:12, fontWeight:800,
             boxShadow:"0 6px 14px rgba(0,200,83,.22)", flexShrink:0,
@@ -1019,20 +1024,20 @@ function TopCard({ teacher, rank, onClick }: { teacher: any; rank: number; onCli
             {initials(teacher.name)}
           </div>
           <div style={{ flex:1, minWidth:0 }}>
-            <p style={{ fontSize:14, fontWeight:800, color:T1, margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", letterSpacing:"-0.2px" }}>{teacher.name}</p>
+            <p style={{ fontSize: isMobile ? 13 : 14, fontWeight:800, color:T1, margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", letterSpacing:"-0.2px" }}>{teacher.name}</p>
             <p style={{ fontSize:10, fontWeight:700, color:T4, margin:"2px 0 0 0", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{teacher.subject || "—"} · {teacher.branchName}</p>
           </div>
           <div style={{
-            width:36, height:36, borderRadius:11, background:medalGrad,
+            width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: isMobile ? 10 : 11, background:medalGrad,
             display:"flex", alignItems:"center", justifyContent:"center",
             boxShadow:"0 6px 14px rgba(0,0,0,.22)", flexShrink:0,
           }}>
-            <Medal size={16} color="#fff" strokeWidth={2.3}/>
+            <Medal size={isMobile ? 14 : 16} color="#fff" strokeWidth={2.3}/>
           </div>
         </div>
 
         {teacher.reasons.length > 0 && (
-          <div style={{ display:"flex", flexWrap:"wrap", gap:5, marginBottom:14 }}>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:5, marginBottom: isMobile ? 12 : 14 }}>
             {teacher.reasons.map((r: string) => (
               <span key={r} style={{
                 fontSize:9, fontWeight:800, padding:"3px 8px", borderRadius:999,
@@ -1045,14 +1050,14 @@ function TopCard({ teacher, rank, onClick }: { teacher: any; rank: number; onCli
           </div>
         )}
 
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(2, 1fr)", gap:8, marginBottom:12 }}>
-          <div style={{ textAlign:"center", background:"rgba(0,200,83,.10)", borderRadius:12, padding:"8px 6px" }}>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(2, 1fr)", gap:8, marginBottom: isMobile ? 10 : 12 }}>
+          <div style={{ textAlign:"center", background:"rgba(0,200,83,.10)", borderRadius:12, padding: isMobile ? "7px 6px" : "8px 6px" }}>
             <p style={{ fontSize:9, fontWeight:800, color:GREEN, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 2px 0" }}>Overall</p>
-            <p style={{ fontSize:18, fontWeight:800, color:GREEN, margin:0 }}>{teacher.overall}%</p>
+            <p style={{ fontSize: isMobile ? 16 : 18, fontWeight:800, color:GREEN, margin:0 }}>{teacher.overall}%</p>
           </div>
-          <div style={{ textAlign:"center", background:"rgba(0,85,255,.08)", borderRadius:12, padding:"8px 6px" }}>
+          <div style={{ textAlign:"center", background:"rgba(0,85,255,.08)", borderRadius:12, padding: isMobile ? "7px 6px" : "8px 6px" }}>
             <p style={{ fontSize:9, fontWeight:800, color:B1, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 2px 0" }}>Test Avg</p>
-            <p style={{ fontSize:18, fontWeight:800, color:B1, margin:0 }}>{teacher.avgScore > 0 ? `${teacher.avgScore}%` : "—"}</p>
+            <p style={{ fontSize: isMobile ? 16 : 18, fontWeight:800, color:B1, margin:0 }}>{teacher.avgScore > 0 ? `${teacher.avgScore}%` : "—"}</p>
           </div>
         </div>
 
@@ -1068,22 +1073,22 @@ function TopCard({ teacher, rank, onClick }: { teacher: any; rank: number; onCli
   );
 }
 
-function DefaulterCard({ teacher, onClick }: { teacher: any; onClick: () => void }) {
+function DefaulterCard({ teacher, onClick, isMobile = false }: { teacher: any; onClick: () => void; isMobile?: boolean }) {
   return (
     <div
       onClick={onClick}
       className="dash-card"
       style={{
-        background:"#fff", border:"0.5px solid rgba(255,51,85,.18)", borderRadius:20,
-        padding:"20px 22px", cursor:"pointer", boxShadow:SHADOW_SM,
+        background:"#fff", border:"0.5px solid rgba(255,51,85,.18)", borderRadius: isMobile ? 16 : 20,
+        padding: isMobile ? "16px 16px" : "20px 22px", cursor:"pointer", boxShadow:SHADOW_SM,
         position:"relative", overflow:"hidden",
       }}
     >
       <div style={{ position:"absolute", top:-30, right:-30, width:120, height:120, background:"radial-gradient(circle, rgba(255,51,85,.14) 0%, transparent 70%)", borderRadius:"50%", pointerEvents:"none" }}/>
       <div style={{ position:"relative", zIndex:1 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:14 }}>
+        <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 12, marginBottom: isMobile ? 12 : 14 }}>
           <div style={{
-            width:44, height:44, borderRadius:13, background:GRAD_RED,
+            width: isMobile ? 38 : 44, height: isMobile ? 38 : 44, borderRadius: isMobile ? 11 : 13, background:GRAD_RED,
             display:"flex", alignItems:"center", justifyContent:"center",
             color:"#fff", fontSize:12, fontWeight:800,
             boxShadow:"0 6px 14px rgba(255,51,85,.22)", flexShrink:0,
@@ -1091,20 +1096,20 @@ function DefaulterCard({ teacher, onClick }: { teacher: any; onClick: () => void
             {initials(teacher.name)}
           </div>
           <div style={{ flex:1, minWidth:0 }}>
-            <p style={{ fontSize:14, fontWeight:800, color:T1, margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", letterSpacing:"-0.2px" }}>{teacher.name}</p>
+            <p style={{ fontSize: isMobile ? 13 : 14, fontWeight:800, color:T1, margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", letterSpacing:"-0.2px" }}>{teacher.name}</p>
             <p style={{ fontSize:10, fontWeight:700, color:T4, margin:"2px 0 0 0", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{teacher.subject || "—"} · {teacher.branchName}</p>
           </div>
           <div style={{
-            width:36, height:36, borderRadius:11, background:GRAD_RED,
+            width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: isMobile ? 10 : 11, background:GRAD_RED,
             display:"flex", alignItems:"center", justifyContent:"center",
             boxShadow:"0 6px 14px rgba(255,51,85,.26)", flexShrink:0,
           }}>
-            <AlertTriangle size={16} color="#fff" strokeWidth={2.3}/>
+            <AlertTriangle size={isMobile ? 14 : 16} color="#fff" strokeWidth={2.3}/>
           </div>
         </div>
 
         {teacher.reasons.length > 0 && (
-          <div style={{ display:"flex", flexWrap:"wrap", gap:5, marginBottom:14 }}>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:5, marginBottom: isMobile ? 12 : 14 }}>
             {teacher.reasons.map((r: string) => (
               <span key={r} style={{
                 fontSize:9, fontWeight:800, padding:"3px 8px", borderRadius:999,
@@ -1117,14 +1122,14 @@ function DefaulterCard({ teacher, onClick }: { teacher: any; onClick: () => void
           </div>
         )}
 
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(2, 1fr)", gap:8, marginBottom:12 }}>
-          <div style={{ textAlign:"center", background:"rgba(255,51,85,.10)", borderRadius:12, padding:"8px 6px" }}>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(2, 1fr)", gap:8, marginBottom: isMobile ? 10 : 12 }}>
+          <div style={{ textAlign:"center", background:"rgba(255,51,85,.10)", borderRadius:12, padding: isMobile ? "7px 6px" : "8px 6px" }}>
             <p style={{ fontSize:9, fontWeight:800, color:RED, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 2px 0" }}>Overall</p>
-            <p style={{ fontSize:18, fontWeight:800, color:RED, margin:0 }}>{teacher.overall > 0 ? `${teacher.overall}%` : "—"}</p>
+            <p style={{ fontSize: isMobile ? 16 : 18, fontWeight:800, color:RED, margin:0 }}>{teacher.overall > 0 ? `${teacher.overall}%` : "—"}</p>
           </div>
-          <div style={{ textAlign:"center", background:"rgba(255,136,0,.10)", borderRadius:12, padding:"8px 6px" }}>
+          <div style={{ textAlign:"center", background:"rgba(255,136,0,.10)", borderRadius:12, padding: isMobile ? "7px 6px" : "8px 6px" }}>
             <p style={{ fontSize:9, fontWeight:800, color:ORANGE, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 2px 0" }}>Test Avg</p>
-            <p style={{ fontSize:18, fontWeight:800, color:ORANGE, margin:0 }}>{teacher.avgScore > 0 ? `${teacher.avgScore}%` : "—"}</p>
+            <p style={{ fontSize: isMobile ? 16 : 18, fontWeight:800, color:ORANGE, margin:0 }}>{teacher.avgScore > 0 ? `${teacher.avgScore}%` : "—"}</p>
           </div>
         </div>
 

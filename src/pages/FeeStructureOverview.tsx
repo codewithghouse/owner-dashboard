@@ -10,9 +10,10 @@ import {
 import {
   B1, T1, T3, T4, GREEN, RED, GOLD, VIOLET,
   GRAD_PRIMARY, GRAD_BLUE, GRAD_GREEN, GRAD_VIOLET, GRAD_GOLD, GRAD_RED,
-  SHADOW_SM, SHADOW_BTN, pageShellStyle,
+  SHADOW_SM, SHADOW_BTN, usePageShellStyle,
   DashGlobalStyles, PageHead, StatTile, DarkHero, AIInsightCard,
 } from "@/lib/dashboardTokens";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import {
@@ -67,6 +68,8 @@ const toDate = (v: any): Date | null => {
 /* ══════════════════════════════════════════════════════════ */
 export default function FeeStructureOverview() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
+  const pageShellStyle = usePageShellStyle();
   const [loading, setLoading]         = useState(true);
   const [structures, setStructures]   = useState<FeeStructure[]>([]);
   const [branchMap, setBranchMap]     = useState<Map<string, string>>(new Map());
@@ -366,7 +369,7 @@ export default function FeeStructureOverview() {
   return (
     <>
       <DashGlobalStyles />
-      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap:24 }}>
+      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap: isMobile ? 16 : 24 }}>
 
       <PageHead
         icon={DollarSign}
@@ -378,14 +381,15 @@ export default function FeeStructureOverview() {
               onClick={exportCombined}
               className="dash-btn"
               style={{
-                display:"inline-flex", alignItems:"center", gap:7,
-                padding:"10px 16px", borderRadius:12,
+                display:"inline-flex", alignItems:"center", justifyContent:"center", gap: isMobile ? 6 : 7,
+                padding: isMobile ? "9px 12px" : "10px 16px", borderRadius: isMobile ? 10 : 12,
                 background:GRAD_PRIMARY, color:"#fff",
-                fontSize:11, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
+                fontSize: isMobile ? 10 : 11, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
                 border:"none", cursor:"pointer", boxShadow:SHADOW_BTN, fontFamily:"inherit",
+                whiteSpace:"nowrap",
               }}
             >
-              <Download size={13}/> Export All
+              <Download size={isMobile ? 12 : 13}/> {isMobile ? "Export" : "Export All"}
             </button>
           ) : null
         }
@@ -394,17 +398,17 @@ export default function FeeStructureOverview() {
       {structures.length === 0 ? (
         <div
           style={{
-            background:"#fff", borderRadius:22, padding:"48px 32px",
+            background:"#fff", borderRadius: isMobile ? 18 : 22, padding: isMobile ? "32px 20px" : "48px 32px",
             border:"0.5px solid rgba(0,85,255,.08)", boxShadow:SHADOW_SM,
-            display:"flex", flexDirection:"column", alignItems:"center", gap:16, textAlign:"center",
+            display:"flex", flexDirection:"column", alignItems:"center", gap: isMobile ? 12 : 16, textAlign:"center",
           }}
         >
-          <div style={{ width:72, height:72, borderRadius:20, background:"#F5F9FF", border:"0.5px solid rgba(0,85,255,.1)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-            <FileSpreadsheet size={34} color={T4}/>
+          <div style={{ width: isMobile ? 60 : 72, height: isMobile ? 60 : 72, borderRadius: isMobile ? 16 : 20, background:"#F5F9FF", border:"0.5px solid rgba(0,85,255,.1)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <FileSpreadsheet size={isMobile ? 28 : 34} color={T4}/>
           </div>
           <div>
-            <h3 style={{ fontSize:16, fontWeight:800, color:T1, margin:"0 0 6px 0", letterSpacing:"-0.3px" }}>No fee structures published yet</h3>
-            <p style={{ fontSize:13, fontWeight:500, color:T3, margin:0, maxWidth:420, lineHeight:1.5 }}>
+            <h3 style={{ fontSize: isMobile ? 14 : 16, fontWeight:800, color:T1, margin:"0 0 6px 0", letterSpacing:"-0.3px" }}>No fee structures published yet</h3>
+            <p style={{ fontSize: isMobile ? 12 : 13, fontWeight:500, color:T3, margin:0, maxWidth:420, lineHeight:1.5 }}>
               Ask your principal or DEO to upload the class-wise fee Excel from the Principal Dashboard → Fee Structure page.
             </p>
           </div>
@@ -424,7 +428,7 @@ export default function FeeStructureOverview() {
           />
 
           {/* Bright Stat Grid */}
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16 }}>
+          <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: isMobile ? 10 : 16 }}>
             <StatTile label="Branches"        value={branchTotals.length.toString()} sub="Active"             grad={GRAD_BLUE}   icon={Building2} onClick={()=>navigate("/fee-structure")} />
             <StatTile label="Total Classes"   value={totalClasses.toString()}        sub="Across branches"    grad={GRAD_VIOLET} icon={Calendar}  onClick={()=>navigate("/fee-structure")} />
             <StatTile label="Total Terms"     value={allTerms.length.toString()}     sub="Term types"         grad={GRAD_GOLD}   icon={Layers}    onClick={()=>navigate("/fee-structure")} />
@@ -433,7 +437,7 @@ export default function FeeStructureOverview() {
 
           {/* Student-level aggregates */}
           {hasStudentData && (
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16 }}>
+            <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: isMobile ? 10 : 16 }}>
               <StatTile label="Total Students" value={studentAgg.totalStudents.toString()}              sub="Enrolled in plans"   grad={GRAD_VIOLET} icon={Users}       onClick={()=>navigate("/finance")} />
               <StatTile label="Fees Collected" value={`₹${currency(studentAgg.totalPaid)}`}             sub="Paid to date"        grad={GRAD_GREEN}  icon={DollarSign}  onClick={()=>navigate("/finance")} />
               <StatTile label="Fees Pending"   value={`₹${currency(studentAgg.totalPending)}`}          sub="Outstanding"         grad={GRAD_RED}    icon={AlertCircle} onClick={()=>navigate("/finance")} />
@@ -443,15 +447,15 @@ export default function FeeStructureOverview() {
 
           {/* Defaulters grouped branch-wise */}
           {hasStudentData && studentAgg.defaulterList.length > 0 && (
-            <div className="space-y-4">
+            <div className="space-y-3 md:space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-red-600 flex items-center justify-center">
+                <div className="flex items-center gap-2.5 md:gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-red-600 flex items-center justify-center shrink-0">
                     <AlertCircle className="w-4 h-4 text-white" />
                   </div>
-                  <div>
-                    <h3 className="text-sm font-extrabold text-red-900">Defaulters by Branch</h3>
-                    <p className="text-[11px] text-red-700 font-semibold">
+                  <div className="min-w-0">
+                    <h3 className="text-[13px] md:text-sm font-extrabold text-red-900">Defaulters by Branch</h3>
+                    <p className="text-[10px] md:text-[11px] text-red-700 font-semibold leading-snug">
                       {studentAgg.defaulterList.length} students · ₹ {currency(studentAgg.totalPending)} pending · {defaultersByBranch.length} branch(es)
                     </p>
                   </div>
@@ -476,87 +480,127 @@ export default function FeeStructureOverview() {
                 .filter(g => defaulterBranchFilter === "All" || g.branchName === defaulterBranchFilter)
                 .map(group => (
                 <div key={group.branchName} className="bg-white rounded-2xl border border-red-100 shadow-sm overflow-hidden">
-                  <div className="px-5 py-3.5 border-b border-red-100 bg-gradient-to-r from-red-50 to-orange-50 flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-white border border-red-200 flex items-center justify-center">
+                  <div className="px-3 md:px-5 py-3 md:py-3.5 border-b border-red-100 bg-gradient-to-r from-red-50 to-orange-50 flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3">
+                    <div className="flex items-center gap-2.5 md:gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-white border border-red-200 flex items-center justify-center shrink-0">
                         <Building2 className="w-4 h-4 text-red-600" />
                       </div>
-                      <div>
-                        <h4 className="text-sm font-extrabold text-[#1e294b]">{group.branchName}</h4>
+                      <div className="min-w-0">
+                        <h4 className="text-[13px] md:text-sm font-extrabold text-[#1e294b] truncate">{group.branchName}</h4>
                         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                           {group.count} defaulter{group.count !== 1 ? "s" : ""}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <div className="text-right">
+                    <div className="flex items-center gap-3 md:gap-4 flex-wrap">
+                      <div className="text-left sm:text-right">
                         <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Paid</p>
-                        <p className="text-sm font-extrabold text-emerald-600">₹ {currency(group.paid)}</p>
+                        <p className="text-xs md:text-sm font-extrabold text-emerald-600">₹ {currency(group.paid)}</p>
                       </div>
-                      <div className="text-right">
+                      <div className="text-left sm:text-right">
                         <p className="text-[9px] font-black text-red-600 uppercase tracking-widest">Pending</p>
-                        <p className="text-sm font-extrabold text-red-600">₹ {currency(group.pending)}</p>
+                        <p className="text-xs md:text-sm font-extrabold text-red-600">₹ {currency(group.pending)}</p>
                       </div>
                       <button
                         onClick={() => openNotify("bulk", group.branchName, group.list)}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-600 text-white text-[10px] font-black uppercase tracking-wider hover:bg-red-700 transition-all shadow-sm"
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-red-600 text-white text-[10px] font-black uppercase tracking-wider hover:bg-red-700 transition-all shadow-sm w-full sm:w-auto"
                         title="Notify principal about all defaulters in this branch"
                       >
-                        <Megaphone className="w-3.5 h-3.5" /> Notify Principal
+                        <Megaphone className="w-3.5 h-3.5" /> {isMobile ? "Notify All" : "Notify Principal"}
                       </button>
                     </div>
                   </div>
-                  <div className="overflow-x-auto max-h-[360px] overflow-y-auto">
-                    <table className="w-full text-left min-w-[600px]">
-                      <thead className="bg-slate-50 sticky top-0 z-10 shadow-[0_1px_0_0_rgb(226_232_240)]">
-                        <tr>
-                          <th className="py-3 px-5 text-left text-[9px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Class</th>
-                          <th className="py-3 px-5 text-left text-[9px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Roll</th>
-                          <th className="py-3 px-5 text-left text-[9px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Student</th>
-                          <th className="py-3 px-5 text-left text-[9px] font-black text-emerald-600 uppercase tracking-widest whitespace-nowrap">Paid</th>
-                          <th className="py-3 px-5 text-left text-[9px] font-black text-red-600 uppercase tracking-widest whitespace-nowrap">Pending</th>
-                          <th className="py-3 px-5 text-right text-[9px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {group.list.slice(0, 50).map((d, i) => (
-                          <tr key={i} className="hover:bg-slate-50/40">
-                            <td className="py-2.5 px-5 text-xs font-semibold text-slate-600">{d.className}</td>
-                            <td className="py-2.5 px-5 text-xs font-bold text-slate-600">{d.rollNo || "—"}</td>
-                            <td className="py-2.5 px-5 text-sm font-bold text-[#1e294b]">{d.studentName}</td>
-                            <td className="py-2.5 px-5 text-xs font-extrabold text-emerald-600">₹ {currency(d.paid)}</td>
-                            <td className="py-2.5 px-5 text-xs font-extrabold text-red-600">₹ {currency(d.pending)}</td>
-                            <td className="py-2.5 px-5 text-right">
-                              <button
-                                onClick={() => openNotify("single", group.branchName, [d])}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-[10px] font-bold uppercase tracking-wider transition-all"
-                                title="Notify principal about this defaulter"
-                              >
-                                <Bell className="w-3 h-3" /> Notify
-                              </button>
-                            </td>
+
+                  {isMobile ? (
+                    <div className="flex flex-col gap-2 p-3 max-h-[420px] overflow-y-auto">
+                      {group.list.slice(0, 50).map((d, i) => (
+                        <div key={i} className="rounded-xl border border-slate-100 bg-slate-50/40 p-3">
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[13px] font-extrabold text-[#1e294b] truncate">{d.studentName}</p>
+                              <p className="text-[10px] font-semibold text-slate-500 truncate">
+                                {d.className}{d.rollNo ? ` · Roll ${d.rollNo}` : ""}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => openNotify("single", group.branchName, [d])}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-[10px] font-bold uppercase tracking-wider transition-all shrink-0"
+                              title="Notify principal"
+                            >
+                              <Bell className="w-3 h-3" /> Notify
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="rounded-lg bg-emerald-50 border border-emerald-100 px-2.5 py-1.5">
+                              <p className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">Paid</p>
+                              <p className="text-[12px] font-extrabold text-emerald-700">₹ {currency(d.paid)}</p>
+                            </div>
+                            <div className="rounded-lg bg-red-50 border border-red-100 px-2.5 py-1.5">
+                              <p className="text-[8px] font-black text-red-600 uppercase tracking-widest">Pending</p>
+                              <p className="text-[12px] font-extrabold text-red-700">₹ {currency(d.pending)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {group.list.length > 50 && (
+                        <p className="text-[10px] text-slate-400 text-center py-1 font-semibold">
+                          Showing top 50 of {group.list.length}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto max-h-[360px] overflow-y-auto">
+                      <table className="w-full text-left min-w-[600px]">
+                        <thead className="bg-slate-50 sticky top-0 z-10 shadow-[0_1px_0_0_rgb(226_232_240)]">
+                          <tr>
+                            <th className="py-3 px-5 text-left text-[9px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Class</th>
+                            <th className="py-3 px-5 text-left text-[9px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Roll</th>
+                            <th className="py-3 px-5 text-left text-[9px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Student</th>
+                            <th className="py-3 px-5 text-left text-[9px] font-black text-emerald-600 uppercase tracking-widest whitespace-nowrap">Paid</th>
+                            <th className="py-3 px-5 text-left text-[9px] font-black text-red-600 uppercase tracking-widest whitespace-nowrap">Pending</th>
+                            <th className="py-3 px-5 text-right text-[9px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Action</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {group.list.length > 50 && (
-                      <p className="text-[10px] text-slate-400 text-center py-2 font-semibold">
-                        Showing top 50 of {group.list.length} defaulters in this branch
-                      </p>
-                    )}
-                  </div>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {group.list.slice(0, 50).map((d, i) => (
+                            <tr key={i} className="hover:bg-slate-50/40">
+                              <td className="py-2.5 px-5 text-xs font-semibold text-slate-600">{d.className}</td>
+                              <td className="py-2.5 px-5 text-xs font-bold text-slate-600">{d.rollNo || "—"}</td>
+                              <td className="py-2.5 px-5 text-sm font-bold text-[#1e294b]">{d.studentName}</td>
+                              <td className="py-2.5 px-5 text-xs font-extrabold text-emerald-600">₹ {currency(d.paid)}</td>
+                              <td className="py-2.5 px-5 text-xs font-extrabold text-red-600">₹ {currency(d.pending)}</td>
+                              <td className="py-2.5 px-5 text-right">
+                                <button
+                                  onClick={() => openNotify("single", group.branchName, [d])}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-[10px] font-bold uppercase tracking-wider transition-all"
+                                  title="Notify principal about this defaulter"
+                                >
+                                  <Bell className="w-3 h-3" /> Notify
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {group.list.length > 50 && (
+                        <p className="text-[10px] text-slate-400 text-center py-2 font-semibold">
+                          Showing top 50 of {group.list.length} defaulters in this branch
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
 
           {/* Filters + view toggle */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex flex-col md:flex-row md:items-center gap-3">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-3 md:p-4 flex flex-col md:flex-row md:items-center gap-2.5 md:gap-3">
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-slate-400" />
               <span className="text-[11px] font-black uppercase tracking-widest text-slate-500">Filter</span>
             </div>
-            <div className="relative flex-1 max-w-xs">
+            <div className="relative flex-1 md:max-w-xs">
               <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               <select
                 value={branchFilter}
@@ -569,51 +613,53 @@ export default function FeeStructureOverview() {
               </select>
               <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
-            {branchFilter !== "All" && (
-              <button
-                onClick={() => setBranchFilter("All")}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-wider transition-all"
-              >
-                <X className="w-3 h-3" /> Clear
-              </button>
-            )}
-            <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1 ml-auto">
-              <button
-                onClick={() => setViewMode("table")}
-                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
-                  viewMode === "table" ? "bg-white text-[#1e3a8a] shadow-sm" : "text-slate-500"
-                }`}
-              >
-                Table
-              </button>
-              <button
-                onClick={() => setViewMode("chart")}
-                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
-                  viewMode === "chart" ? "bg-white text-[#1e3a8a] shadow-sm" : "text-slate-500"
-                }`}
-              >
-                Chart
-              </button>
+            <div className="flex items-center gap-2 md:ml-auto">
+              {branchFilter !== "All" && (
+                <button
+                  onClick={() => setBranchFilter("All")}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-wider transition-all"
+                >
+                  <X className="w-3 h-3" /> Clear
+                </button>
+              )}
+              <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1 ml-auto">
+                <button
+                  onClick={() => setViewMode("table")}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
+                    viewMode === "table" ? "bg-white text-[#1e3a8a] shadow-sm" : "text-slate-500"
+                  }`}
+                >
+                  Table
+                </button>
+                <button
+                  onClick={() => setViewMode("chart")}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
+                    viewMode === "chart" ? "bg-white text-[#1e3a8a] shadow-sm" : "text-slate-500"
+                  }`}
+                >
+                  Chart
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Chart view — term-wise by branch */}
           {viewMode === "chart" && (
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-              <h3 className="text-sm font-extrabold text-[#1e294b] mb-4">Fee Breakdown by Branch & Term</h3>
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 md:p-6">
+              <h3 className="text-[13px] md:text-sm font-extrabold text-[#1e294b] mb-3 md:mb-4">Fee Breakdown by Branch & Term</h3>
               {chartData.length === 0 ? (
-                <div className="h-80 flex items-center justify-center text-sm text-slate-400 font-semibold">No branches match filter</div>
+                <div className="h-60 md:h-80 flex items-center justify-center text-xs md:text-sm text-slate-400 font-semibold">No branches match filter</div>
               ) : (
-                <div className="h-[380px]">
+                <div className="h-[280px] md:h-[380px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                    <BarChart data={chartData} margin={{ top: 10, right: isMobile ? 5 : 20, left: isMobile ? -20 : -10, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="branch" tick={{ fill: "#64748b", fontSize: 11, fontWeight: 600 }} />
-                      <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }}
+                      <XAxis dataKey="branch" tick={{ fill: "#64748b", fontSize: isMobile ? 9 : 11, fontWeight: 600 }} interval={0} angle={isMobile ? -20 : 0} textAnchor={isMobile ? "end" : "middle"} height={isMobile ? 50 : 30} />
+                      <YAxis tick={{ fill: "#94a3b8", fontSize: isMobile ? 9 : 11 }}
                         tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
-                      <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px rgba(0,0,0,0.1)" }}
+                      <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px rgba(0,0,0,0.1)", fontSize: isMobile ? 11 : 12 }}
                         formatter={(v: any) => [`₹ ${currency(v)}`, ""]} />
-                      <Legend wrapperStyle={{ fontSize: "10px", fontWeight: 700, paddingTop: "8px" }} />
+                      <Legend wrapperStyle={{ fontSize: isMobile ? "9px" : "10px", fontWeight: 700, paddingTop: "8px" }} />
                       {allTerms.map((t, i) => (
                         <Bar key={t} dataKey={t} fill={chartColors[i % chartColors.length]} radius={[4,4,0,0]} />
                       ))}
@@ -626,9 +672,9 @@ export default function FeeStructureOverview() {
 
           {/* Table view — one card per branch */}
           {viewMode === "table" && (
-            <div className="space-y-4">
+            <div className="space-y-3 md:space-y-4">
               {filtered.length === 0 ? (
-                <div className="bg-white border border-slate-100 rounded-2xl p-8 text-center text-sm text-slate-400 font-semibold">
+                <div className="bg-white border border-slate-100 rounded-2xl p-6 md:p-8 text-center text-xs md:text-sm text-slate-400 font-semibold">
                   No branches match the filter
                 </div>
               ) : filtered.map(s => {
@@ -640,72 +686,110 @@ export default function FeeStructureOverview() {
                 const ts = toDate(s.uploadedAt);
                 return (
                   <div key={s.id} className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
-                    <div className="px-5 py-4 border-b border-slate-100 flex items-start justify-between gap-3 flex-wrap">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-xl bg-[#1e3a8a] flex items-center justify-center shrink-0">
-                          <Building2 className="w-5 h-5 text-white" />
+                    <div className="px-3 md:px-5 py-3 md:py-4 border-b border-slate-100 flex items-start justify-between gap-3 flex-wrap">
+                      <div className="flex items-center gap-2.5 md:gap-3 min-w-0">
+                        <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-[#1e3a8a] flex items-center justify-center shrink-0">
+                          <Building2 className="w-4 h-4 md:w-5 md:h-5 text-white" />
                         </div>
                         <div className="min-w-0">
-                          <h3 className="text-base font-extrabold text-[#1e294b] truncate">{s.branchName}</h3>
-                          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
+                          <h3 className="text-sm md:text-base font-extrabold text-[#1e294b] truncate">{s.branchName}</h3>
+                          <p className="text-[9px] md:text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
                             {s.rows.length} classes · {s.termTypes.length} terms
                             {s.academicYear && <> · AY {s.academicYear}</>}
                           </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-xs font-black text-emerald-600">₹ {currency(branchTotal)}</div>
-                        <p className="text-[10px] font-semibold text-slate-400 mt-0.5">
-                          {ts ? `Updated ${ts.toLocaleDateString("en-IN")}` : "—"}
+                      <div className="text-right shrink-0">
+                        <div className="text-xs md:text-sm font-black text-emerald-600">₹ {currency(branchTotal)}</div>
+                        <p className="text-[9px] md:text-[10px] font-semibold text-slate-400 mt-0.5">
+                          {ts ? `${isMobile ? "Upd" : "Updated"} ${ts.toLocaleDateString("en-IN")}` : "—"}
                         </p>
                       </div>
                     </div>
 
                     {s.notes && (
-                      <div className="px-5 py-2 bg-amber-50/50 border-b border-amber-100 flex items-start gap-2">
+                      <div className="px-3 md:px-5 py-2 bg-amber-50/50 border-b border-amber-100 flex items-start gap-2">
                         <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                        <p className="text-[11px] text-amber-700 font-semibold">{s.notes}</p>
+                        <p className="text-[10px] md:text-[11px] text-amber-700 font-semibold">{s.notes}</p>
                       </div>
                     )}
 
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left min-w-[500px]">
-                        <thead className="bg-slate-50/60">
-                          <tr>
-                            <th className="py-3 px-5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Class</th>
-                            {s.termTypes.map(t => (
-                              <th key={t} className="py-3 px-5 text-[9px] font-black text-slate-500 uppercase tracking-widest">{t}</th>
-                            ))}
-                            <th className="py-3 px-5 text-[9px] font-black text-[#1e3a8a] uppercase tracking-widest">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {s.rows.map((r, i) => {
-                            const rowTotal = s.termTypes.reduce((a, t) => a + (r.amounts[t] || 0), 0);
-                            return (
-                              <tr key={i} className="hover:bg-slate-50/40">
-                                <td className="py-3 px-5 text-sm font-bold text-[#1e294b]">{r.className}</td>
+                    {isMobile ? (
+                      <div className="flex flex-col gap-2 p-3">
+                        {s.rows.map((r, i) => {
+                          const rowTotal = s.termTypes.reduce((a, t) => a + (r.amounts[t] || 0), 0);
+                          return (
+                            <div key={i} className="rounded-xl border border-slate-100 bg-slate-50/40 p-3">
+                              <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-slate-100">
+                                <p className="text-sm font-extrabold text-[#1e294b] truncate">{r.className}</p>
+                                <p className="text-sm font-extrabold text-[#1e3a8a] whitespace-nowrap">₹ {currency(rowTotal)}</p>
+                              </div>
+                              <div className="grid grid-cols-2 gap-1.5">
                                 {s.termTypes.map(t => (
-                                  <td key={t} className="py-3 px-5 text-sm font-semibold text-slate-600">
-                                    ₹ {currency(r.amounts[t] || 0)}
-                                  </td>
+                                  <div key={t} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-white border border-slate-100">
+                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest truncate">{t}</span>
+                                    <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap">₹ {currency(r.amounts[t] || 0)}</span>
+                                  </div>
                                 ))}
-                                <td className="py-3 px-5 text-sm font-extrabold text-[#1e3a8a]">₹ {currency(rowTotal)}</td>
-                              </tr>
-                            );
-                          })}
-                          <tr className="bg-blue-50/50 border-t-2 border-[#1e3a8a]/10">
-                            <td className="py-3 px-5 text-xs font-black text-[#1e3a8a] uppercase tracking-wider">Branch Total</td>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        <div className="rounded-xl bg-blue-50 border-2 border-[#1e3a8a]/15 p-3 mt-1">
+                          <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-[#1e3a8a]/10">
+                            <p className="text-[11px] font-black text-[#1e3a8a] uppercase tracking-wider">Branch Total</p>
+                            <p className="text-sm font-extrabold text-[#1e3a8a] whitespace-nowrap">₹ {currency(branchTotal)}</p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-1.5">
                             {s.termTypes.map(t => (
-                              <td key={t} className="py-3 px-5 text-sm font-extrabold text-[#1e3a8a]">
-                                ₹ {currency(perTermTotal[t] || 0)}
-                              </td>
+                              <div key={t} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-white">
+                                <span className="text-[9px] font-black text-[#1e3a8a] uppercase tracking-widest truncate">{t}</span>
+                                <span className="text-[11px] font-extrabold text-[#1e3a8a] whitespace-nowrap">₹ {currency(perTermTotal[t] || 0)}</span>
+                              </div>
                             ))}
-                            <td className="py-3 px-5 text-sm font-extrabold text-[#1e3a8a]">₹ {currency(branchTotal)}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left min-w-[500px]">
+                          <thead className="bg-slate-50/60">
+                            <tr>
+                              <th className="py-3 px-5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Class</th>
+                              {s.termTypes.map(t => (
+                                <th key={t} className="py-3 px-5 text-[9px] font-black text-slate-500 uppercase tracking-widest">{t}</th>
+                              ))}
+                              <th className="py-3 px-5 text-[9px] font-black text-[#1e3a8a] uppercase tracking-widest">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {s.rows.map((r, i) => {
+                              const rowTotal = s.termTypes.reduce((a, t) => a + (r.amounts[t] || 0), 0);
+                              return (
+                                <tr key={i} className="hover:bg-slate-50/40">
+                                  <td className="py-3 px-5 text-sm font-bold text-[#1e294b]">{r.className}</td>
+                                  {s.termTypes.map(t => (
+                                    <td key={t} className="py-3 px-5 text-sm font-semibold text-slate-600">
+                                      ₹ {currency(r.amounts[t] || 0)}
+                                    </td>
+                                  ))}
+                                  <td className="py-3 px-5 text-sm font-extrabold text-[#1e3a8a]">₹ {currency(rowTotal)}</td>
+                                </tr>
+                              );
+                            })}
+                            <tr className="bg-blue-50/50 border-t-2 border-[#1e3a8a]/10">
+                              <td className="py-3 px-5 text-xs font-black text-[#1e3a8a] uppercase tracking-wider">Branch Total</td>
+                              {s.termTypes.map(t => (
+                                <td key={t} className="py-3 px-5 text-sm font-extrabold text-[#1e3a8a]">
+                                  ₹ {currency(perTermTotal[t] || 0)}
+                                </td>
+                              ))}
+                              <td className="py-3 px-5 text-sm font-extrabold text-[#1e3a8a]">₹ {currency(branchTotal)}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -720,44 +804,44 @@ export default function FeeStructureOverview() {
         const totalPending = notifyState.students.reduce((a, b) => a + b.pending, 0);
         return (
           <div
-            className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4"
             onClick={() => !notifySending && setNotifyState(null)}
           >
             <div
               onClick={e => e.stopPropagation()}
-              className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+              className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-2xl max-h-[92vh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
             >
               {/* Header */}
-              <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-red-50 to-orange-50 flex items-start justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center flex-shrink-0">
-                    {notifyState.mode === "single" ? <Bell className="w-5 h-5 text-white" /> : <Megaphone className="w-5 h-5 text-white" />}
+              <div className="px-4 md:px-6 py-3.5 md:py-4 border-b border-slate-100 bg-gradient-to-r from-red-50 to-orange-50 flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2.5 md:gap-3 min-w-0">
+                  <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-red-600 flex items-center justify-center flex-shrink-0">
+                    {notifyState.mode === "single" ? <Bell className="w-4 h-4 md:w-5 md:h-5 text-white" /> : <Megaphone className="w-4 h-4 md:w-5 md:h-5 text-white" />}
                   </div>
-                  <div>
-                    <h3 className="text-base font-extrabold text-[#1e294b]">
-                      {notifyState.mode === "single" ? "Notify Principal" : "Notify Principal — Bulk"}
+                  <div className="min-w-0">
+                    <h3 className="text-sm md:text-base font-extrabold text-[#1e294b] truncate">
+                      {notifyState.mode === "single" ? "Notify Principal" : isMobile ? "Notify — Bulk" : "Notify Principal — Bulk"}
                     </h3>
-                    <p className="text-[11px] font-semibold text-slate-500">
-                      {notifyState.branchName} · {notifyState.students.length} student{notifyState.students.length !== 1 ? "s" : ""} · ₹ {currency(totalPending)} pending
+                    <p className="text-[10px] md:text-[11px] font-semibold text-slate-500 leading-snug">
+                      {notifyState.branchName} · {notifyState.students.length} student{notifyState.students.length !== 1 ? "s" : ""} · ₹ {currency(totalPending)}
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => !notifySending && setNotifyState(null)}
                   disabled={notifySending}
-                  className="p-1.5 rounded-lg hover:bg-white/60 transition-all"
+                  className="p-1.5 rounded-lg hover:bg-white/60 transition-all shrink-0"
                 >
                   <X className="w-4 h-4 text-slate-500" />
                 </button>
               </div>
 
               {/* Body */}
-              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+              <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-5 space-y-3 md:space-y-4">
                 {/* Target principal */}
                 <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Recipient</p>
-                  <p className="text-sm font-extrabold text-[#1e294b]">{principal?.name || "Unassigned"}</p>
-                  <p className="text-[11px] font-semibold text-slate-500">{principal?.email || "—"}</p>
+                  <p className="text-sm font-extrabold text-[#1e294b] truncate">{principal?.name || "Unassigned"}</p>
+                  <p className="text-[11px] font-semibold text-slate-500 truncate">{principal?.email || "—"}</p>
                 </div>
 
                 {/* Student list preview */}
@@ -765,12 +849,12 @@ export default function FeeStructureOverview() {
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">
                     {notifyState.mode === "single" ? "Student" : `Defaulters (${notifyState.students.length})`}
                   </p>
-                  <div className="max-h-40 overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-100">
+                  <div className="max-h-36 md:max-h-40 overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-100">
                     {notifyState.students.map((s, i) => (
                       <div key={i} className="px-3 py-2 flex items-center justify-between gap-2 text-xs">
                         <div className="min-w-0 flex-1">
                           <p className="font-bold text-[#1e294b] truncate">{s.studentName}</p>
-                          <p className="text-[10px] text-slate-500 font-semibold">
+                          <p className="text-[10px] text-slate-500 font-semibold truncate">
                             {s.className}{s.rollNo ? ` · Roll ${s.rollNo}` : ""}
                           </p>
                         </div>
@@ -786,33 +870,33 @@ export default function FeeStructureOverview() {
                   <textarea
                     value={notifyMessage}
                     onChange={e => setNotifyMessage(e.target.value)}
-                    rows={10}
+                    rows={isMobile ? 7 : 10}
                     disabled={notifySending}
                     className="w-full px-3 py-2.5 text-xs font-medium text-slate-700 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-red-100 focus:border-red-300 resize-y font-mono leading-relaxed"
                   />
-                  <p className="text-[10px] text-slate-400 font-semibold mt-1.5">
+                  <p className="text-[10px] text-slate-400 font-semibold mt-1.5 leading-snug">
                     This message will be sent to the branch principal. They will see it in their dashboard.
                   </p>
                 </div>
               </div>
 
               {/* Footer */}
-              <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2">
+              <div className="px-4 md:px-6 py-3 md:py-3.5 border-t border-slate-100 bg-slate-50 flex flex-col-reverse sm:flex-row items-stretch sm:items-center sm:justify-end gap-2">
                 <button
                   onClick={() => !notifySending && setNotifyState(null)}
                   disabled={notifySending}
-                  className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-100 transition-all disabled:opacity-50"
+                  className="px-4 py-2.5 sm:py-2 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-100 transition-all disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={sendNotify}
                   disabled={notifySending || !notifyMessage.trim()}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-all shadow-sm disabled:opacity-50"
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-all shadow-sm disabled:opacity-50"
                 >
                   {notifySending
                     ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending…</>
-                    : <><Send className="w-3.5 h-3.5" /> Send Notification</>}
+                    : <><Send className="w-3.5 h-3.5" /> {isMobile ? "Send" : "Send Notification"}</>}
                 </button>
               </div>
             </div>

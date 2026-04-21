@@ -12,6 +12,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area, LineChart, Line
 } from "recharts";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const GRADE_COLORS = ["#1e3a8a","#2563eb","#3b82f6","#60a5fa","#93c5fd","#bfdbfe"];
@@ -47,6 +48,7 @@ const PAGE_SIZE = 10;
 
 export default function StudentsIntelligence() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   /* ── raw data ───────────────────────────────────── */
   const [students,   setStudents]   = useState<any[]>([]);
   const [schools,    setSchools]    = useState<Map<string,string>>(new Map());
@@ -504,21 +506,21 @@ export default function StudentsIntelligence() {
           fontFamily: "'DM Sans', -apple-system, sans-serif",
           background: "#EEF4FF",
           minHeight: "100vh",
-          margin: "-16px -24px 0",
-          padding: "24px 32px 40px",
+          margin: isMobile ? "-12px -12px 0" : "-16px -24px 0",
+          padding: isMobile ? "16px 14px 28px" : "24px 32px 40px",
         }}
       >
       {/* ── Page Head ───────────────────────────────────── */}
-      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:20, marginBottom:22, flexWrap:"wrap" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:14 }}>
-          <div style={{ width:48, height:48, borderRadius:14, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 8px 22px rgba(0,85,255,.35)" }}>
-            <GraduationCap size={24} color="#fff" strokeWidth={2.2}/>
+      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap: isMobile ? 12 : 20, marginBottom: isMobile ? 16 : 22, flexWrap:"wrap" }}>
+        <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 14, minWidth:0, flex: isMobile ? "1 1 auto" : undefined }}>
+          <div style={{ width: isMobile ? 40 : 48, height: isMobile ? 40 : 48, borderRadius: isMobile ? 12 : 14, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 8px 22px rgba(0,85,255,.35)", flexShrink:0 }}>
+            <GraduationCap size={isMobile ? 20 : 24} color="#fff" strokeWidth={2.2}/>
           </div>
-          <div>
-            <h1 style={{ fontSize:32, fontWeight:700, color:T1, letterSpacing:"-0.8px", margin:0, lineHeight:1.1 }}>
+          <div style={{ minWidth:0 }}>
+            <h1 style={{ fontSize: isMobile ? 20 : 32, fontWeight:700, color:T1, letterSpacing: isMobile ? "-0.4px" : "-0.8px", margin:0, lineHeight:1.1 }}>
               Students Intelligence
             </h1>
-            <p style={{ fontSize:12, color:T3, fontWeight:500, margin:"5px 0 0 0", letterSpacing:"0.10em", textTransform:"uppercase" }}>
+            <p style={{ fontSize: isMobile ? 10 : 12, color:T3, fontWeight:500, margin:"5px 0 0 0", letterSpacing:"0.10em", textTransform:"uppercase" }}>
               Enrollment, performance &amp; behavior analytics
             </p>
           </div>
@@ -527,14 +529,15 @@ export default function StudentsIntelligence() {
           onClick={()=>navigate("/students")}
           className="stu-btn"
           style={{
-            display:"inline-flex", alignItems:"center", gap:8,
-            padding:"11px 18px", borderRadius:14,
+            display:"inline-flex", alignItems:"center", justifyContent:"center", gap: isMobile ? 6 : 8,
+            padding: isMobile ? "9px 14px" : "11px 18px", borderRadius: isMobile ? 12 : 14,
             background:GRAD_PRIMARY, color:"#fff",
-            fontSize:12, fontWeight:700, letterSpacing:"0.06em", textTransform:"uppercase",
+            fontSize: isMobile ? 11 : 12, fontWeight:700, letterSpacing:"0.06em", textTransform:"uppercase",
             border:"none", cursor:"pointer", boxShadow:SHADOW_BTN, fontFamily:"inherit",
+            width: isMobile ? "100%" : "auto",
           }}
         >
-          <Plus size={16} strokeWidth={2.4}/> Add Student
+          <Plus size={isMobile ? 14 : 16} strokeWidth={2.4}/> Add Student
         </button>
       </div>
 
@@ -547,38 +550,38 @@ export default function StudentsIntelligence() {
           {/* ── Dark Hero Banner ───────────────────────── */}
           <div
             style={{
-              background:GRAD_HERO, borderRadius:24, padding:"24px 28px", color:"#fff",
-              marginBottom:24, position:"relative", overflow:"hidden",
+              background:GRAD_HERO, borderRadius: isMobile ? 18 : 24, padding: isMobile ? "18px 18px" : "24px 28px", color:"#fff",
+              marginBottom: isMobile ? 16 : 24, position:"relative", overflow:"hidden",
               boxShadow:"0 14px 40px rgba(0,8,60,.32), 0 0 0 .5px rgba(255,255,255,.12)",
             }}
           >
             <div style={{ position:"absolute", top:-60, right:-40, width:280, height:280, background:"radial-gradient(circle, rgba(255,255,255,.12) 0%, transparent 65%)", borderRadius:"50%", pointerEvents:"none" }}/>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:24, flexWrap:"wrap", position:"relative", zIndex:1 }}>
-              <div style={{ display:"flex", alignItems:"flex-start", gap:16, flex:1, minWidth:300 }}>
-                <div style={{ width:52, height:52, borderRadius:15, background:"rgba(255,255,255,.16)", border:"0.5px solid rgba(255,255,255,.26)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                  <Users size={26} color="#fff" strokeWidth={2.2}/>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap: isMobile ? 14 : 24, flexWrap:"wrap", position:"relative", zIndex:1 }}>
+              <div style={{ display:"flex", alignItems:"flex-start", gap: isMobile ? 12 : 16, flex:1, minWidth: isMobile ? 0 : 300 }}>
+                <div style={{ width: isMobile ? 42 : 52, height: isMobile ? 42 : 52, borderRadius: isMobile ? 12 : 15, background:"rgba(255,255,255,.16)", border:"0.5px solid rgba(255,255,255,.26)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                  <Users size={isMobile ? 20 : 26} color="#fff" strokeWidth={2.2}/>
                 </div>
-                <div>
-                  <div style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"4px 10px", borderRadius:999, background:"rgba(255,255,255,.14)", border:"0.5px solid rgba(255,255,255,.22)", fontSize:10, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:10 }}>
+                <div style={{ minWidth:0 }}>
+                  <div style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"4px 10px", borderRadius:999, background:"rgba(255,255,255,.14)", border:"0.5px solid rgba(255,255,255,.22)", fontSize: isMobile ? 9 : 10, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:10 }}>
                     <Sparkles size={11}/> Academic Intelligence
                   </div>
-                  <h2 style={{ fontSize:38, fontWeight:800, letterSpacing:"-1px", margin:0, color:"#fff", lineHeight:1 }}>
+                  <h2 style={{ fontSize: isMobile ? 28 : 38, fontWeight:800, letterSpacing: isMobile ? "-0.6px" : "-1px", margin:0, color:"#fff", lineHeight:1 }}>
                     {totalEnrollment.toLocaleString()}
                   </h2>
-                  <p style={{ fontSize:13, color:"rgba(255,255,255,.72)", fontWeight:500, margin:"8px 0 0 0" }}>
+                  <p style={{ fontSize: isMobile ? 11 : 13, color:"rgba(255,255,255,.72)", fontWeight:500, margin:"8px 0 0 0" }}>
                     Total scholars across {branchList.length-1} branches · {newThisTerm > 0 ? `+${newThisTerm} new this term` : "steady enrollment"}
                   </p>
                 </div>
               </div>
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(3, minmax(120px,1fr))", gap:10 }}>
+              <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : "repeat(3, minmax(120px,1fr))", gap: isMobile ? 8 : 10, width: isMobile ? "100%" : "auto" }}>
                 {[
                   { label:"Avg Attendance", value:avgAttendance > 0 ? `${avgAttendance}%` : "—" },
                   { label:"At Risk",        value:atRisk.toString() },
                   { label:"High Performers",value:highPerformers.toString() },
                 ].map(s=>(
-                  <div key={s.label} style={{ background:"rgba(255,255,255,.10)", borderRadius:14, padding:"12px 14px", border:"0.5px solid rgba(255,255,255,.14)" }}>
-                    <p style={{ fontSize:9, fontWeight:700, color:"rgba(255,255,255,.65)", letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 6px 0" }}>{s.label}</p>
-                    <p style={{ fontSize:20, fontWeight:800, color:"#fff", margin:0, letterSpacing:"-0.4px" }}>{s.value}</p>
+                  <div key={s.label} style={{ background:"rgba(255,255,255,.10)", borderRadius: isMobile ? 12 : 14, padding: isMobile ? "10px 10px" : "12px 14px", border:"0.5px solid rgba(255,255,255,.14)" }}>
+                    <p style={{ fontSize: isMobile ? 8 : 9, fontWeight:700, color:"rgba(255,255,255,.65)", letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 6px 0" }}>{s.label}</p>
+                    <p style={{ fontSize: isMobile ? 16 : 20, fontWeight:800, color:"#fff", margin:0, letterSpacing:"-0.4px" }}>{s.value}</p>
                   </div>
                 ))}
               </div>
@@ -586,7 +589,7 @@ export default function StudentsIntelligence() {
           </div>
 
           {/* ── Bright Stat Grid ─────────────────────── */}
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16, marginBottom:24 }}>
+          <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: isMobile ? 10 : 16, marginBottom: isMobile ? 16 : 24 }}>
             {[
               { label:"Total Enrollment", value:totalEnrollment.toLocaleString(), sub:newThisTerm > 0 ? `+${newThisTerm} this term` : "Steady", grad:GRAD_BLUE, icon:Users, delta:newThisTerm > 0 ? "up" : null, route:"/students" },
               { label:"Avg Attendance", value:avgAttendance > 0 ? `${avgAttendance}%` : "—", sub:`Across ${totalEnrollment} students`, grad:GRAD_GREEN, icon:Percent, delta:null, route:"/students" },
@@ -602,15 +605,15 @@ export default function StudentsIntelligence() {
                   tabIndex={0}
                   className="stu-tile"
                   style={{
-                    background:s.grad, borderRadius:22, padding:"20px 22px", color:"#fff",
+                    background:s.grad, borderRadius: isMobile ? 16 : 22, padding: isMobile ? "14px 14px" : "20px 22px", color:"#fff",
                     cursor:"pointer", position:"relative", overflow:"hidden",
                     boxShadow:"0 0 0 .5px rgba(255,255,255,.15), 0 14px 38px rgba(0,85,255,.26), 0 4px 12px rgba(0,85,255,.18)",
                   }}
                 >
                   <div style={{ position:"absolute", top:-30, right:-20, width:110, height:110, background:"radial-gradient(circle, rgba(255,255,255,.22) 0%, transparent 70%)", borderRadius:"50%", pointerEvents:"none" }}/>
-                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14, position:"relative", zIndex:1 }}>
-                    <div style={{ width:38, height:38, borderRadius:12, background:"rgba(255,255,255,.22)", border:"0.5px solid rgba(255,255,255,.28)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                      <Icon size={19} color="#fff" strokeWidth={2.3}/>
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: isMobile ? 10 : 14, position:"relative", zIndex:1 }}>
+                    <div style={{ width: isMobile ? 32 : 38, height: isMobile ? 32 : 38, borderRadius: isMobile ? 10 : 12, background:"rgba(255,255,255,.22)", border:"0.5px solid rgba(255,255,255,.28)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                      <Icon size={isMobile ? 16 : 19} color="#fff" strokeWidth={2.3}/>
                     </div>
                     {s.delta && (
                       <div style={{ display:"inline-flex", alignItems:"center", gap:3, padding:"4px 8px", borderRadius:8, background:"rgba(255,255,255,.22)", fontSize:10, fontWeight:800, color:"#fff" }}>
@@ -618,22 +621,22 @@ export default function StudentsIntelligence() {
                       </div>
                     )}
                   </div>
-                  <p style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,.75)", letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 4px 0", position:"relative", zIndex:1 }}>{s.label}</p>
-                  <p style={{ fontSize:30, fontWeight:800, color:"#fff", letterSpacing:"-0.6px", margin:0, lineHeight:1.1, position:"relative", zIndex:1 }}>{s.value}</p>
-                  <p style={{ fontSize:11, fontWeight:600, color:"rgba(255,255,255,.78)", margin:"6px 0 0 0", position:"relative", zIndex:1 }}>{s.sub}</p>
+                  <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:700, color:"rgba(255,255,255,.75)", letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 4px 0", position:"relative", zIndex:1 }}>{s.label}</p>
+                  <p style={{ fontSize: isMobile ? 22 : 30, fontWeight:800, color:"#fff", letterSpacing:"-0.6px", margin:0, lineHeight:1.1, position:"relative", zIndex:1 }}>{s.value}</p>
+                  <p style={{ fontSize: isMobile ? 10 : 11, fontWeight:600, color:"rgba(255,255,255,.78)", margin:"6px 0 0 0", position:"relative", zIndex:1 }}>{s.sub}</p>
                 </div>
               );
             })}
           </div>
 
           {/* ── Charts Row (3-col) ───────────────────── */}
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:16, marginBottom:24 }}>
+          <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: isMobile ? 12 : 16, marginBottom: isMobile ? 16 : 24 }}>
 
             {/* Grade Distribution */}
             <div
               className="stu3d"
               style={{
-                background:"#fff", borderRadius:22, padding:"22px 22px 18px",
+                background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px 14px" : "22px 22px 18px",
                 boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
               }}
             >
@@ -651,7 +654,7 @@ export default function StudentsIntelligence() {
                   <PieChart>
                     <Pie
                       data={gradeDistData.length ? gradeDistData : [{name:"No Data",value:1,fill:"#e2e8f0"}]}
-                      cx="50%" cy="50%" outerRadius={78} innerRadius={38}
+                      cx="50%" cy="50%" outerRadius={isMobile ? 62 : 78} innerRadius={isMobile ? 30 : 38}
                       dataKey="value" stroke="#fff" strokeWidth={2} paddingAngle={3}
                       label={({name,midAngle,cx,cy,outerRadius:or})=>{
                         const R=Math.PI/180;
@@ -672,7 +675,7 @@ export default function StudentsIntelligence() {
             <div
               className="stu3d"
               style={{
-                background:"#fff", borderRadius:22, padding:"22px 22px 18px",
+                background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px 14px" : "22px 22px 18px",
                 boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
               }}
             >
@@ -709,7 +712,7 @@ export default function StudentsIntelligence() {
             <div
               className="stu3d"
               style={{
-                background:"#fff", borderRadius:22, padding:"22px 22px 18px",
+                background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px 14px" : "22px 22px 18px",
                 boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
               }}
             >
@@ -751,12 +754,12 @@ export default function StudentsIntelligence() {
           <div
             className="stu3d"
             style={{
-              background:"#fff", borderRadius:22, padding:"22px 24px",
+              background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px" : "22px 24px",
               boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
-              marginBottom:24,
+              marginBottom: isMobile ? 16 : 24,
             }}
           >
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:16, marginBottom:20, flexWrap:"wrap" }}>
+            <div style={{ display:"flex", alignItems: isMobile ? "flex-start" : "center", justifyContent:"space-between", gap: isMobile ? 10 : 16, marginBottom: isMobile ? 14 : 20, flexWrap:"wrap" }}>
               <div style={{ display:"flex", alignItems:"center", gap:12 }}>
                 <div style={{ width:36, height:36, borderRadius:11, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(0,85,255,.28)" }}>
                   <Percent size={18} color="#fff" strokeWidth={2.3}/>
@@ -789,9 +792,9 @@ export default function StudentsIntelligence() {
               </div>
             </div>
 
-            <div style={{ overflowX:"auto", paddingBottom:4 }}>
-              <div style={{ minWidth:600 }}>
-                <div style={{ display:"grid", gap:8, marginBottom:8, gridTemplateColumns:`140px repeat(${Math.max(heatmapGrades.length,1)},1fr)` }}>
+            <div style={{ overflowX:"auto", paddingBottom:4, WebkitOverflowScrolling:"touch" }}>
+              <div style={{ minWidth: isMobile ? 480 : 600 }}>
+                <div style={{ display:"grid", gap: isMobile ? 6 : 8, marginBottom: isMobile ? 6 : 8, gridTemplateColumns:`${isMobile ? 100 : 140}px repeat(${Math.max(heatmapGrades.length,1)},${isMobile ? "56px" : "1fr"})` }}>
                   <div style={{ fontSize:9, fontWeight:700, color:T4, letterSpacing:"0.12em", textTransform:"uppercase" }}>Branch</div>
                   {heatmapGrades.map(g=>(
                     <div key={g} style={{ textAlign:"center", fontSize:9, fontWeight:700, color:T4, letterSpacing:"0.12em", textTransform:"uppercase" }}>{g}</div>
@@ -801,18 +804,18 @@ export default function StudentsIntelligence() {
                   <div style={{ textAlign:"center", padding:"30px 0", fontSize:12, color:T4, fontWeight:600 }}>No attendance data yet</div>
                 ) : (
                   heatmapData.map(row=>(
-                    <div key={row.branch} style={{ display:"grid", gap:8, marginBottom:8, gridTemplateColumns:`140px repeat(${Math.max(heatmapGrades.length,1)},1fr)` }}>
+                    <div key={row.branch} style={{ display:"grid", gap: isMobile ? 6 : 8, marginBottom: isMobile ? 6 : 8, gridTemplateColumns:`${isMobile ? 100 : 140}px repeat(${Math.max(heatmapGrades.length,1)},${isMobile ? "56px" : "1fr"})` }}>
                       <div style={{ display:"flex", alignItems:"center" }}>
-                        <span style={{ fontSize:11, fontWeight:700, color:T3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", paddingRight:6 }}>{row.branch}</span>
+                        <span style={{ fontSize: isMobile ? 10 : 11, fontWeight:700, color:T3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", paddingRight:6 }}>{row.branch}</span>
                       </div>
                       {row.cells.map((val,i)=>{
                         const bg = val >= 95 ? GREEN : val >= 85 ? GOLD : val > 0 ? RED : "rgba(0,85,255,.06)";
                         return (
                           <div key={i} className="stu-btn"
                             style={{
-                              height:40, borderRadius:10,
+                              height: isMobile ? 34 : 40, borderRadius: isMobile ? 8 : 10,
                               display:"flex", alignItems:"center", justifyContent:"center",
-                              fontWeight:800, fontSize:11,
+                              fontWeight:800, fontSize: isMobile ? 10 : 11,
                               color: val>0 ? "#fff" : T4,
                               background: bg,
                               boxShadow: val>0 ? "0 4px 10px rgba(0,0,0,.08)" : "none",
@@ -832,22 +835,22 @@ export default function StudentsIntelligence() {
           {/* ── Student Table ─────────────────────────── */}
           <div
             style={{
-              background:"#fff", borderRadius:22,
+              background:"#fff", borderRadius: isMobile ? 16 : 22,
               boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
-              overflow:"hidden", marginBottom:24,
+              overflow:"hidden", marginBottom: isMobile ? 16 : 24,
             }}
           >
-            <div style={{ padding:"18px 24px", borderBottom:"0.5px solid rgba(0,85,255,.08)", display:"flex", gap:12, alignItems:"center", flexWrap:"wrap" }}>
-              <div style={{ position:"relative", flex:1, minWidth:220 }}>
+            <div style={{ padding: isMobile ? "14px 14px" : "18px 24px", borderBottom:"0.5px solid rgba(0,85,255,.08)", display:"flex", gap: isMobile ? 8 : 12, alignItems:"center", flexWrap:"wrap" }}>
+              <div style={{ position:"relative", flex:"1 1 100%", minWidth: isMobile ? 0 : 220, order: isMobile ? 0 : undefined }}>
                 <Search style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)" }} size={15} color={T4}/>
                 <input
                   value={search}
                   onChange={e=>{setSearch(e.target.value);setPage(1);}}
                   placeholder="Search scholars by name..."
                   style={{
-                    width:"100%", padding:"10px 12px 10px 36px", borderRadius:12,
+                    width:"100%", padding: isMobile ? "9px 10px 9px 34px" : "10px 12px 10px 36px", borderRadius:12,
                     border:"0.5px solid rgba(0,85,255,.14)", background:"#F5F9FF",
-                    fontSize:13, fontWeight:500, color:T1, outline:"none", fontFamily:"inherit",
+                    fontSize: isMobile ? 12 : 13, fontWeight:500, color:T1, outline:"none", fontFamily:"inherit",
                   }}
                 />
               </div>
@@ -855,9 +858,10 @@ export default function StudentsIntelligence() {
                 value={tableBranch}
                 onChange={e=>{setTableBranch(e.target.value);setPage(1);}}
                 style={{
-                  padding:"10px 14px", borderRadius:12, border:"0.5px solid rgba(0,85,255,.14)",
+                  padding: isMobile ? "9px 10px" : "10px 14px", borderRadius:12, border:"0.5px solid rgba(0,85,255,.14)",
                   background:"#F5F9FF", fontSize:12, fontWeight:700, color:T3,
-                  outline:"none", fontFamily:"inherit", minWidth:140,
+                  outline:"none", fontFamily:"inherit", minWidth: isMobile ? 0 : 140,
+                  flex: isMobile ? 1 : undefined,
                 }}
               >
                 {branchList.map(b=><option key={b} value={b}>{b==="All"?"All Branches":b}</option>)}
@@ -865,16 +869,91 @@ export default function StudentsIntelligence() {
               <button
                 className="stu-btn"
                 style={{
-                  display:"inline-flex", alignItems:"center", gap:6,
-                  padding:"10px 14px", borderRadius:12,
+                  display:"inline-flex", alignItems:"center", justifyContent:"center", gap:6,
+                  padding: isMobile ? "9px 12px" : "10px 14px", borderRadius:12,
                   background:"#F5F9FF", border:"0.5px solid rgba(0,85,255,.14)",
                   fontSize:12, fontWeight:700, color:T3, cursor:"pointer", fontFamily:"inherit",
                 }}
               >
-                <Filter size={13}/> Filters
+                <Filter size={13}/> {isMobile ? "" : "Filters"}
               </button>
             </div>
 
+            {isMobile ? (
+              <div style={{ padding: "8px 10px 4px" }}>
+                {grouped.map(([letter, rows])=>(
+                  <React.Fragment key={letter}>
+                    <div style={{ padding:"8px 6px", fontSize:10, fontWeight:800, color:B1, letterSpacing:"0.16em", textTransform:"uppercase" }}>
+                      {letter}
+                    </div>
+                    {rows.map(s=>{
+                      const risk = getRisk(s.score);
+                      const riskBg = s.score>=75 ? "rgba(0,200,83,.1)" : s.score>=50 ? "rgba(255,170,0,.1)" : "rgba(255,51,85,.1)";
+                      const riskColor = s.score>=75 ? GREEN : s.score>=50 ? GOLD : RED;
+                      const avatarBg = s.score>=75 ? GRAD_GREEN : s.score>=50 ? GRAD_GOLD : GRAD_RED;
+                      const isSelected = selected?._eid===s._eid;
+                      return (
+                        <div key={s._eid}
+                          onClick={()=>setSelected(isSelected ? null : s)}
+                          style={{
+                            borderRadius:14, padding:"12px 12px", marginBottom:8,
+                            background: isSelected ? "rgba(0,85,255,.06)" : "#F8FBFF",
+                            border:"0.5px solid rgba(0,85,255,.08)",
+                            cursor:"pointer",
+                            display:"flex", flexDirection:"column", gap:10,
+                          }}
+                        >
+                          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                            <div style={{
+                              width:38, height:38, borderRadius:"50%", background:avatarBg,
+                              display:"flex", alignItems:"center", justifyContent:"center",
+                              color:"#fff", fontSize:12, fontWeight:800, flexShrink:0,
+                              boxShadow:"0 4px 10px rgba(0,85,255,.18)",
+                            }}>
+                              {getInitials(s.name)}
+                            </div>
+                            <div style={{ minWidth:0, flex:1 }}>
+                              <p style={{ fontSize:13, fontWeight:800, color:T1, margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{s.name}</p>
+                              <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"2px 0 0 0" }}>{s.grade} · {s.branch}</p>
+                            </div>
+                            <span style={{
+                              fontSize:9, fontWeight:800, letterSpacing:"0.12em", textTransform:"uppercase",
+                              padding:"3px 8px", borderRadius:6, background:riskBg, color:riskColor, flexShrink:0,
+                            }}>{risk.label}</span>
+                          </div>
+                          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto", gap:10, alignItems:"center" }}>
+                            <div>
+                              <p style={{ fontSize:9, fontWeight:700, color:T4, letterSpacing:"0.10em", textTransform:"uppercase", margin:0 }}>Attendance</p>
+                              <p style={{ fontSize:13, fontWeight:800, color:T1, margin:"2px 0 0 0" }}>{s.attendance>0?`${s.attendance}%`:"—"}</p>
+                            </div>
+                            <div>
+                              <p style={{ fontSize:9, fontWeight:700, color:T4, letterSpacing:"0.10em", textTransform:"uppercase", margin:0 }}>Score</p>
+                              <p style={{ fontSize:13, fontWeight:800, color:T1, margin:"2px 0 0 0" }}>{s.score>0?`${s.score}%`:"—"}</p>
+                            </div>
+                            <button
+                              onClick={(e)=>{e.stopPropagation();setSelected(isSelected ? null : s);}}
+                              style={{
+                                padding:"7px 14px", borderRadius:10,
+                                background:isSelected?GRAD_PRIMARY:"rgba(0,85,255,.08)",
+                                color:isSelected?"#fff":B1,
+                                fontSize:10, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
+                                border:"none", cursor:"pointer", fontFamily:"inherit",
+                                boxShadow:isSelected?SHADOW_BTN:"none",
+                              }}
+                            >
+                              {isSelected ? "Close" : "View"}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </React.Fragment>
+                ))}
+                {filtered.length===0 && (
+                  <div style={{ padding:"40px 0", textAlign:"center", fontSize:11, fontWeight:700, color:T4, letterSpacing:"0.14em", textTransform:"uppercase" }}>No scholars found</div>
+                )}
+              </div>
+            ) : (
             <div style={{ overflowX:"auto" }}>
               <table style={{ width:"100%", minWidth:720, borderCollapse:"collapse" }}>
                 <thead>
@@ -967,12 +1046,13 @@ export default function StudentsIntelligence() {
                 </tbody>
               </table>
             </div>
+            )}
 
-            <div style={{ padding:"14px 24px", borderTop:"0.5px solid rgba(0,85,255,.08)", display:"flex", alignItems:"center", justifyContent:"space-between", gap:16, flexWrap:"wrap" }}>
-              <p style={{ fontSize:10, fontWeight:700, color:T4, letterSpacing:"0.14em", textTransform:"uppercase", margin:0 }}>
+            <div style={{ padding: isMobile ? "12px 14px" : "14px 24px", borderTop:"0.5px solid rgba(0,85,255,.08)", display:"flex", alignItems:"center", justifyContent:"space-between", gap: isMobile ? 10 : 16, flexWrap:"wrap" }}>
+              <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:700, color:T4, letterSpacing:"0.14em", textTransform:"uppercase", margin:0, width: isMobile ? "100%" : "auto", textAlign: isMobile ? "center" : "left" }}>
                 Showing {Math.min((page-1)*PAGE_SIZE+1, filtered.length)}–{Math.min(page*PAGE_SIZE, filtered.length)} of {filtered.length}
               </p>
-              <div style={{ display:"flex", gap:6 }}>
+              <div style={{ display:"flex", gap:6, margin: isMobile ? "0 auto" : 0, flexWrap:"wrap", justifyContent:"center" }}>
                 <button
                   disabled={page===1}
                   onClick={()=>setPage(p=>p-1)}
@@ -1020,43 +1100,44 @@ export default function StudentsIntelligence() {
             return (
               <div
                 style={{
-                  background:"#fff", borderRadius:22,
+                  background:"#fff", borderRadius: isMobile ? 16 : 22,
                   boxShadow:SHADOW_LG, border:"0.5px solid rgba(0,85,255,.10)",
-                  overflow:"hidden", marginBottom:24,
+                  overflow:"hidden", marginBottom: isMobile ? 16 : 24,
                   animation:"slide-in-from-bottom .3s ease",
                 }}
               >
-                <div style={{ padding:"22px 26px", borderBottom:"0.5px solid rgba(0,85,255,.08)", display:"flex", justifyContent:"space-between", alignItems:"center", gap:16, flexWrap:"wrap" }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+                <div style={{ padding: isMobile ? "16px 14px" : "22px 26px", borderBottom:"0.5px solid rgba(0,85,255,.08)", display:"flex", justifyContent:"space-between", alignItems: isMobile ? "flex-start" : "center", gap: isMobile ? 10 : 16, flexWrap:"wrap" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 14, minWidth:0, flex: isMobile ? "1 1 100%" : undefined }}>
                     <div style={{
-                      width:54, height:54, borderRadius:16, background:headerGrad,
+                      width: isMobile ? 44 : 54, height: isMobile ? 44 : 54, borderRadius: isMobile ? 13 : 16, background:headerGrad,
                       display:"flex", alignItems:"center", justifyContent:"center",
-                      color:"#fff", fontSize:16, fontWeight:800,
+                      color:"#fff", fontSize: isMobile ? 14 : 16, fontWeight:800, flexShrink:0,
                       boxShadow:"0 8px 20px rgba(0,85,255,.22)",
                     }}>
                       {getInitials(selected.name)}
                     </div>
-                    <div>
-                      <h2 style={{ fontSize:22, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.5px" }}>{selected.name}</h2>
-                      <p style={{ fontSize:11, fontWeight:700, color:T4, margin:"4px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>
+                    <div style={{ minWidth:0 }}>
+                      <h2 style={{ fontSize: isMobile ? 17 : 22, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.5px", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{selected.name}</h2>
+                      <p style={{ fontSize: isMobile ? 10 : 11, fontWeight:700, color:T4, margin:"4px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>
                         {selected.grade} · {selected.branch}
                       </p>
                     </div>
                   </div>
-                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 6 : 8, flexWrap:"wrap", width: isMobile ? "100%" : "auto" }}>
                     <span style={{
-                      fontSize:10, fontWeight:800, padding:"6px 12px", borderRadius:10,
+                      fontSize: isMobile ? 9 : 10, fontWeight:800, padding:"6px 12px", borderRadius:10,
                       background:headerGrad, color:"#fff", letterSpacing:"0.12em", textTransform:"uppercase",
                       boxShadow:"0 4px 10px rgba(0,85,255,.18)",
                     }}>{risk.label} Risk</span>
                     <button
                       className="stu-btn"
                       style={{
-                        display:"inline-flex", alignItems:"center", gap:6,
-                        padding:"9px 16px", borderRadius:11,
+                        display:"inline-flex", alignItems:"center", justifyContent:"center", gap:6,
+                        padding: isMobile ? "8px 12px" : "9px 16px", borderRadius:11,
                         background:GRAD_PRIMARY, color:"#fff",
-                        fontSize:10, fontWeight:800, letterSpacing:"0.10em", textTransform:"uppercase",
+                        fontSize: isMobile ? 9 : 10, fontWeight:800, letterSpacing:"0.10em", textTransform:"uppercase",
                         border:"none", cursor:"pointer", boxShadow:SHADOW_BTN, fontFamily:"inherit",
+                        flex: isMobile ? 1 : undefined,
                       }}
                     >
                       <Mail size={13}/> Contact Parent
@@ -1064,9 +1145,9 @@ export default function StudentsIntelligence() {
                     <button onClick={()=>setSelected(null)}
                       className="stu-btn"
                       style={{
-                        width:36, height:36, borderRadius:11, border:"0.5px solid rgba(0,85,255,.12)",
+                        width: isMobile ? 34 : 36, height: isMobile ? 34 : 36, borderRadius:11, border:"0.5px solid rgba(0,85,255,.12)",
                         background:"#F5F9FF", display:"flex", alignItems:"center", justifyContent:"center",
-                        cursor:"pointer",
+                        cursor:"pointer", flexShrink:0,
                       }}
                     >
                       <X size={15} color={T3}/>
@@ -1074,7 +1155,7 @@ export default function StudentsIntelligence() {
                   </div>
                 </div>
 
-                <div style={{ padding:24 }}>
+                <div style={{ padding: isMobile ? "16px 14px" : 24 }}>
                   {(() => {
                     const attDisplay  = att30 !== null ? `${att30}%` : (selected.attendance > 0 ? `${selected.attendance}%` : "—");
                     const attSubText  = attDelta !== null
@@ -1088,7 +1169,7 @@ export default function StudentsIntelligence() {
                     const scoreColor = scoreDelta === null ? T4 : scoreDelta >= 0 ? GREEN : RED;
 
                     return (
-                      <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:14, marginBottom:22 }}>
+                      <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: isMobile ? 10 : 14, marginBottom: isMobile ? 16 : 22 }}>
                         {[
                           { label:"Attendance (30d)", value:attDisplay, sub:attSubText, subColor:attColor, icon:Percent, grad:GRAD_GREEN },
                           { label:"Academic Score", value:scoreDisplay, sub:scoreSubText, subColor:scoreColor, icon:Award, grad:GRAD_BLUE },
@@ -1098,18 +1179,18 @@ export default function StudentsIntelligence() {
                           return (
                             <div key={c.label} className="stu3d"
                               style={{
-                                background:"#F5F9FF", borderRadius:16, padding:"16px 18px",
+                                background:"#F5F9FF", borderRadius: isMobile ? 14 : 16, padding: isMobile ? "14px 14px" : "16px 18px",
                                 border:"0.5px solid rgba(0,85,255,.1)",
                               }}
                             >
                               <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
-                                <p style={{ fontSize:10, fontWeight:800, color:T4, letterSpacing:"0.12em", textTransform:"uppercase", margin:0 }}>{c.label}</p>
-                                <div style={{ width:30, height:30, borderRadius:10, background:c.grad, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 4px 10px rgba(0,85,255,.2)" }}>
+                                <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:800, color:T4, letterSpacing:"0.12em", textTransform:"uppercase", margin:0 }}>{c.label}</p>
+                                <div style={{ width: isMobile ? 28 : 30, height: isMobile ? 28 : 30, borderRadius:10, background:c.grad, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 4px 10px rgba(0,85,255,.2)" }}>
                                   <Icon size={14} color="#fff" strokeWidth={2.4}/>
                                 </div>
                               </div>
-                              <p style={{ fontSize:26, fontWeight:800, color:isCritical?RED:T1, margin:0, letterSpacing:"-0.4px", lineHeight:1 }}>{c.value}</p>
-                              <p style={{ fontSize:11, fontWeight:700, color:c.subColor, margin:"6px 0 0 0" }}>{c.sub}</p>
+                              <p style={{ fontSize: isMobile ? 22 : 26, fontWeight:800, color:isCritical?RED:T1, margin:0, letterSpacing:"-0.4px", lineHeight:1 }}>{c.value}</p>
+                              <p style={{ fontSize: isMobile ? 10 : 11, fontWeight:700, color:c.subColor, margin:"6px 0 0 0" }}>{c.sub}</p>
                             </div>
                           );
                         })}
@@ -1152,33 +1233,33 @@ export default function StudentsIntelligence() {
           {/* ── AI Intelligence Card ─────────────────── */}
           <div
             style={{
-              background:GRAD_HERO, borderRadius:22, padding:"24px 26px", color:"#fff",
+              background:GRAD_HERO, borderRadius: isMobile ? 16 : 22, padding: isMobile ? "18px 16px" : "24px 26px", color:"#fff",
               position:"relative", overflow:"hidden",
               boxShadow:"0 14px 40px rgba(0,8,60,.32), 0 0 0 .5px rgba(255,255,255,.12)",
             }}
           >
             <div style={{ position:"absolute", bottom:-50, left:-40, width:240, height:240, background:"radial-gradient(circle, rgba(123,63,244,.28) 0%, transparent 65%)", borderRadius:"50%", pointerEvents:"none" }}/>
-            <div style={{ display:"flex", alignItems:"flex-start", gap:14, position:"relative", zIndex:1, marginBottom:16 }}>
-              <div style={{ width:44, height:44, borderRadius:13, background:"rgba(255,255,255,.16)", border:"0.5px solid rgba(255,255,255,.26)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                <Sparkles size={22} color="#fff" strokeWidth={2.2}/>
+            <div style={{ display:"flex", alignItems:"flex-start", gap: isMobile ? 12 : 14, position:"relative", zIndex:1, marginBottom: isMobile ? 14 : 16 }}>
+              <div style={{ width: isMobile ? 38 : 44, height: isMobile ? 38 : 44, borderRadius: isMobile ? 11 : 13, background:"rgba(255,255,255,.16)", border:"0.5px solid rgba(255,255,255,.26)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                <Sparkles size={isMobile ? 18 : 22} color="#fff" strokeWidth={2.2}/>
               </div>
-              <div>
+              <div style={{ minWidth:0 }}>
                 <div style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:999, background:"rgba(255,255,255,.14)", border:"0.5px solid rgba(255,255,255,.22)", fontSize:9, fontWeight:800, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:8 }}>
                   AI Insights
                 </div>
-                <h3 style={{ fontSize:18, fontWeight:700, color:"#fff", margin:0, letterSpacing:"-0.4px" }}>Student Intelligence Summary</h3>
+                <h3 style={{ fontSize: isMobile ? 15 : 18, fontWeight:700, color:"#fff", margin:0, letterSpacing:"-0.4px" }}>Student Intelligence Summary</h3>
               </div>
             </div>
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:12, position:"relative", zIndex:1 }}>
+            <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: isMobile ? 10 : 12, position:"relative", zIndex:1 }}>
               {[
                 { label:"Performance Insight", value:highPerformers>0?`${((highPerformers/Math.max(totalEnrollment,1))*100).toFixed(0)}% high performers`:"Track top scorers", sub:atRisk>0?`${atRisk} need attention`:"All stable" },
                 { label:"Attendance Pulse", value:avgAttendance > 0 ? `${avgAttendance}% campus avg` : "Collecting data", sub:avgAttendance>=90?"Excellent":avgAttendance>=75?"Healthy":"Monitor closely" },
                 { label:"Enrollment Momentum", value:newThisTerm > 0 ? `+${newThisTerm} new this term` : "Steady state", sub:`${totalEnrollment} total scholars` },
               ].map(c=>(
-                <div key={c.label} style={{ background:"rgba(255,255,255,.10)", borderRadius:14, padding:"14px 16px", border:"0.5px solid rgba(255,255,255,.14)" }}>
+                <div key={c.label} style={{ background:"rgba(255,255,255,.10)", borderRadius: isMobile ? 12 : 14, padding: isMobile ? "12px 14px" : "14px 16px", border:"0.5px solid rgba(255,255,255,.14)" }}>
                   <p style={{ fontSize:9, fontWeight:800, color:"rgba(255,255,255,.65)", letterSpacing:"0.14em", textTransform:"uppercase", margin:"0 0 8px 0" }}>{c.label}</p>
-                  <p style={{ fontSize:15, fontWeight:700, color:"#fff", margin:0, letterSpacing:"-0.3px" }}>{c.value}</p>
-                  <p style={{ fontSize:11, fontWeight:600, color:"rgba(255,255,255,.72)", margin:"6px 0 0 0" }}>{c.sub}</p>
+                  <p style={{ fontSize: isMobile ? 14 : 15, fontWeight:700, color:"#fff", margin:0, letterSpacing:"-0.3px" }}>{c.value}</p>
+                  <p style={{ fontSize: isMobile ? 10 : 11, fontWeight:600, color:"rgba(255,255,255,.72)", margin:"6px 0 0 0" }}>{c.sub}</p>
                 </div>
               ))}
             </div>

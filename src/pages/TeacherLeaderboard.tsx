@@ -10,9 +10,10 @@ import {
 import {
   B1, T1, T3, T4, GREEN, RED, GOLD, VIOLET,
   GRAD_PRIMARY, GRAD_BLUE, GRAD_GREEN, GRAD_VIOLET, GRAD_GOLD, GRAD_RED,
-  SHADOW_SM, SHADOW_BTN, pageShellStyle,
+  SHADOW_SM, SHADOW_BTN, usePageShellStyle,
   DashGlobalStyles, PageHead, StatTile, DarkHero, Card3D, AIInsightCard,
 } from "@/lib/dashboardTokens";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   scoreTeachers, TeacherScore, TeacherDoc, ScoreDoc,
   AttendanceDoc, AssignmentDoc, TeacherAttendanceDoc,
@@ -74,6 +75,8 @@ function filterByTime<T extends { date?: any; createdAt?: any; uploadedAt?: any 
 
 // ═════════════════════════════════════════════════════════════════════════
 export default function TeacherLeaderboard() {
+  const isMobile = useIsMobile();
+  const pageShellStyle = usePageShellStyle();
   const [loading, setLoading] = useState(true);
   const [teachers, setTeachers] = useState<TeacherDoc[]>([]);
   const [testScores, setTestScores] = useState<ScoreDoc[]>([]);
@@ -191,15 +194,15 @@ export default function TeacherLeaderboard() {
   return (
     <>
       <DashGlobalStyles />
-      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap:24 }}>
+      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap: isMobile ? 16 : 24 }}>
 
       <PageHead
         icon={Trophy}
         title="Teacher Leaderboard"
-        subtitle="Auto-ranked by student outcomes + engagement"
+        subtitle={isMobile ? "Ranked by outcomes & engagement" : "Auto-ranked by student outcomes + engagement"}
         right={
-          <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
-            <div style={{ display:"inline-flex", padding:4, borderRadius:14, background:"#fff", border:"0.5px solid rgba(0,85,255,.12)", boxShadow:SHADOW_SM }}>
+          <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 8 : 8, flexWrap:"wrap", width: isMobile ? "100%" : "auto" }}>
+            <div style={{ display:"flex", padding:4, borderRadius: isMobile ? 12 : 14, background:"#fff", border:"0.5px solid rgba(0,85,255,.12)", boxShadow:SHADOW_SM, width: isMobile ? "100%" : "auto" }}>
               {(["term", "month", "all"] as TimeRange[]).map((r) => {
                 const active = timeRange === r;
                 return (
@@ -208,30 +211,32 @@ export default function TeacherLeaderboard() {
                     onClick={() => setTimeRange(r)}
                     className="dash-btn"
                     style={{
-                      padding:"7px 14px", borderRadius:10,
+                      padding: isMobile ? "7px 8px" : "7px 14px", borderRadius: isMobile ? 9 : 10,
                       background: active ? GRAD_PRIMARY : "transparent",
                       color: active ? "#fff" : T3,
-                      fontSize:10, fontWeight:800, letterSpacing:"0.10em", textTransform:"uppercase",
+                      fontSize: isMobile ? 9 : 10, fontWeight:800, letterSpacing: isMobile ? "0.06em" : "0.10em", textTransform:"uppercase",
                       border:"none", cursor:"pointer", fontFamily:"inherit",
                       boxShadow: active ? SHADOW_BTN : "none",
+                      flex: isMobile ? 1 : "initial", whiteSpace:"nowrap",
                     }}
                   >
-                    {r === "term" ? "This Term" : r === "month" ? "This Month" : "All Time"}
+                    {r === "term" ? (isMobile ? "Term" : "This Term") : r === "month" ? (isMobile ? "Month" : "This Month") : (isMobile ? "All" : "All Time")}
                   </button>
                 );
               })}
             </div>
-            <div style={{ position:"relative" }}>
+            <div style={{ position:"relative", width: isMobile ? "100%" : "auto" }}>
               <Building2 size={14} color={T4} style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}/>
               <select
                 value={branchFilter}
                 onChange={(e) => setBranchFilter(e.target.value)}
                 style={{
-                  appearance:"none", padding:"10px 36px 10px 36px",
-                  borderRadius:14, border:"0.5px solid rgba(0,85,255,.12)",
+                  appearance:"none", padding: isMobile ? "9px 34px 9px 34px" : "10px 36px 10px 36px",
+                  borderRadius: isMobile ? 12 : 14, border:"0.5px solid rgba(0,85,255,.12)",
                   background:"#fff", boxShadow:SHADOW_SM,
                   fontSize:12, fontWeight:700, color:T3,
-                  outline:"none", fontFamily:"inherit", cursor:"pointer", minWidth:180,
+                  outline:"none", fontFamily:"inherit", cursor:"pointer",
+                  minWidth: isMobile ? 0 : 180, width: isMobile ? "100%" : "auto",
                 }}
               >
                 {branchOptions.map((b) => (
@@ -257,7 +262,7 @@ export default function TeacherLeaderboard() {
       />
 
       {/* Bright Stat Grid */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16 }}>
+      <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: isMobile ? 10 : 16 }}>
         <StatTile label="Total Teachers"   value={stats.total.toString()}                                        sub="In scope"                          grad={GRAD_BLUE}   icon={Users} />
         <StatTile label="Avg Performance"  value={`${stats.avg.toFixed(1)}%`}                                    sub="Across all teachers"                grad={GRAD_GREEN}  icon={TrendingUp} />
         <StatTile label="Active Teachers"  value={stats.active.toString()}                                       sub="With recent data"                   grad={GRAD_VIOLET} icon={Sparkles} />
@@ -266,10 +271,10 @@ export default function TeacherLeaderboard() {
 
       {/* Empty state */}
       {ranked.length === 0 ? (
-        <div className="bg-white border border-dashed border-slate-200 rounded-2xl p-12 text-center">
-          <Trophy className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-          <h3 className="text-base font-extrabold text-[#1e294b] mb-1">No teachers to rank yet</h3>
-          <p className="text-sm text-slate-500 font-medium max-w-md mx-auto">
+        <div className="bg-white border border-dashed border-slate-200 rounded-2xl p-6 md:p-12 text-center">
+          <Trophy className="w-10 h-10 md:w-12 md:h-12 text-slate-200 mx-auto mb-3 md:mb-4" />
+          <h3 className="text-sm md:text-base font-extrabold text-[#1e294b] mb-1">No teachers to rank yet</h3>
+          <p className="text-xs md:text-sm text-slate-500 font-medium max-w-md mx-auto leading-snug">
             Once principals add teachers and academic data is recorded, they'll appear here with performance rankings.
           </p>
         </div>
@@ -277,84 +282,124 @@ export default function TeacherLeaderboard() {
         <>
           {/* ═══ Top Podium — only teachers with real data ════════════ */}
           {top3.length > 0 && (
-            <div className="bg-gradient-to-br from-amber-50 via-white to-blue-50 rounded-3xl border border-amber-100 p-5 md:p-8 pt-10">
-              <div className="flex items-center gap-2 mb-8">
-                <Award className="w-5 h-5 text-amber-600" />
-                <h2 className="text-sm font-extrabold text-[#1e294b] uppercase tracking-wider">
+            <div className="bg-gradient-to-br from-amber-50 via-white to-blue-50 rounded-2xl md:rounded-3xl border border-amber-100 p-4 md:p-8 pt-8 md:pt-10">
+              <div className="flex items-center gap-2 mb-5 md:mb-8">
+                <Award className="w-4 h-4 md:w-5 md:h-5 text-amber-600" />
+                <h2 className="text-[11px] md:text-sm font-extrabold text-[#1e294b] uppercase tracking-wider">
                   {top3.length === 1 ? "Top Performer" : top3.length === 2 ? "Top 2 Performers" : "Top 3 Performers"}
                 </h2>
               </div>
-              <div className={`grid gap-3 md:gap-6 items-end ${
-                top3.length === 1 ? "grid-cols-1 max-w-xs mx-auto" :
-                top3.length === 2 ? "grid-cols-2 max-w-2xl mx-auto" :
-                "grid-cols-3"
-              }`}>
-                {top3.length >= 3 && top3[1] && (
-                  <PodiumCard
-                    rank={2}
-                    score={top3[1]}
-                    branchName={branchMap.get(top3[1].teacher.branchId || "") || top3[1].teacher.branchId || ""}
-                    onClick={() => setSelected(top3[1])}
-                  />
-                )}
-                {top3[0] && (
-                  <PodiumCard
-                    rank={1}
-                    score={top3[0]}
-                    branchName={branchMap.get(top3[0].teacher.branchId || "") || top3[0].teacher.branchId || ""}
-                    onClick={() => setSelected(top3[0])}
-                  />
-                )}
-                {top3.length === 2 && top3[1] && (
-                  <PodiumCard
-                    rank={2}
-                    score={top3[1]}
-                    branchName={branchMap.get(top3[1].teacher.branchId || "") || top3[1].teacher.branchId || ""}
-                    onClick={() => setSelected(top3[1])}
-                  />
-                )}
-                {top3.length >= 3 && top3[2] && (
-                  <PodiumCard
-                    rank={3}
-                    score={top3[2]}
-                    branchName={branchMap.get(top3[2].teacher.branchId || "") || top3[2].teacher.branchId || ""}
-                    onClick={() => setSelected(top3[2])}
-                  />
-                )}
-              </div>
+
+              {isMobile ? (
+                // ─── Mobile podium: #1 featured on top, #2+#3 in 2-col row below ───
+                <div className="flex flex-col gap-4">
+                  {top3[0] && (
+                    <div className="max-w-[200px] mx-auto w-full">
+                      <PodiumCard
+                        rank={1}
+                        score={top3[0]}
+                        branchName={branchMap.get(top3[0].teacher.branchId || "") || top3[0].teacher.branchId || ""}
+                        onClick={() => setSelected(top3[0])}
+                        isMobile
+                      />
+                    </div>
+                  )}
+                  {top3.length > 1 && (
+                    <div className="grid grid-cols-2 gap-3 items-end">
+                      {top3[1] && (
+                        <PodiumCard
+                          rank={2}
+                          score={top3[1]}
+                          branchName={branchMap.get(top3[1].teacher.branchId || "") || top3[1].teacher.branchId || ""}
+                          onClick={() => setSelected(top3[1])}
+                          isMobile
+                        />
+                      )}
+                      {top3[2] && (
+                        <PodiumCard
+                          rank={3}
+                          score={top3[2]}
+                          branchName={branchMap.get(top3[2].teacher.branchId || "") || top3[2].teacher.branchId || ""}
+                          onClick={() => setSelected(top3[2])}
+                          isMobile
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className={`grid gap-3 md:gap-6 items-end ${
+                  top3.length === 1 ? "grid-cols-1 max-w-xs mx-auto" :
+                  top3.length === 2 ? "grid-cols-2 max-w-2xl mx-auto" :
+                  "grid-cols-3"
+                }`}>
+                  {top3.length >= 3 && top3[1] && (
+                    <PodiumCard
+                      rank={2}
+                      score={top3[1]}
+                      branchName={branchMap.get(top3[1].teacher.branchId || "") || top3[1].teacher.branchId || ""}
+                      onClick={() => setSelected(top3[1])}
+                    />
+                  )}
+                  {top3[0] && (
+                    <PodiumCard
+                      rank={1}
+                      score={top3[0]}
+                      branchName={branchMap.get(top3[0].teacher.branchId || "") || top3[0].teacher.branchId || ""}
+                      onClick={() => setSelected(top3[0])}
+                    />
+                  )}
+                  {top3.length === 2 && top3[1] && (
+                    <PodiumCard
+                      rank={2}
+                      score={top3[1]}
+                      branchName={branchMap.get(top3[1].teacher.branchId || "") || top3[1].teacher.branchId || ""}
+                      onClick={() => setSelected(top3[1])}
+                    />
+                  )}
+                  {top3.length >= 3 && top3[2] && (
+                    <PodiumCard
+                      rank={3}
+                      score={top3[2]}
+                      branchName={branchMap.get(top3[2].teacher.branchId || "") || top3[2].teacher.branchId || ""}
+                      onClick={() => setSelected(top3[2])}
+                    />
+                  )}
+                </div>
+              )}
             </div>
           )}
 
           {/* Search bar */}
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1 max-w-md">
+          <div className="flex items-center gap-2 md:gap-3">
+            <div className="relative flex-1 md:max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search teacher by name or email..."
+                placeholder={isMobile ? "Search teacher..." : "Search teacher by name or email..."}
                 className="pl-10 h-10 w-full border border-slate-200 rounded-xl text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-[#1e3a8a]/10"
               />
             </div>
             {branchFilter !== "All" && (
               <button
                 onClick={() => setBranchFilter("All")}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-wider transition-all"
+                className="flex items-center gap-1.5 px-2.5 md:px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-wider transition-all shrink-0"
               >
-                <X className="w-3 h-3" /> Clear Branch
+                <X className="w-3 h-3" /> {isMobile ? "Clear" : "Clear Branch"}
               </button>
             )}
           </div>
 
           {/* ═══ Full ranked list ══════════════════════════════════════ */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-              <h3 className="text-xs font-extrabold text-[#1e294b] uppercase tracking-wider flex items-center gap-2">
-                <Filter className="w-3.5 h-3.5" /> Full Rankings ({ranked.length})
+            <div className="px-4 md:px-5 py-3 md:py-3.5 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+              <h3 className="text-[11px] md:text-xs font-extrabold text-[#1e294b] uppercase tracking-wider flex items-center gap-2">
+                <Filter className="w-3 h-3 md:w-3.5 md:h-3.5" /> Full Rankings ({ranked.length})
               </h3>
             </div>
-            <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
+            <div className={`divide-y divide-slate-100 ${isMobile ? "max-h-[65vh]" : "max-h-[600px]"} overflow-y-auto`}>
               {(rest.length > 0 ? rest : ranked).map((r, i) => {
                 const rank = rest.length > 0 ? i + 4 : i + 1;
                 return (
@@ -364,6 +409,7 @@ export default function TeacherLeaderboard() {
                     score={r}
                     branchName={branchMap.get(r.teacher.branchId || "") || r.teacher.branchId || ""}
                     onClick={() => setSelected(r)}
+                    isMobile={isMobile}
                   />
                 );
               })}
@@ -378,6 +424,7 @@ export default function TeacherLeaderboard() {
           score={selected}
           branchName={branchMap.get(selected.teacher.branchId || "") || selected.teacher.branchId || ""}
           onClose={() => setSelected(null)}
+          isMobile={isMobile}
         />
       )}
 
@@ -401,50 +448,68 @@ export default function TeacherLeaderboard() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function PodiumCard({
-  rank, score, branchName, onClick,
-}: { rank: 1 | 2 | 3; score: TeacherScore; branchName: string; onClick: () => void }) {
-  const heightClass = rank === 1 ? "min-h-[260px]" : rank === 2 ? "min-h-[220px]" : "min-h-[200px]";
+  rank, score, branchName, onClick, isMobile = false,
+}: { rank: 1 | 2 | 3; score: TeacherScore; branchName: string; onClick: () => void; isMobile?: boolean }) {
+  // Mobile uses uniform heights so #2 and #3 sit equal in the grid below the hero #1.
+  const heightClass = isMobile
+    ? (rank === 1 ? "min-h-[200px]" : "min-h-[170px]")
+    : (rank === 1 ? "min-h-[260px]" : rank === 2 ? "min-h-[220px]" : "min-h-[200px]");
   const accent =
     rank === 1 ? { border: "border-amber-300", bg: "bg-gradient-to-br from-amber-100 to-white", ring: "ring-amber-400/40", badgeBg: "bg-amber-500", trophy: "text-amber-600" }
     : rank === 2 ? { border: "border-slate-300", bg: "bg-gradient-to-br from-slate-100 to-white", ring: "ring-slate-400/30", badgeBg: "bg-slate-400", trophy: "text-slate-500" }
     : { border: "border-orange-300", bg: "bg-gradient-to-br from-orange-100 to-white", ring: "ring-orange-400/30", badgeBg: "bg-orange-500", trophy: "text-orange-600" };
+
+  const rounded = isMobile ? "rounded-2xl" : "rounded-3xl";
+  const padding = isMobile
+    ? (rank === 1 ? "p-3 pt-7" : "p-2.5 pt-6")
+    : "p-4 md:p-5 pt-8";
+  const badgeSize = isMobile
+    ? (rank === 1 ? "w-9 h-9 -top-4 text-base" : "w-8 h-8 -top-4 text-sm")
+    : "w-10 h-10 md:w-12 md:h-12 -top-5 text-lg md:text-xl";
+  const avatarSize = isMobile
+    ? (rank === 1 ? "w-14 h-14 text-base" : "w-11 h-11 text-sm")
+    : "w-14 h-14 md:w-16 md:h-16 text-base md:text-lg";
+  const nameSize = isMobile ? (rank === 1 ? "text-[13px]" : "text-[11px]") : "text-sm md:text-base";
+  const scoreSize = isMobile ? (rank === 1 ? "text-2xl" : "text-xl") : "text-2xl md:text-3xl";
+  const crownSize = isMobile ? "w-6 h-6 mb-1" : "w-7 h-7 md:w-8 md:h-8 mb-2";
 
   return (
     <div
       onClick={onClick}
       role="button"
       tabIndex={0}
-      className={`clickable-card relative ${accent.bg} ${accent.border} border-2 rounded-3xl p-4 md:p-5 pt-8 flex flex-col items-center justify-end text-center shadow-sm hover:ring-4 ${accent.ring} transition-all cursor-pointer ${heightClass}`}
+      className={`clickable-card relative ${accent.bg} ${accent.border} border-2 ${rounded} ${padding} flex flex-col items-center justify-end text-center shadow-sm hover:ring-4 ${accent.ring} transition-all cursor-pointer ${heightClass}`}
     >
-      {/* Rank badge — anchored above card center */}
-      <div className={`absolute -top-5 left-1/2 -translate-x-1/2 w-10 h-10 md:w-12 md:h-12 rounded-full ${accent.badgeBg} flex items-center justify-center text-white font-black text-lg md:text-xl shadow-lg ring-4 ring-white`}>
+      {/* Rank badge */}
+      <div className={`absolute left-1/2 -translate-x-1/2 rounded-full ${accent.badgeBg} flex items-center justify-center text-white font-black shadow-lg ring-4 ring-white ${badgeSize}`}>
         {rank}
       </div>
 
       {/* Crown for #1 */}
-      {rank === 1 && <Crown className={`w-7 h-7 md:w-8 md:h-8 ${accent.trophy} mb-2`} />}
+      {rank === 1 && <Crown className={`${crownSize} ${accent.trophy}`} />}
 
       {/* Initials circle */}
-      <div className={`w-14 h-14 md:w-16 md:h-16 rounded-full bg-white border-2 ${accent.border} flex items-center justify-center text-base md:text-lg font-extrabold text-[#1e294b] shadow-sm mb-3`}>
+      <div className={`rounded-full bg-white border-2 ${accent.border} flex items-center justify-center font-extrabold text-[#1e294b] shadow-sm mb-2 md:mb-3 ${avatarSize}`}>
         {initialsOf(score.teacher.name)}
       </div>
 
-      <h4 className="text-sm md:text-base font-extrabold text-[#1e294b] truncate w-full px-2">
+      <h4 className={`${nameSize} font-extrabold text-[#1e294b] truncate w-full px-1`}>
         {score.teacher.name || score.teacher.email || "Teacher"}
       </h4>
       {branchName && (
-        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1 truncate w-full">
+        <p className={`${isMobile ? "text-[9px]" : "text-[10px]"} font-bold text-slate-500 uppercase tracking-wider mt-0.5 md:mt-1 truncate w-full`}>
           {branchName}
         </p>
       )}
 
-      <div className={`text-2xl md:text-3xl font-black mt-2 ${scoreTone(score.composite)}`}>
+      <div className={`font-black mt-1.5 md:mt-2 ${scoreSize} ${scoreTone(score.composite)}`}>
         {score.composite.toFixed(0)}%
       </div>
 
-      <div className="flex flex-wrap justify-center gap-1 mt-2">
-        {score.reasons.slice(0, 2).map((b, i) => (
-          <span key={i} className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${TONE_CLASSES[b.tone]}`}>
+      {/* Reasons — show 2 on desktop, 1 on mobile #2/#3, 2 on mobile #1 */}
+      <div className="flex flex-wrap justify-center gap-1 mt-1.5 md:mt-2">
+        {score.reasons.slice(0, isMobile && rank !== 1 ? 1 : 2).map((b, i) => (
+          <span key={i} className={`${isMobile ? "text-[8px] px-1.5" : "text-[9px] px-2"} font-bold py-0.5 rounded-full border ${TONE_CLASSES[b.tone]}`}>
             {b.label}
           </span>
         ))}
@@ -454,8 +519,59 @@ function PodiumCard({
 }
 
 function TeacherRow({
-  rank, score, branchName, onClick,
-}: { rank: number; score: TeacherScore; branchName: string; onClick: () => void }) {
+  rank, score, branchName, onClick, isMobile = false,
+}: { rank: number; score: TeacherScore; branchName: string; onClick: () => void; isMobile?: boolean }) {
+  // Mobile: 2-line row — top line has rank + avatar + name/branch + score.
+  // Progress bar occupies full row width below for clearer signal.
+  if (isMobile) {
+    return (
+      <div
+        onClick={onClick}
+        role="button"
+        tabIndex={0}
+        className="px-3 py-3 hover:bg-slate-50/60 active:bg-slate-100/60 transition-colors cursor-pointer"
+      >
+        <div className="flex items-center gap-3">
+          {/* Rank */}
+          <div className="w-6 text-center text-[11px] font-black text-slate-400 shrink-0">
+            #{rank}
+          </div>
+
+          {/* Avatar */}
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-[11px] font-extrabold text-[#1e294b] flex-shrink-0">
+            {initialsOf(score.teacher.name)}
+          </div>
+
+          {/* Name + branch */}
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-extrabold text-[#1e294b] truncate leading-tight">
+              {score.teacher.name || score.teacher.email || "Teacher"}
+            </p>
+            {branchName && (
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">
+                {branchName}
+              </p>
+            )}
+          </div>
+
+          {/* Score */}
+          <p className={`text-base font-black shrink-0 ${scoreTone(score.composite)}`}>
+            {score.composite.toFixed(0)}%
+          </p>
+        </div>
+
+        {/* Full-width progress bar */}
+        <div className="mt-2 ml-9 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+          <div
+            className={`h-full ${scoreBgTone(score.composite)} rounded-full transition-all duration-500`}
+            style={{ width: `${Math.min(100, score.composite)}%` }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop (original)
   return (
     <div
       onClick={onClick}
@@ -513,8 +629,8 @@ function TeacherRow({
 }
 
 function DetailModal({
-  score, branchName, onClose,
-}: { score: TeacherScore; branchName: string; onClose: () => void }) {
+  score, branchName, onClose, isMobile = false,
+}: { score: TeacherScore; branchName: string; onClose: () => void; isMobile?: boolean }) {
   const metrics = [
     { label: "Class Avg Score", value: score.classAvg,    weight: 35, unit: "%" },
     { label: "Pass Rate",       value: score.passRate,    weight: 20, unit: "%" },
@@ -525,54 +641,65 @@ function DetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+      className={`fixed inset-0 z-50 bg-black/50 flex ${isMobile ? "items-end p-0" : "items-center justify-center p-4"}`}
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+        className={`bg-white flex flex-col shadow-2xl overflow-hidden ${
+          isMobile
+            ? "w-full rounded-t-3xl max-h-[92vh] animate-in slide-in-from-bottom-8 duration-300"
+            : "rounded-3xl w-full max-w-2xl max-h-[90vh]"
+        }`}
       >
+        {/* Drag handle (mobile only) */}
+        {isMobile && (
+          <div className="flex justify-center pt-2 pb-1 bg-gradient-to-r from-amber-50 to-blue-50">
+            <div className="w-10 h-1 rounded-full bg-slate-300" />
+          </div>
+        )}
+
         {/* Header */}
-        <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-amber-50 to-blue-50 flex items-start justify-between gap-3">
-          <div className="flex items-start gap-4">
-            <div className="w-14 h-14 rounded-full bg-white border-2 border-amber-200 flex items-center justify-center text-base font-extrabold text-[#1e294b] flex-shrink-0">
+        <div className={`${isMobile ? "px-4 py-3" : "px-6 py-5"} border-b border-slate-100 bg-gradient-to-r from-amber-50 to-blue-50 flex items-start justify-between gap-2 md:gap-3`}>
+          <div className={`flex items-start ${isMobile ? "gap-3" : "gap-4"} min-w-0 flex-1`}>
+            <div className={`${isMobile ? "w-12 h-12 text-sm" : "w-14 h-14 text-base"} rounded-full bg-white border-2 border-amber-200 flex items-center justify-center font-extrabold text-[#1e294b] flex-shrink-0`}>
               {initialsOf(score.teacher.name)}
             </div>
-            <div>
-              <h3 className="text-base md:text-lg font-extrabold text-[#1e294b]">
+            <div className="min-w-0 flex-1">
+              <h3 className={`${isMobile ? "text-[15px]" : "text-base md:text-lg"} font-extrabold text-[#1e294b] truncate`}>
                 {score.teacher.name || score.teacher.email}
               </h3>
-              <p className="text-xs font-semibold text-slate-500">
+              <p className={`${isMobile ? "text-[11px]" : "text-xs"} font-semibold text-slate-500 truncate`}>
                 {branchName ? `${branchName} · ` : ""}{score.teacher.email || "No email"}
               </p>
-              <div className="flex items-center gap-2 mt-2">
-                <span className={`text-xl md:text-2xl font-black ${scoreTone(score.composite)}`}>
+              <div className="flex items-center gap-2 mt-1.5 md:mt-2 flex-wrap">
+                <span className={`${isMobile ? "text-xl" : "text-xl md:text-2xl"} font-black ${scoreTone(score.composite)}`}>
                   {score.composite.toFixed(1)}%
                 </span>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                   Composite Score
                 </span>
               </div>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/60 transition-all">
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/60 transition-all shrink-0">
             <X className="w-4 h-4 text-slate-500" />
           </button>
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+        <div className={`flex-1 overflow-y-auto ${isMobile ? "px-4 py-4 space-y-4" : "px-6 py-5 space-y-5"}`}>
           {/* Reasons */}
           {score.reasons.length > 0 && (
             <div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
                 Why They Rank Here
               </p>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5 md:gap-2">
                 {score.reasons.map((b, i) => (
                   <span
                     key={i}
-                    className={`text-xs font-bold px-3 py-1.5 rounded-full border ${TONE_CLASSES[b.tone]}`}
+                    className={`${isMobile ? "text-[10px] px-2.5 py-1" : "text-xs px-3 py-1.5"} font-bold rounded-full border ${TONE_CLASSES[b.tone]}`}
                   >
                     {b.label} · {b.value}
                   </span>
@@ -583,10 +710,10 @@ function DetailModal({
 
           {/* Metric breakdown */}
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 md:mb-3">
               Score Breakdown
             </p>
-            <div className="space-y-3">
+            <div className="space-y-2.5 md:space-y-3">
               {metrics.map((m) => {
                 const hasData = m.value !== null && m.value !== undefined;
                 const displayVal = hasData
@@ -597,14 +724,14 @@ function DetailModal({
                 const pctBar = hasData && !m.raw ? Math.min(100, m.value as number) : 0;
                 return (
                   <div key={m.label}>
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-700">{m.label}</span>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                          {m.weight}% weight
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`${isMobile ? "text-[11px]" : "text-xs"} font-bold text-slate-700 truncate`}>{m.label}</span>
+                        <span className={`${isMobile ? "text-[8px]" : "text-[9px]"} font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap`}>
+                          {m.weight}%
                         </span>
                       </div>
-                      <span className={`text-xs font-extrabold ${hasData ? scoreTone(Number(m.value)) : "text-slate-400"}`}>
+                      <span className={`${isMobile ? "text-[11px]" : "text-xs"} font-extrabold whitespace-nowrap ${hasData ? scoreTone(Number(m.value)) : "text-slate-400"}`}>
                         {displayVal}
                       </span>
                     </div>
@@ -623,33 +750,40 @@ function DetailModal({
           </div>
 
           {/* Context */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="bg-slate-50 rounded-xl p-3 text-center">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Students</p>
-              <p className="text-lg font-extrabold text-[#1e294b]">{score.studentCount}</p>
+          <div className="grid grid-cols-3 gap-2 md:gap-3">
+            <div className={`bg-slate-50 rounded-xl ${isMobile ? "p-2.5" : "p-3"} text-center`}>
+              <p className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest">Students</p>
+              <p className={`${isMobile ? "text-base" : "text-lg"} font-extrabold text-[#1e294b]`}>{score.studentCount}</p>
             </div>
-            <div className="bg-slate-50 rounded-xl p-3 text-center">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tests Recorded</p>
-              <p className="text-lg font-extrabold text-[#1e294b]">{score.testCount}</p>
+            <div className={`bg-slate-50 rounded-xl ${isMobile ? "p-2.5" : "p-3"} text-center`}>
+              <p className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest">Tests</p>
+              <p className={`${isMobile ? "text-base" : "text-lg"} font-extrabold text-[#1e294b]`}>{score.testCount}</p>
             </div>
-            <div className="bg-slate-50 rounded-xl p-3 text-center">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Assignments</p>
-              <p className="text-lg font-extrabold text-[#1e294b]">{score.assignments}</p>
+            <div className={`bg-slate-50 rounded-xl ${isMobile ? "p-2.5" : "p-3"} text-center`}>
+              <p className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest">Assignments</p>
+              <p className={`${isMobile ? "text-base" : "text-lg"} font-extrabold text-[#1e294b]`}>{score.assignments}</p>
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
-          <p className="text-[10px] text-slate-400 font-semibold">
-            Weighted signals: scores 35% · pass rate 20% · attendance 20% · assignments 15% · punctuality 10%
-          </p>
+        <div className={`${isMobile ? "px-4 py-3 flex-col items-stretch gap-2" : "px-6 py-3.5 flex-row items-center justify-between"} border-t border-slate-100 bg-slate-50 flex`}>
+          {!isMobile && (
+            <p className="text-[10px] text-slate-400 font-semibold">
+              Weighted signals: scores 35% · pass rate 20% · attendance 20% · assignments 15% · punctuality 10%
+            </p>
+          )}
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-[#1e3a8a] text-white text-xs font-bold hover:bg-[#152961] transition-all"
+            className={`${isMobile ? "w-full py-3" : "px-4 py-2"} rounded-xl bg-[#1e3a8a] text-white text-xs font-bold hover:bg-[#152961] transition-all`}
           >
             Close
           </button>
+          {isMobile && (
+            <p className="text-[9px] text-slate-400 font-semibold text-center leading-snug">
+              Weighted: scores 35% · pass 20% · attendance 20% · assignments 15% · punctuality 10%
+            </p>
+          )}
         </div>
       </div>
     </div>

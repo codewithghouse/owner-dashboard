@@ -14,9 +14,10 @@ import { Button } from "@/components/ui/button";
 import {
   B1, T1, T3, T4, GREEN, RED, GOLD, VIOLET,
   GRAD_PRIMARY, GRAD_BLUE, GRAD_GREEN, GRAD_VIOLET, GRAD_GOLD, GRAD_RED,
-  SHADOW_SM, SHADOW_LG, SHADOW_BTN, pageShellStyle,
+  SHADOW_SM, SHADOW_LG, SHADOW_BTN, usePageShellStyle,
   DashGlobalStyles, PageHead, StatTile, DarkHero, Card3D, AIInsightCard,
 } from "@/lib/dashboardTokens";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   subscribeBranchesComparison, subscribeBranchDetail,
   BranchComparisonData, BranchDetailData,
@@ -47,13 +48,14 @@ const EMPTY_FORM: BranchForm = { name: "", location: "", established: "", color:
    Adds: perspective rotation, subtle Z-lift on hover, cursor spotlight.
    ══════════════════════════════════════════════════════════════════════════ */
 function BranchTiltCard({
-  children, onClick, outerStyle, outerClassName, isDark,
+  children, onClick, outerStyle, outerClassName, isDark, disableTilt = false,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   outerStyle: React.CSSProperties;
   outerClassName: string;
   isDark: boolean;
+  disableTilt?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [tilt, setTilt]     = useState({ x: 0, y: 0 });
@@ -64,7 +66,7 @@ function BranchTiltCard({
   const LIFT_Z   = 20;   // pixels on hover
 
   const handleMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!ref.current) return;
+    if (disableTilt || !ref.current) return;
     const rect = ref.current.getBoundingClientRect();
     const relX = (e.clientX - rect.left) / rect.width;   // 0..1
     const relY = (e.clientY - rect.top)  / rect.height;  // 0..1
@@ -80,6 +82,21 @@ function BranchTiltCard({
     setTilt({ x: 0, y: 0 });
     setHovered(false);
   };
+
+  if (disableTilt) {
+    return (
+      <div
+        ref={ref}
+        onClick={onClick}
+        role="button"
+        tabIndex={0}
+        style={outerStyle}
+        className={outerClassName}
+      >
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -140,18 +157,18 @@ function BranchModal({
 }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-[#1e3a8a]" />
+    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-3 md:p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl md:rounded-[2rem] shadow-2xl w-full max-w-md p-5 md:p-8 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-5 md:mb-6">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+              <Building2 className="w-4 h-4 md:w-5 md:h-5 text-[#1e3a8a]" />
             </div>
-            <h2 className="text-lg font-black text-[#1e293b]">
+            <h2 className="text-base md:text-lg font-black text-[#1e293b] truncate">
               {mode === "add" ? "Add New Branch" : "Edit Branch"}
             </h2>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-50 transition-colors">
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-50 transition-colors shrink-0">
             <X className="w-5 h-5 text-slate-400" />
           </button>
         </div>
@@ -211,20 +228,20 @@ function BranchModal({
           </div>
         </div>
 
-        <div className="flex gap-3 mt-8">
+        <div className="flex gap-3 mt-6 md:mt-8">
           <button
             onClick={onClose}
-            className="flex-1 h-12 rounded-2xl border border-slate-100 text-sm font-black text-slate-500 hover:bg-slate-50 transition-all"
+            className="flex-1 h-11 md:h-12 rounded-2xl border border-slate-100 text-[13px] md:text-sm font-black text-slate-500 hover:bg-slate-50 transition-all"
           >
             Cancel
           </button>
           <button
             onClick={onSave}
             disabled={saving || !form.name.trim()}
-            className="flex-1 h-12 rounded-2xl bg-[#1e294b] text-white text-sm font-black hover:bg-[#1e3a8a] transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+            className="flex-1 h-11 md:h-12 rounded-2xl bg-[#1e294b] text-white text-[13px] md:text-sm font-black hover:bg-[#1e3a8a] transition-all disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            {mode === "add" ? "Add Branch" : "Save Changes"}
+            {mode === "add" ? "Add Branch" : "Save"}
           </button>
         </div>
       </div>
@@ -241,30 +258,30 @@ function DeleteModal({
 }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm p-8 animate-in zoom-in-95 duration-200">
-        <div className="flex flex-col items-center text-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center">
-            <Trash2 className="w-8 h-8 text-rose-500" />
+    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-3 md:p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl md:rounded-[2rem] shadow-2xl w-full max-w-sm p-5 md:p-8 animate-in zoom-in-95 duration-200">
+        <div className="flex flex-col items-center text-center gap-3 md:gap-4">
+          <div className="w-14 h-14 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center">
+            <Trash2 className="w-7 h-7 md:w-8 md:h-8 text-rose-500" />
           </div>
           <div>
-            <h2 className="text-lg font-black text-[#1e293b]">Delete Branch?</h2>
-            <p className="text-sm text-slate-400 font-medium mt-2">
+            <h2 className="text-base md:text-lg font-black text-[#1e293b]">Delete Branch?</h2>
+            <p className="text-[13px] md:text-sm text-slate-400 font-medium mt-2 leading-relaxed">
               You're about to delete <strong className="text-[#1e293b]">{branchName}</strong>.
               This removes the branch record. Existing students and teachers linked to this branch remain in the system.
             </p>
           </div>
-          <div className="flex gap-3 w-full">
+          <div className="flex gap-3 w-full mt-1">
             <button
               onClick={onClose}
-              className="flex-1 h-12 rounded-2xl border border-slate-100 text-sm font-black text-slate-500 hover:bg-slate-50 transition-all"
+              className="flex-1 h-11 md:h-12 rounded-2xl border border-slate-100 text-[13px] md:text-sm font-black text-slate-500 hover:bg-slate-50 transition-all"
             >
               Cancel
             </button>
             <button
               onClick={onConfirm}
               disabled={deleting}
-              className="flex-1 h-12 rounded-2xl bg-rose-500 text-white text-sm font-black hover:bg-rose-600 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+              className="flex-1 h-11 md:h-12 rounded-2xl bg-rose-500 text-white text-[13px] md:text-sm font-black hover:bg-rose-600 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
               Delete
@@ -279,6 +296,8 @@ function DeleteModal({
 export default function BranchesComparison() {
   const { id }     = useParams();
   const navigate   = useNavigate();
+  const isMobile   = useIsMobile();
+  const pageShellStyle = usePageShellStyle();
   const [listData,   setListData]   = useState<BranchComparisonData | null>(null);
   const [detailData, setDetailData] = useState<BranchDetailData | null>(null);
   const [loading,    setLoading]    = useState(true);
@@ -668,52 +687,52 @@ export default function BranchesComparison() {
     return (
       <>
         <DashGlobalStyles />
-        <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap:24 }}>
+        <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap: isMobile ? 16 : 24 }}>
 
           <button
             onClick={() => navigate("/branches")}
             className="dash-btn"
             style={{
               display:"inline-flex", alignItems:"center", gap:7, alignSelf:"flex-start",
-              padding:"8px 14px", borderRadius:12,
+              padding: isMobile ? "7px 12px" : "8px 14px", borderRadius:12,
               background:"#fff", border:"0.5px solid rgba(0,85,255,.12)",
-              fontSize:11, fontWeight:700, color:T3,
+              fontSize: isMobile ? 10 : 11, fontWeight:700, color:T3,
               letterSpacing:"0.06em", textTransform:"uppercase",
               cursor:"pointer", boxShadow:SHADOW_SM, fontFamily:"inherit",
             }}
           >
-            <ArrowLeft size={14}/> Back to Branches
+            <ArrowLeft size={isMobile ? 12 : 14}/> {isMobile ? "Back" : "Back to Branches"}
           </button>
 
           {/* Dark Hero */}
           <div
             style={{
               background:"linear-gradient(135deg,#001040 0%,#001888 35%,#0033CC 70%,#0055FF 100%)",
-              borderRadius:24, padding:"24px 28px", color:"#fff",
+              borderRadius: isMobile ? 18 : 24, padding: isMobile ? "18px 16px" : "24px 28px", color:"#fff",
               position:"relative", overflow:"hidden",
               boxShadow:"0 14px 40px rgba(0,8,60,.32), 0 0 0 .5px rgba(255,255,255,.12)",
             }}
           >
             <div style={{ position:"absolute", top:-60, right:-40, width:280, height:280, background:"radial-gradient(circle, rgba(255,255,255,.12) 0%, transparent 65%)", borderRadius:"50%", pointerEvents:"none" }}/>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:20, flexWrap:"wrap", position:"relative", zIndex:1 }}>
-              <div style={{ display:"flex", alignItems:"center", gap:16 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems: isMobile ? "flex-start" : "center", gap: isMobile ? 14 : 20, flexWrap:"wrap", position:"relative", zIndex:1 }}>
+              <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 12 : 16, minWidth:0, flex: isMobile ? "1 1 100%" : undefined }}>
                 <div
                   style={{
-                    width:60, height:60, borderRadius:17,
+                    width: isMobile ? 48 : 60, height: isMobile ? 48 : 60, borderRadius: isMobile ? 14 : 17,
                     background:summary.color || GRAD_PRIMARY,
                     display:"flex", alignItems:"center", justifyContent:"center",
                     boxShadow:"0 10px 28px rgba(0,0,0,.26), 0 0 0 2px rgba(255,255,255,.2)",
                     flexShrink:0,
                   }}
                 >
-                  <Building2 size={30} color="#fff" strokeWidth={2.2}/>
+                  <Building2 size={isMobile ? 24 : 30} color="#fff" strokeWidth={2.2}/>
                 </div>
-                <div>
-                  <div style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"3px 10px", borderRadius:999, background:"rgba(255,255,255,.14)", border:"0.5px solid rgba(255,255,255,.22)", fontSize:9, fontWeight:800, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:8 }}>
+                <div style={{ minWidth:0 }}>
+                  <div style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"3px 10px", borderRadius:999, background:"rgba(255,255,255,.14)", border:"0.5px solid rgba(255,255,255,.22)", fontSize: isMobile ? 8 : 9, fontWeight:800, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:8 }}>
                     <Sparkles size={10}/> Branch Profile
                   </div>
-                  <h2 style={{ fontSize:30, fontWeight:800, letterSpacing:"-0.8px", margin:0, color:"#fff", lineHeight:1 }}>{summary.name}</h2>
-                  <p style={{ fontSize:12, color:"rgba(255,255,255,.72)", fontWeight:500, margin:"8px 0 0 0", letterSpacing:"0.04em" }}>
+                  <h2 style={{ fontSize: isMobile ? 20 : 30, fontWeight:800, letterSpacing: isMobile ? "-0.4px" : "-0.8px", margin:0, color:"#fff", lineHeight:1.1, whiteSpace: isMobile ? "normal" : "nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{summary.name}</h2>
+                  <p style={{ fontSize: isMobile ? 11 : 12, color:"rgba(255,255,255,.72)", fontWeight:500, margin: isMobile ? "6px 0 0 0" : "8px 0 0 0", letterSpacing:"0.04em" }}>
                     {summary.studentCount.toLocaleString()} students
                     {summary.teacherCount > 0 && ` · ${summary.teacherCount} teachers`}
                     {summary.established !== "N/A" && ` · Est. ${summary.established}`}
@@ -721,9 +740,9 @@ export default function BranchesComparison() {
                   </p>
                 </div>
               </div>
-              <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+              <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 8 : 10, flexWrap:"wrap", width: isMobile ? "100%" : "auto" }}>
                 <span style={{
-                  fontSize:10, fontWeight:800, padding:"8px 14px", borderRadius:10,
+                  fontSize: isMobile ? 9 : 10, fontWeight:800, padding: isMobile ? "6px 10px" : "8px 14px", borderRadius:10,
                   background: summary.status === "High Risk" ? GRAD_RED : summary.status === "Low Risk" ? GRAD_GREEN : GRAD_GOLD,
                   color:"#fff", letterSpacing:"0.12em", textTransform:"uppercase",
                   boxShadow:"0 4px 12px rgba(0,0,0,.24)",
@@ -734,58 +753,60 @@ export default function BranchesComparison() {
                   onClick={() => navigate("/reports")}
                   className="dash-btn"
                   style={{
-                    display:"inline-flex", alignItems:"center", gap:6,
-                    padding:"10px 18px", borderRadius:12,
+                    display:"inline-flex", alignItems:"center", justifyContent:"center", gap:6,
+                    padding: isMobile ? "9px 14px" : "10px 18px", borderRadius:12,
                     background:"#fff", color:T1,
-                    fontSize:11, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
+                    fontSize: isMobile ? 10 : 11, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
                     border:"none", cursor:"pointer", fontFamily:"inherit",
                     boxShadow:"0 4px 12px rgba(0,0,0,.18)",
+                    flex: isMobile ? 1 : undefined,
                   }}
                 >
-                  <FileText size={13}/> Generate Report
+                  <FileText size={13}/> {isMobile ? "Report" : "Generate Report"}
                 </button>
               </div>
             </div>
           </div>
 
           {/* Bright KPI Grid */}
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16 }}>
+          <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: isMobile ? 10 : 16 }}>
             {kpiTiles.map(k => (
               <StatTile key={k.label} label={k.label} value={k.value} sub={k.sub} grad={k.grad} icon={k.icon} />
             ))}
           </div>
 
         {/* Wrapper for remaining legacy content */}
-        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm">
-          <div className="p-8 lg:p-12">
+        <div className="bg-white rounded-2xl md:rounded-[2rem] border border-slate-100 shadow-sm">
+          <div className="p-4 md:p-8 lg:p-12">
 
             {/* Charts — only render if at least one has data */}
             {(hasTrendData || benchmarkFiltered.length > 0) && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-12">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-10 mb-8 md:mb-12">
 
               {/* Historical Performance */}
               <div>
-                <h3 className="text-base font-bold text-[#111827] mb-8">Historical Performance</h3>
+                <h3 className="text-sm md:text-base font-bold text-[#111827] mb-4 md:mb-8">Historical Performance</h3>
                 {!hasTrendData ? (
-                  <div className="h-[260px] flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-xl gap-2">
+                  <div className="h-[220px] md:h-[260px] flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-xl gap-2">
                     <p className="text-sm text-slate-400 font-semibold">No attendance data yet</p>
                     <p className="text-xs text-slate-300">Appears once daily attendance is recorded</p>
                   </div>
                 ) : (
-                  <div className="h-[260px]">
+                  <div className="h-[240px] md:h-[260px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={historicalTrend} margin={{ left: -20, right: 10 }}>
+                      <LineChart data={historicalTrend} margin={{ left: isMobile ? -14 : -20, right: 10, top: 4, bottom: isMobile ? 28 : 4 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                         <XAxis dataKey="period" axisLine={false} tickLine={false}
-                          tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: "bold" }} dy={10} />
+                          tick={{ fill: "#94a3b8", fontSize: isMobile ? 10 : 11, fontWeight: "bold" }} dy={10} />
                         <YAxis axisLine={false} tickLine={false}
-                          tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: "bold" }} domain={[0, 100]} />
+                          tick={{ fill: "#94a3b8", fontSize: isMobile ? 9 : 11, fontWeight: "bold" }} domain={[0, 100]} width={isMobile ? 30 : 40} ticks={isMobile ? [0, 50, 100] : undefined}/>
                         <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} />
+                        <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: isMobile ? 10 : 11, fontWeight: 700, paddingTop: 4 }} iconType="circle"/>
                         <Line type="monotone" dataKey="schoolAvg" name="School Avg"
-                          stroke="#22c55e" strokeWidth={2} strokeDasharray="6 6" dot={false} />
+                          stroke="#22c55e" strokeWidth={isMobile ? 1.5 : 2} strokeDasharray="6 6" dot={false} />
                         <Line type="monotone" dataKey="score" name={summary.name}
-                          stroke={summary.color} strokeWidth={3}
-                          dot={{ r: 5, fill: "#fff", strokeWidth: 2.5, stroke: summary.color }} />
+                          stroke={summary.color} strokeWidth={isMobile ? 2.5 : 3}
+                          dot={{ r: isMobile ? 3.5 : 5, fill: "#fff", strokeWidth: 2, stroke: summary.color }} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -794,28 +815,29 @@ export default function BranchesComparison() {
 
               {/* Benchmark Comparison */}
               <div>
-                <h3 className="text-base font-bold text-[#111827] mb-8">Benchmark Comparison</h3>
+                <h3 className="text-sm md:text-base font-bold text-[#111827] mb-4 md:mb-8">Benchmark Comparison</h3>
                 {benchmarkFiltered.length === 0 ? (
-                  <div className="h-[260px] flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-xl gap-2">
+                  <div className="h-[220px] md:h-[260px] flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-xl gap-2">
                     <p className="text-sm text-slate-400 font-semibold">No benchmark data yet</p>
                     <p className="text-xs text-slate-300">Appears once results or attendance are recorded</p>
                   </div>
                 ) : (
-                  <div className="h-[260px]">
+                  <div className="h-[240px] md:h-[260px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={benchmarkFiltered} barGap={6} margin={{ bottom: 20 }}>
+                      <BarChart data={benchmarkFiltered} barGap={6} margin={{ top: 4, right: isMobile ? 6 : 10, bottom: isMobile ? 28 : 20, left: isMobile ? -14 : 0 }}>
                         <XAxis dataKey="metric" axisLine={false} tickLine={false}
-                          tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} dy={10} />
+                          tick={{ fill: "#94a3b8", fontSize: isMobile ? 9 : 10, fontWeight: "bold" }} dy={10}
+                          interval={0} angle={isMobile ? -12 : 0} textAnchor={isMobile ? "end" : "middle"} height={isMobile ? 40 : 28}/>
                         <YAxis axisLine={false} tickLine={false}
-                          tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }}
-                          domain={[0, 100]} ticks={[0, 20, 40, 60, 80, 100]} />
+                          tick={{ fill: "#94a3b8", fontSize: isMobile ? 9 : 10, fontWeight: "bold" }}
+                          domain={[0, 100]} ticks={isMobile ? [0, 50, 100] : [0, 20, 40, 60, 80, 100]} width={isMobile ? 30 : 40}/>
                         <Tooltip cursor={{ fill: "#f8fafc" }} contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} />
-                        <Legend verticalAlign="bottom" align="center" wrapperStyle={{ paddingTop: "10px" }}
+                        <Legend verticalAlign="bottom" align="center" wrapperStyle={{ paddingTop: isMobile ? "4px" : "10px" }}
                           content={({ payload }) => (
-                            <div className="flex justify-center gap-6 mt-4">
+                            <div className={`flex justify-center flex-wrap ${isMobile ? "gap-3 mt-2" : "gap-6 mt-4"}`}>
                               {payload?.map((e: any, i: number) => (
                                 <div key={i} className="flex items-center gap-2">
-                                  <div className="w-4 h-4 rounded-sm" style={{ backgroundColor: e.color }}></div>
+                                  <div className="w-3 h-3 md:w-4 md:h-4 rounded-sm" style={{ backgroundColor: e.color }}></div>
                                   <span className="text-[10px] font-bold text-slate-500">{e.value}</span>
                                 </div>
                               ))}
@@ -823,9 +845,9 @@ export default function BranchesComparison() {
                           )}
                         />
                         <Bar dataKey="branch" name={summary.name.split(" ")[0]} fill={summary.color}
-                          radius={[3, 3, 0, 0]} barSize={18} />
+                          radius={[3, 3, 0, 0]} barSize={isMobile ? 14 : 18} />
                         <Bar dataKey="avg" name="School Avg" fill="#d1d5db"
-                          radius={[3, 3, 0, 0]} barSize={18} />
+                          radius={[3, 3, 0, 0]} barSize={isMobile ? 14 : 18} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -835,24 +857,24 @@ export default function BranchesComparison() {
             )}
 
             {/* Strengths & Improvements */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="p-8 rounded-[1.5rem] border border-emerald-100 bg-[#f0fdf4]/50">
-                <h4 className="text-base font-bold text-[#22c55e] mb-6 flex items-center gap-2.5">
-                  <CheckCircle className="w-5 h-5" /> Strengths
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+              <div className="p-4 md:p-8 rounded-2xl md:rounded-[1.5rem] border border-emerald-100 bg-[#f0fdf4]/50">
+                <h4 className="text-sm md:text-base font-bold text-[#22c55e] mb-4 md:mb-6 flex items-center gap-2.5">
+                  <CheckCircle className="w-4 h-4 md:w-5 md:h-5" /> Strengths
                 </h4>
-                <ul className="space-y-3">
+                <ul className="space-y-2 md:space-y-3">
                   {strengths.map((s, i) => (
-                    <li key={i} className="text-slate-700 font-medium text-sm leading-relaxed">• {s}</li>
+                    <li key={i} className="text-slate-700 font-medium text-[13px] md:text-sm leading-relaxed">• {s}</li>
                   ))}
                 </ul>
               </div>
-              <div className="p-8 rounded-[1.5rem] border border-rose-100 bg-[#fef2f2]/50">
-                <h4 className="text-base font-bold text-[#ef4444] mb-6 flex items-center gap-2.5">
-                  <AlertTriangle className="w-5 h-5" /> Areas for Improvement
+              <div className="p-4 md:p-8 rounded-2xl md:rounded-[1.5rem] border border-rose-100 bg-[#fef2f2]/50">
+                <h4 className="text-sm md:text-base font-bold text-[#ef4444] mb-4 md:mb-6 flex items-center gap-2.5">
+                  <AlertTriangle className="w-4 h-4 md:w-5 md:h-5" /> Areas for Improvement
                 </h4>
-                <ul className="space-y-3">
+                <ul className="space-y-2 md:space-y-3">
                   {improvements.map((s, i) => (
-                    <li key={i} className="text-slate-700 font-medium text-sm leading-relaxed">• {s}</li>
+                    <li key={i} className="text-slate-700 font-medium text-[13px] md:text-sm leading-relaxed">• {s}</li>
                   ))}
                 </ul>
               </div>
@@ -861,26 +883,26 @@ export default function BranchesComparison() {
         </div>
 
         {/* ── Recommended Action Plan ──────────────────────────────────────── */}
-        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-10">
-          <h3 className="text-xl font-bold text-[#111827] mb-10">Recommended Action Plan</h3>
+        <div className="bg-white rounded-2xl md:rounded-[2rem] border border-slate-100 shadow-sm p-4 md:p-10">
+          <h3 className="text-base md:text-xl font-bold text-[#111827] mb-5 md:mb-10">Recommended Action Plan</h3>
           <div className="space-y-0 divide-y divide-slate-50">
             {actionPlan.map((plan, idx) => (
-              <div key={idx} className="flex items-center justify-between py-7 gap-8 group">
-                <div className="flex items-center gap-6">
+              <div key={idx} className="flex items-start md:items-center justify-between py-4 md:py-7 gap-3 md:gap-8 group">
+                <div className="flex items-start md:items-center gap-3 md:gap-6 flex-1 min-w-0">
                   <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-white font-black text-sm shrink-0"
+                    className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-white font-black text-xs md:text-sm shrink-0"
                     style={{ backgroundColor: summary.color }}
                   >
                     {idx + 1}
                   </div>
-                  <div>
-                    <h4 className="text-[15px] font-bold text-[#111827] mb-1 group-hover:text-blue-600 transition-colors">
+                  <div className="min-w-0">
+                    <h4 className="text-[13px] md:text-[15px] font-bold text-[#111827] mb-0.5 md:mb-1 group-hover:text-blue-600 transition-colors">
                       {plan.task}
                     </h4>
-                    <p className="text-slate-400 text-xs font-medium">{plan.sub}</p>
+                    <p className="text-slate-400 text-[11px] md:text-xs font-medium leading-snug">{plan.sub}</p>
                   </div>
                 </div>
-                <span className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-white whitespace-nowrap ${plan.prColor}`}>
+                <span className={`px-3 md:px-4 py-1 md:py-1.5 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest text-white whitespace-nowrap shrink-0 ${plan.prColor}`}>
                   {plan.priority}
                 </span>
               </div>
@@ -931,7 +953,7 @@ export default function BranchesComparison() {
   return (
     <>
       <DashGlobalStyles />
-      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap:24 }}>
+      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap: isMobile ? 16 : 24 }}>
 
       {/* CRUD Modals */}
       <BranchModal
@@ -959,14 +981,15 @@ export default function BranchesComparison() {
             onClick={() => { setCrudForm(EMPTY_FORM); setAddOpen(true); }}
             className="dash-btn"
             style={{
-              display:"inline-flex", alignItems:"center", gap:7,
-              padding:"11px 18px", borderRadius:14,
+              display:"inline-flex", alignItems:"center", justifyContent:"center", gap:7,
+              padding: isMobile ? "10px 16px" : "11px 18px", borderRadius: isMobile ? 12 : 14,
               background:GRAD_PRIMARY, color:"#fff",
-              fontSize:12, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
+              fontSize: isMobile ? 11 : 12, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
               border:"none", cursor:"pointer", boxShadow:SHADOW_BTN, fontFamily:"inherit",
+              width: isMobile ? "100%" : "auto",
             }}
           >
-            <Plus size={15} strokeWidth={2.4}/> Add Branch
+            <Plus size={isMobile ? 14 : 15} strokeWidth={2.4}/> Add Branch
           </button>
         }
       />
@@ -987,19 +1010,19 @@ export default function BranchesComparison() {
 
       {/* Branch Cards */}
       {branches.length === 0 ? (
-        <div className="py-20 flex flex-col items-center justify-center bg-white rounded-[2rem] border border-slate-100">
-          <Building2 className="w-16 h-16 text-slate-200 mb-4" />
+        <div className="py-12 md:py-20 px-4 flex flex-col items-center justify-center bg-white rounded-2xl md:rounded-[2rem] border border-slate-100">
+          <Building2 className="w-12 h-12 md:w-16 md:h-16 text-slate-200 mb-3 md:mb-4" />
           <p className="text-sm font-bold text-slate-400">No branches yet</p>
-          <p className="text-xs text-slate-300 mt-1 mb-6">Create your first branch to start comparing performance</p>
+          <p className="text-xs text-slate-300 mt-1 mb-5 md:mb-6 text-center">Create your first branch to start comparing performance</p>
           <button
             onClick={() => { setCrudForm(EMPTY_FORM); setAddOpen(true); }}
-            className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-[#1e294b] text-white text-sm font-black hover:bg-[#1e3a8a] transition-all shadow-lg"
+            className="flex items-center gap-2 px-5 md:px-6 py-3 rounded-2xl bg-[#1e294b] text-white text-[13px] md:text-sm font-black hover:bg-[#1e3a8a] transition-all shadow-lg"
           >
             <Plus className="w-4 h-4" /> Add First Branch
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-7">
           {branches.map(b => {
             const hasData = b.ahi > 0 || b.feeCollection > 0 || b.passRate > 0 || b.attendance > 0;
             const theme   = tierTheme(b.status, hasData);
@@ -1044,6 +1067,7 @@ export default function BranchesComparison() {
                 key={b.id}
                 onClick={() => navigate(`/branches/${b.id}`)}
                 isDark={isDark}
+                disableTilt={isMobile}
                 outerStyle={{
                   background: theme.bg,
                   /* Layered shadow:
@@ -1062,7 +1086,7 @@ export default function BranchesComparison() {
                         "inset 0 1px 0 rgba(255,255,255,0.85)",
                         "inset 0 -1px 0 rgba(15,23,42,0.05)",
                       ].join(","),
-                  minHeight: 340,
+                  minHeight: isMobile ? 280 : 340,
                   /* Gradient ring border via padding-trick: inner card sits inside */
                   padding: 1.5,
                   backgroundImage: theme.ringBorder,
@@ -1108,8 +1132,8 @@ export default function BranchesComparison() {
                   }}
                 />
 
-                {/* ── Edit / Delete — appear on hover, glass/subtle depending on tier ── */}
-                <div className="absolute top-5 right-5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 z-[3]">
+                {/* ── Edit / Delete — appear on hover, glass/subtle depending on tier. On mobile, always visible. ── */}
+                <div className={`absolute top-5 right-5 flex items-center gap-1 transition-all duration-200 z-[3] ${isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
                   <button
                     onClick={(e) => { e.stopPropagation(); openEdit(b, b.id); }}
                     className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
@@ -1136,25 +1160,25 @@ export default function BranchesComparison() {
 
                 {/* ── Card body — content on LEFT, decorative pattern flows on RIGHT ── */}
                 <div
-                  className="relative z-[2] p-7 md:p-8 flex flex-col h-full"
-                  style={{ transform: "translateZ(30px)", transformStyle: "preserve-3d" }}
+                  className="relative z-[2] p-5 md:p-8 flex flex-col h-full"
+                  style={isMobile ? undefined : { transform: "translateZ(30px)", transformStyle: "preserve-3d" }}
                 >
 
                   {/* Big tier title — mirrors LUXURY/PREMIUM/STANDARD in ref image */}
                   <h2
-                    className={`text-[32px] md:text-[40px] leading-[1.05] font-black tracking-tight ${tierTitleColor} mb-3 uppercase`}
+                    className={`text-[26px] md:text-[40px] leading-[1.05] font-black tracking-tight ${tierTitleColor} mb-2 md:mb-3 uppercase`}
                     style={{ letterSpacing: "-0.015em" }}
                   >
                     {tierTitleText}
                   </h2>
 
                   {/* Description/tagline — max two lines, like ref image */}
-                  <p className={`text-[13px] leading-relaxed font-medium max-w-[85%] ${theme.subtitle} mb-7`}>
+                  <p className={`text-[12px] md:text-[13px] leading-relaxed font-medium max-w-[85%] ${theme.subtitle} mb-5 md:mb-7`}>
                     {tagline}
                   </p>
 
                   {/* Branch name + student count — compact line beneath tagline */}
-                  <div className="flex items-center gap-2.5 mb-6">
+                  <div className="flex items-center gap-2.5 mb-5 md:mb-6">
                     <div
                       className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-md"
                       style={{
@@ -1173,7 +1197,7 @@ export default function BranchesComparison() {
                   </div>
 
                   {/* 2-column feature grid — metrics as icon + label/value (Hajj card style) */}
-                  <div className="grid grid-cols-2 gap-x-5 gap-y-3.5 mb-6">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-3 md:gap-x-5 md:gap-y-3.5 mb-5 md:mb-6">
                     {metrics.map(m => (
                       <div key={m.label} className="flex items-start gap-2.5">
                         <div
@@ -1235,32 +1259,32 @@ export default function BranchesComparison() {
 
       {/* Charts — only render if at least one has data */}
       {branches.length > 0 && (rankingWithData.length > 0 || hasTrendsData) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
 
           {/* Performance Ranking */}
-          <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm">
-            <h3 className="text-lg font-bold text-[#111827] mb-12">Performance Ranking</h3>
+          <div className="bg-white rounded-2xl md:rounded-[2.5rem] border border-slate-100 p-4 md:p-8 shadow-sm">
+            <h3 className="text-base md:text-lg font-bold text-[#111827] mb-6 md:mb-12">Performance Ranking</h3>
             {rankingWithData.length === 0 ? (
-              <div className="h-[300px] flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-xl gap-2">
+              <div className="h-[260px] md:h-[300px] flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-xl gap-2">
                 <p className="text-sm text-slate-400 font-semibold">No performance data yet</p>
                 <p className="text-xs text-slate-300">Appears once attendance or results are recorded</p>
               </div>
             ) : (
-              <div className="h-[300px]">
+              <div className="h-[280px] md:h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={rankingWithData} layout="vertical" barGap={4} margin={{ left: 0, right: 20 }}>
+                  <BarChart data={rankingWithData} layout="vertical" barGap={4} margin={{ left: isMobile ? -8 : 0, right: isMobile ? 8 : 20 }}>
                     <XAxis type="number" domain={[0, 100]} axisLine={false} tickLine={false}
-                      tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} ticks={[0, 20, 40, 60, 80, 100]} />
+                      tick={{ fill: "#94a3b8", fontSize: isMobile ? 9 : 10, fontWeight: "bold" }} ticks={isMobile ? [0, 50, 100] : [0, 20, 40, 60, 80, 100]} />
                     <YAxis dataKey="metric" type="category" axisLine={false} tickLine={false}
-                      tick={{ fill: "#64748b", fontSize: 11, fontWeight: "bold" }} width={80} />
+                      tick={{ fill: "#64748b", fontSize: isMobile ? 9 : 11, fontWeight: "bold" }} width={isMobile ? 68 : 80} />
                     <Tooltip cursor={{ fill: "#f8fafc" }} contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} />
-                    <Legend verticalAlign="bottom" align="center" wrapperStyle={{ paddingTop: "20px" }}
+                    <Legend verticalAlign="bottom" align="center" wrapperStyle={{ paddingTop: isMobile ? "10px" : "20px" }}
                       content={({ payload }) => (
-                        <div className="flex justify-center gap-6 mt-6">
+                        <div className={`flex flex-wrap justify-center ${isMobile ? "gap-3 mt-2" : "gap-6 mt-6"}`}>
                           {payload?.map((e: any, i: number) => (
                             <div key={i} className="flex items-center gap-2">
-                              <div className="w-4 h-4 rounded-sm" style={{ backgroundColor: e.color }}></div>
-                              <span className="text-[11px] font-bold text-slate-500">{e.value}</span>
+                              <div className="w-3 h-3 md:w-4 md:h-4 rounded-sm" style={{ backgroundColor: e.color }}></div>
+                              <span className="text-[10px] md:text-[11px] font-bold text-slate-500">{e.value}</span>
                             </div>
                           ))}
                         </div>
@@ -1268,7 +1292,7 @@ export default function BranchesComparison() {
                     />
                     {branches.map((b, i) => (
                       <Bar key={b.id} dataKey={`b${i}`} name={b.name.split(" ")[0]}
-                        fill={b.color} radius={[0, 2, 2, 0]} barSize={10} />
+                        fill={b.color} radius={[0, 2, 2, 0]} barSize={isMobile ? 8 : 10} />
                     ))}
                   </BarChart>
                 </ResponsiveContainer>
@@ -1277,31 +1301,31 @@ export default function BranchesComparison() {
           </div>
 
           {/* Comparative Trends */}
-          <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm">
-            <h3 className="text-lg font-bold text-[#111827] mb-12">Comparative Trends (Attendance %)</h3>
+          <div className="bg-white rounded-2xl md:rounded-[2.5rem] border border-slate-100 p-4 md:p-8 shadow-sm">
+            <h3 className="text-base md:text-lg font-bold text-[#111827] mb-6 md:mb-12">Comparative Trends <span className="text-slate-400 font-medium text-xs md:text-sm">(Attendance %)</span></h3>
             {!hasTrendsData ? (
-              <div className="h-[300px] flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-xl gap-2">
+              <div className="h-[260px] md:h-[300px] flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-xl gap-2">
                 <p className="text-sm text-slate-400 font-semibold">No attendance trend data yet</p>
                 <p className="text-xs text-slate-300">Appears once daily attendance is recorded</p>
               </div>
             ) : (
-              <div className="h-[300px]">
+              <div className="h-[280px] md:h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={comparativeTrends} margin={{ left: -10, right: 10 }}>
+                  <LineChart data={comparativeTrends} margin={{ left: isMobile ? -14 : -10, right: 10, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis dataKey="month" axisLine={false} tickLine={false}
-                      tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: "bold" }} dy={10} />
+                      tick={{ fill: "#94a3b8", fontSize: isMobile ? 10 : 11, fontWeight: "bold" }} dy={10} />
                     <YAxis axisLine={false} tickLine={false}
-                      tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: "bold" }}
-                      domain={[0, 100]} ticks={[0, 20, 40, 60, 80, 100]} />
+                      tick={{ fill: "#94a3b8", fontSize: isMobile ? 9 : 11, fontWeight: "bold" }}
+                      domain={[0, 100]} ticks={isMobile ? [0, 50, 100] : [0, 20, 40, 60, 80, 100]} width={isMobile ? 30 : 40} />
                     <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} />
-                    <Legend verticalAlign="bottom" align="center" wrapperStyle={{ paddingTop: "20px" }}
+                    <Legend verticalAlign="bottom" align="center" wrapperStyle={{ paddingTop: isMobile ? "8px" : "20px" }}
                       content={({ payload }) => (
-                        <div className="flex justify-center gap-6 mt-6">
+                        <div className={`flex flex-wrap justify-center ${isMobile ? "gap-3 mt-2" : "gap-6 mt-6"}`}>
                           {payload?.map((e: any, i: number) => (
                             <div key={i} className="flex items-center gap-2">
-                              <div className="w-4 h-4 rounded-full border-[2.5px] bg-white" style={{ borderColor: e.color }}></div>
-                              <span className="text-[11px] font-bold text-slate-500">{e.value}</span>
+                              <div className="w-3 h-3 md:w-4 md:h-4 rounded-full border-[2.5px] bg-white" style={{ borderColor: e.color }}></div>
+                              <span className="text-[10px] md:text-[11px] font-bold text-slate-500">{e.value}</span>
                             </div>
                           ))}
                         </div>
@@ -1309,8 +1333,8 @@ export default function BranchesComparison() {
                     />
                     {branches.map((b, i) => (
                       <Line key={b.id} type="monotone" dataKey={`b${i}`} name={b.name.split(" ")[0]}
-                        stroke={b.color} strokeWidth={3}
-                        dot={{ r: 5, fill: "#fff", strokeWidth: 2.5, stroke: b.color }}
+                        stroke={b.color} strokeWidth={isMobile ? 2.5 : 3}
+                        dot={{ r: isMobile ? 3.5 : 5, fill: "#fff", strokeWidth: 2, stroke: b.color }}
                         activeDot={{ r: 7 }} />
                     ))}
                   </LineChart>
@@ -1323,14 +1347,14 @@ export default function BranchesComparison() {
 
       {/* Efficiency Metrics */}
       {branches.length > 0 && (
-        <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-10">
-          <h3 className="text-xl font-bold text-[#111827] mb-10">Efficiency Metrics</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white rounded-2xl md:rounded-[2.5rem] border border-slate-100 shadow-sm p-4 md:p-10">
+          <h3 className="text-base md:text-xl font-bold text-[#111827] mb-5 md:mb-10">Efficiency Metrics</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
             {efficiencyMetrics.map((m, i) => (
-              <div key={i} className="bg-[#f8fafc]/50 border border-slate-100 p-8 rounded-[1.5rem] text-center transition-all hover:bg-white hover:shadow-lg">
-                <p className="text-slate-400 text-[11px] font-bold uppercase tracking-tight mb-4">{m.label}</p>
-                <h3 className={`text-3xl font-black tracking-tighter mb-2 ${m.col}`}>{m.value}</h3>
-                <p className={`text-[11px] font-bold ${m.col}`}>{m.note}</p>
+              <div key={i} className="bg-[#f8fafc]/50 border border-slate-100 p-4 md:p-8 rounded-xl md:rounded-[1.5rem] text-center transition-all hover:bg-white hover:shadow-lg">
+                <p className="text-slate-400 text-[10px] md:text-[11px] font-bold uppercase tracking-tight mb-2 md:mb-4">{m.label}</p>
+                <h3 className={`text-xl md:text-3xl font-black tracking-tighter mb-1 md:mb-2 ${m.col}`}>{m.value}</h3>
+                <p className={`text-[10px] md:text-[11px] font-bold ${m.col}`}>{m.note}</p>
               </div>
             ))}
           </div>

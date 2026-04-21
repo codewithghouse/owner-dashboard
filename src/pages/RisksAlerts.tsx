@@ -15,12 +15,15 @@ import { collection, getDocs } from "firebase/firestore";
 import {
   B1, T1, T3, T4, GREEN, RED, GOLD,
   GRAD_PRIMARY, GRAD_BLUE, GRAD_GREEN, GRAD_GOLD, GRAD_RED,
-  SHADOW_SM, SHADOW_LG, SHADOW_BTN, pageShellStyle,
+  SHADOW_SM, SHADOW_LG, SHADOW_BTN, usePageShellStyle,
   DashGlobalStyles, PageHead, StatTile, DarkHero, Card3D, AIInsightCard,
 } from "@/lib/dashboardTokens";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function RisksAlerts() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
+  const pageShellStyle = usePageShellStyle();
   const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
   const [branches, setBranches] = useState<{id: string, name: string}[]>([]);
   const [data, setData] = useState<RisksData | null>(null);
@@ -81,18 +84,20 @@ export default function RisksAlerts() {
   return (
     <>
       <DashGlobalStyles />
-      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap:24 }}>
+      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap: isMobile ? 16 : 24 }}>
 
         <PageHead
           icon={ShieldAlert}
           title="Risks & Alerts"
           subtitle="Early warning system & risk monitoring"
           right={
-            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-              <div style={{ display:"inline-flex", alignItems:"center", gap:5, fontSize:10, fontWeight:800, color:T4, letterSpacing:"0.12em", textTransform:"uppercase" }}>
-                <Filter size={12}/> Branch
-              </div>
-              <div style={{ position:"relative" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8, width: isMobile ? "100%" : "auto" }}>
+              {!isMobile && (
+                <div style={{ display:"inline-flex", alignItems:"center", gap:5, fontSize:10, fontWeight:800, color:T4, letterSpacing:"0.12em", textTransform:"uppercase" }}>
+                  <Filter size={12}/> Branch
+                </div>
+              )}
+              <div style={{ position:"relative", width: isMobile ? "100%" : "auto" }}>
                 <Building2 size={13} color={T4} style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}/>
                 <select
                   value={selectedBranchId}
@@ -102,7 +107,9 @@ export default function RisksAlerts() {
                     borderRadius:12, border:"0.5px solid rgba(0,85,255,.12)",
                     background:"#fff", boxShadow:SHADOW_SM,
                     fontSize:12, fontWeight:700, color:T3,
-                    outline:"none", fontFamily:"inherit", cursor:"pointer", minWidth:160,
+                    outline:"none", fontFamily:"inherit", cursor:"pointer",
+                    width: isMobile ? "100%" : "auto",
+                    minWidth: isMobile ? 0 : 160,
                   }}
                 >
                   <option value="all">All Branches</option>
@@ -123,7 +130,7 @@ export default function RisksAlerts() {
         />
 
         {/* Bright Stat Grid */}
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16 }}>
+        <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: isMobile ? 10 : 16 }}>
           {activeData.stats.map((stat, i) => {
             const isAlert = stat.label.toLowerCase().includes("critical") || stat.label.toLowerCase().includes("alert");
             const isWarn = stat.label.toLowerCase().includes("warning");
@@ -145,27 +152,27 @@ export default function RisksAlerts() {
         </div>
 
         {/* Charts Row */}
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:16 }}>
-          <Card3D>
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
-              <div>
-                <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Risk Distribution</h3>
-                <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>By category</p>
+        <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: isMobile ? 12 : 16 }}>
+          <Card3D padding={isMobile ? "16px 14px" : "22px 24px"}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: isMobile ? 10 : 14 }}>
+              <div style={{ minWidth:0 }}>
+                <h3 style={{ fontSize: isMobile ? 14 : 15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Risk Distribution</h3>
+                <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>By category</p>
               </div>
-              <div style={{ width:32, height:32, borderRadius:10, background:"rgba(0,85,255,.08)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                <BarChart3 size={16} color={B1} strokeWidth={2.3}/>
+              <div style={{ width: isMobile ? 28 : 32, height: isMobile ? 28 : 32, borderRadius:10, background:"rgba(0,85,255,.08)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                <BarChart3 size={isMobile ? 14 : 16} color={B1} strokeWidth={2.3}/>
               </div>
             </div>
-            <div style={{ height:240 }}>
+            <div style={{ height: isMobile ? 220 : 240 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={activeData.distribution.length ? activeData.distribution : [{ name:"No Data", value:1, fill:"#e2e8f0" }]}
                     cx="50%" cy="50%"
-                    innerRadius={50} outerRadius={80}
+                    innerRadius={isMobile ? 42 : 50} outerRadius={isMobile ? 66 : 80}
                     paddingAngle={3}
                     dataKey="value"
-                    label={({ cx, cy, midAngle, outerRadius, value, name }: any) => {
+                    label={isMobile ? false : ({ cx, cy, midAngle, outerRadius, value, name }: any) => {
                       const R = Math.PI / 180;
                       const r = outerRadius + 18;
                       const x = cx + r * Math.cos(-midAngle * R);
@@ -181,93 +188,103 @@ export default function RisksAlerts() {
                     {activeData.distribution.map((e, i) => <Cell key={i} fill={e.fill} stroke="none"/>)}
                   </Pie>
                   <Tooltip contentStyle={{ borderRadius:12, border:"none", boxShadow:SHADOW_LG, fontSize:11, fontWeight:700 }}/>
+                  {isMobile && <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{ fontSize:10, fontWeight:700, paddingTop:4 }}/>}
                 </PieChart>
               </ResponsiveContainer>
             </div>
           </Card3D>
 
-          <Card3D>
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
-              <div>
-                <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Risk Trend</h3>
-                <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Critical vs Warning</p>
+          <Card3D padding={isMobile ? "16px 14px" : "22px 24px"}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: isMobile ? 10 : 14 }}>
+              <div style={{ minWidth:0 }}>
+                <h3 style={{ fontSize: isMobile ? 14 : 15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Risk Trend</h3>
+                <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Critical vs Warning</p>
               </div>
-              <div style={{ width:32, height:32, borderRadius:10, background:"rgba(255,51,85,.1)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                <TrendingUp size={16} color={RED} strokeWidth={2.3}/>
+              <div style={{ width: isMobile ? 28 : 32, height: isMobile ? 28 : 32, borderRadius:10, background:"rgba(255,51,85,.1)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                <TrendingUp size={isMobile ? 14 : 16} color={RED} strokeWidth={2.3}/>
               </div>
             </div>
-            <div style={{ height:240 }}>
+            <div style={{ height: isMobile ? 240 : 240 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={activeData.trend} margin={{ left:-20, right:10, top:5, bottom:10 }}>
+                <LineChart data={activeData.trend} margin={{ left: isMobile ? -12 : -20, right: isMobile ? 10 : 10, top:5, bottom: isMobile ? 6 : 10 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,85,255,.07)"/>
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill:T3, fontSize:11, fontWeight:700 }} dy={8}/>
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill:T3, fontSize:11, fontWeight:700 }}/>
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill:T3, fontSize: isMobile ? 10 : 11, fontWeight:700 }} dy={8}/>
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill:T3, fontSize: isMobile ? 9 : 11, fontWeight:700 }} width={isMobile ? 30 : 40} allowDecimals={false}/>
                   <Tooltip contentStyle={{ borderRadius:12, border:"none", boxShadow:SHADOW_LG, fontSize:11, fontWeight:700 }}/>
-                  <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{ fontSize:11, fontWeight:700, paddingTop:4 }}/>
-                  <Line type="monotone" dataKey="critical" name="Critical" stroke={RED} strokeWidth={3}
-                    dot={{ r:4, fill:"#fff", strokeWidth:2, stroke:RED }} activeDot={{ r:6 }}/>
-                  <Line type="monotone" dataKey="warning" name="Warning" stroke={GOLD} strokeWidth={3}
-                    dot={{ r:4, fill:"#fff", strokeWidth:2, stroke:GOLD }} activeDot={{ r:6 }}/>
+                  <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{ fontSize: isMobile ? 10 : 11, fontWeight:700, paddingTop:4 }}/>
+                  <Line type="monotone" dataKey="critical" name="Critical" stroke={RED} strokeWidth={isMobile ? 2.5 : 3}
+                    dot={{ r: isMobile ? 3 : 4, fill:"#fff", strokeWidth:2, stroke:RED }} activeDot={{ r:6 }}/>
+                  <Line type="monotone" dataKey="warning" name="Warning" stroke={GOLD} strokeWidth={isMobile ? 2.5 : 3}
+                    dot={{ r: isMobile ? 3 : 4, fill:"#fff", strokeWidth:2, stroke:GOLD }} activeDot={{ r:6 }}/>
                 </LineChart>
               </ResponsiveContainer>
             </div>
           </Card3D>
 
-          <Card3D>
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
-              <div>
-                <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Branch-wise Risk</h3>
-                <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Risk volume</p>
+          <Card3D padding={isMobile ? "16px 14px" : "22px 24px"}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: isMobile ? 10 : 14 }}>
+              <div style={{ minWidth:0 }}>
+                <h3 style={{ fontSize: isMobile ? 14 : 15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Branch-wise Risk</h3>
+                <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Risk volume</p>
               </div>
-              <div style={{ width:32, height:32, borderRadius:10, background:"rgba(0,200,83,.1)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                <Building2 size={16} color={GREEN} strokeWidth={2.3}/>
+              <div style={{ width: isMobile ? 28 : 32, height: isMobile ? 28 : 32, borderRadius:10, background:"rgba(0,200,83,.1)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                <Building2 size={isMobile ? 14 : 16} color={GREEN} strokeWidth={2.3}/>
               </div>
             </div>
-            <div style={{ height:240 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={activeData.branchRisks} margin={{ bottom:10 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,85,255,.07)"/>
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill:T3, fontSize:11, fontWeight:700 }} dy={8}/>
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill:T3, fontSize:11, fontWeight:700 }}/>
-                  <Tooltip contentStyle={{ borderRadius:12, border:"none", boxShadow:SHADOW_LG, fontSize:11, fontWeight:700 }} cursor={{ fill:"rgba(0,85,255,.04)" }}/>
-                  <Bar dataKey="value" radius={[6,6,0,0]} barSize={36}>
-                    {activeData.branchRisks.map((e, i) => <Cell key={i} fill={e.color}/>)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            {(() => {
+              const branchCount = activeData.branchRisks.length;
+              const mobileMin = Math.max(320, branchCount * 72);
+              return (
+                <div style={{ overflowX: isMobile ? "auto" : "visible", WebkitOverflowScrolling:"touch", paddingBottom: isMobile ? 4 : 0 }}>
+                  <div style={{ height: isMobile ? 240 : 240, minWidth: isMobile ? mobileMin : "100%" }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={activeData.branchRisks} margin={{ top: 8, right: isMobile ? 8 : 10, bottom: isMobile ? 20 : 10, left: isMobile ? -14 : 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,85,255,.07)"/>
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill:T3, fontSize: isMobile ? 10 : 11, fontWeight:700 }} dy={8} interval={0}/>
+                        <YAxis axisLine={false} tickLine={false} tick={{ fill:T3, fontSize: isMobile ? 9 : 11, fontWeight:700 }} width={isMobile ? 30 : 40} allowDecimals={false}/>
+                        <Tooltip contentStyle={{ borderRadius:12, border:"none", boxShadow:SHADOW_LG, fontSize:11, fontWeight:700 }} cursor={{ fill:"rgba(0,85,255,.04)" }}/>
+                        <Bar dataKey="value" radius={[6,6,0,0]} barSize={isMobile ? 28 : 36}
+                          label={{ position:"top", fill:T3, fontSize: isMobile ? 10 : 11, fontWeight:800 }}>
+                          {activeData.branchRisks.map((e, i) => <Cell key={i} fill={e.color}/>)}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              );
+            })()}
           </Card3D>
         </div>
 
         {/* Active Alerts List */}
         <div
           style={{
-            background:"#fff", borderRadius:22, padding:"22px 26px",
+            background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px" : "22px 26px",
             boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
           }}
         >
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:18 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-              <div style={{ width:36, height:36, borderRadius:11, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(0,85,255,.28)" }}>
-                <AlertOctagon size={18} color="#fff" strokeWidth={2.3}/>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: isMobile ? 14 : 18 }}>
+            <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 12, minWidth:0 }}>
+              <div style={{ width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius:11, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(0,85,255,.28)", flexShrink:0 }}>
+                <AlertOctagon size={isMobile ? 16 : 18} color="#fff" strokeWidth={2.3}/>
               </div>
-              <div>
-                <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Active Alerts</h3>
-                <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>{totalAlerts} total</p>
+              <div style={{ minWidth:0 }}>
+                <h3 style={{ fontSize: isMobile ? 14 : 15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Active Alerts</h3>
+                <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>{totalAlerts} total</p>
               </div>
             </div>
           </div>
 
           {activeData.alerts.length === 0 || (activeData.alerts.length === 1 && activeData.alerts[0].id === "no-alerts") ? (
-            <div style={{ padding:"48px 0", display:"flex", flexDirection:"column", alignItems:"center", gap:12 }}>
-              <div style={{ width:68, height:68, borderRadius:20, background:"rgba(0,200,83,.12)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                <CheckCircle2 size={34} color={GREEN} strokeWidth={2.2}/>
+            <div style={{ padding: isMobile ? "36px 0" : "48px 0", display:"flex", flexDirection:"column", alignItems:"center", gap: isMobile ? 10 : 12 }}>
+              <div style={{ width: isMobile ? 56 : 68, height: isMobile ? 56 : 68, borderRadius: isMobile ? 16 : 20, background:"rgba(0,200,83,.12)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <CheckCircle2 size={isMobile ? 28 : 34} color={GREEN} strokeWidth={2.2}/>
               </div>
-              <p style={{ fontSize:13, fontWeight:800, color:GREEN, margin:0, letterSpacing:"0.04em" }}>Great! No active alerts found</p>
-              <p style={{ fontSize:11, fontWeight:500, color:T4, margin:0 }}>All systems healthy across branches</p>
+              <p style={{ fontSize: isMobile ? 12 : 13, fontWeight:800, color:GREEN, margin:0, letterSpacing:"0.04em", textAlign:"center" }}>Great! No active alerts found</p>
+              <p style={{ fontSize: isMobile ? 10 : 11, fontWeight:500, color:T4, margin:0, textAlign:"center", padding:"0 12px" }}>All systems healthy across branches</p>
             </div>
           ) : (
-            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+            <div style={{ display:"flex", flexDirection:"column", gap: isMobile ? 10 : 12 }}>
               {activeData.alerts.filter(a => a.id !== "no-alerts").map(alert => {
                 const Icon = getAlertIcon(alert.title);
                 const accentGrad = alert.type === "critical" ? GRAD_RED : alert.type === "warning" ? GRAD_GOLD : GRAD_BLUE;
@@ -279,54 +296,99 @@ export default function RisksAlerts() {
                     onClick={() => navigate(`/risks/${alert.id}`)}
                     className="dash-card"
                     style={{
-                      background:accentBg, borderRadius:16,
+                      background:accentBg, borderRadius: isMobile ? 14 : 16,
                       border:`0.5px solid ${accentColor}22`,
-                      padding:"16px 18px", cursor:"pointer",
+                      padding: isMobile ? "14px 14px" : "16px 18px", cursor:"pointer",
                       position:"relative", overflow:"hidden",
                     }}
                   >
-                    <div style={{ position:"absolute", left:0, top:0, bottom:0, width:5, background:accentGrad }}/>
-                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, paddingLeft:8 }}>
-                      <div style={{ display:"flex", alignItems:"flex-start", gap:14, flex:1, minWidth:0 }}>
-                        <div style={{
-                          width:42, height:42, borderRadius:12, background:accentGrad,
-                          display:"flex", alignItems:"center", justifyContent:"center",
-                          color:"#fff", flexShrink:0,
-                          boxShadow:`0 6px 14px ${accentColor}33`,
-                        }}>
-                          <Icon size={20} strokeWidth={2.3}/>
-                        </div>
-                        <div style={{ minWidth:0, flex:1 }}>
-                          <div style={{ display:"flex", flexWrap:"wrap", alignItems:"center", gap:8, marginBottom:4 }}>
-                            <h4 style={{ fontSize:14, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.2px" }}>{alert.title}</h4>
-                            <span style={{
-                              fontSize:9, fontWeight:800, padding:"3px 9px", borderRadius:999,
-                              background:accentGrad, color:"#fff",
-                              letterSpacing:"0.12em", textTransform:"uppercase",
-                            }}>
-                              {alert.status}
-                            </span>
+                    <div style={{ position:"absolute", left:0, top:0, bottom:0, width: isMobile ? 4 : 5, background:accentGrad }}/>
+                    {isMobile ? (
+                      <div style={{ paddingLeft:8, display:"flex", flexDirection:"column", gap:10 }}>
+                        <div style={{ display:"flex", alignItems:"flex-start", gap:12 }}>
+                          <div style={{
+                            width:38, height:38, borderRadius:11, background:accentGrad,
+                            display:"flex", alignItems:"center", justifyContent:"center",
+                            color:"#fff", flexShrink:0,
+                            boxShadow:`0 6px 14px ${accentColor}33`,
+                          }}>
+                            <Icon size={18} strokeWidth={2.3}/>
                           </div>
-                          <p style={{ fontSize:12, fontWeight:500, color:T3, margin:0, lineHeight:1.5 }}>
-                            {alert.desc}
-                            {alert.timing && <span style={{ color:T4 }}> · {alert.timing}</span>}
-                          </p>
+                          <div style={{ minWidth:0, flex:1 }}>
+                            <div style={{ display:"flex", flexWrap:"wrap", alignItems:"center", gap:6, marginBottom:4 }}>
+                              <h4 style={{ fontSize:13, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.2px" }}>{alert.title}</h4>
+                              <span style={{
+                                fontSize:8, fontWeight:800, padding:"3px 8px", borderRadius:999,
+                                background:accentGrad, color:"#fff",
+                                letterSpacing:"0.12em", textTransform:"uppercase",
+                              }}>
+                                {alert.status}
+                              </span>
+                            </div>
+                            <p style={{ fontSize:11, fontWeight:500, color:T3, margin:0, lineHeight:1.5 }}>
+                              {alert.desc}
+                              {alert.timing && <span style={{ color:T4 }}> · {alert.timing}</span>}
+                            </p>
+                          </div>
                         </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/risks/${alert.id}`); }}
+                          className="dash-btn"
+                          style={{
+                            padding:"10px 14px", borderRadius:11,
+                            background:GRAD_PRIMARY, color:"#fff",
+                            fontSize:10, fontWeight:800, letterSpacing:"0.10em", textTransform:"uppercase",
+                            border:"none", cursor:"pointer", fontFamily:"inherit",
+                            boxShadow:SHADOW_BTN, display:"inline-flex", alignItems:"center", justifyContent:"center", gap:5,
+                            width:"100%",
+                          }}
+                        >
+                          View Details <ChevronRight size={12}/>
+                        </button>
                       </div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); navigate(`/risks/${alert.id}`); }}
-                        className="dash-btn"
-                        style={{
-                          padding:"9px 16px", borderRadius:11,
-                          background:GRAD_PRIMARY, color:"#fff",
-                          fontSize:10, fontWeight:800, letterSpacing:"0.10em", textTransform:"uppercase",
-                          border:"none", cursor:"pointer", fontFamily:"inherit",
-                          boxShadow:SHADOW_BTN, flexShrink:0, display:"inline-flex", alignItems:"center", gap:5,
-                        }}
-                      >
-                        View <ChevronRight size={12}/>
-                      </button>
-                    </div>
+                    ) : (
+                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, paddingLeft:8 }}>
+                        <div style={{ display:"flex", alignItems:"flex-start", gap:14, flex:1, minWidth:0 }}>
+                          <div style={{
+                            width:42, height:42, borderRadius:12, background:accentGrad,
+                            display:"flex", alignItems:"center", justifyContent:"center",
+                            color:"#fff", flexShrink:0,
+                            boxShadow:`0 6px 14px ${accentColor}33`,
+                          }}>
+                            <Icon size={20} strokeWidth={2.3}/>
+                          </div>
+                          <div style={{ minWidth:0, flex:1 }}>
+                            <div style={{ display:"flex", flexWrap:"wrap", alignItems:"center", gap:8, marginBottom:4 }}>
+                              <h4 style={{ fontSize:14, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.2px" }}>{alert.title}</h4>
+                              <span style={{
+                                fontSize:9, fontWeight:800, padding:"3px 9px", borderRadius:999,
+                                background:accentGrad, color:"#fff",
+                                letterSpacing:"0.12em", textTransform:"uppercase",
+                              }}>
+                                {alert.status}
+                              </span>
+                            </div>
+                            <p style={{ fontSize:12, fontWeight:500, color:T3, margin:0, lineHeight:1.5 }}>
+                              {alert.desc}
+                              {alert.timing && <span style={{ color:T4 }}> · {alert.timing}</span>}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/risks/${alert.id}`); }}
+                          className="dash-btn"
+                          style={{
+                            padding:"9px 16px", borderRadius:11,
+                            background:GRAD_PRIMARY, color:"#fff",
+                            fontSize:10, fontWeight:800, letterSpacing:"0.10em", textTransform:"uppercase",
+                            border:"none", cursor:"pointer", fontFamily:"inherit",
+                            boxShadow:SHADOW_BTN, flexShrink:0, display:"inline-flex", alignItems:"center", gap:5,
+                          }}
+                        >
+                          View <ChevronRight size={12}/>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}

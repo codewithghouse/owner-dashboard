@@ -16,9 +16,10 @@ import { toast } from "sonner";
 import {
   B1, T1, T3, T4, GREEN, RED, GOLD, VIOLET,
   GRAD_PRIMARY, GRAD_BLUE, GRAD_GREEN, GRAD_VIOLET, GRAD_GOLD, GRAD_RED,
-  SHADOW_SM, SHADOW_BTN, pageShellStyle,
+  SHADOW_SM, SHADOW_BTN, usePageShellStyle,
   DashGlobalStyles, PageHead, DarkHero, AIInsightCard,
 } from "@/lib/dashboardTokens";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface RiskThresholds {
@@ -140,6 +141,8 @@ function downloadCSV(data: Record<string, any>[], filename: string) {
 }
 
 export default function SettingsPage() {
+  const isMobile = useIsMobile();
+  const pageShellStyle = usePageShellStyle();
   const [settings, setSettings]     = useState<SchoolSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading]       = useState(true);
   const [saving, setSaving]         = useState(false);
@@ -383,13 +386,13 @@ export default function SettingsPage() {
   // ── Loading Skeleton ───────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap:18 }}>
+      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap: isMobile ? 14 : 18 }}>
         {[1, 2, 3].map(i => (
-          <div key={i} style={{ background:"#fff", borderRadius:22, border:"0.5px solid rgba(0,85,255,.08)", boxShadow:SHADOW_SM, padding:"28px 28px", animation:"pulse 2s ease-in-out infinite" }}>
-            <div style={{ height:14, width:140, background:"rgba(0,85,255,.08)", borderRadius:999, marginBottom:22 }}/>
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(2, 1fr)", gap:16 }}>
+          <div key={i} style={{ background:"#fff", borderRadius: isMobile ? 16 : 22, border:"0.5px solid rgba(0,85,255,.08)", boxShadow:SHADOW_SM, padding: isMobile ? "18px 18px" : "28px 28px", animation:"pulse 2s ease-in-out infinite" }}>
+            <div style={{ height: isMobile ? 12 : 14, width: isMobile ? 110 : 140, background:"rgba(0,85,255,.08)", borderRadius:999, marginBottom: isMobile ? 16 : 22 }}/>
+            <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)", gap: isMobile ? 12 : 16 }}>
               {[1, 2, 3, 4].map(j => (
-                <div key={j} style={{ height:46, background:"rgba(0,85,255,.04)", borderRadius:14 }}/>
+                <div key={j} style={{ height: isMobile ? 42 : 46, background:"rgba(0,85,255,.04)", borderRadius:14 }}/>
               ))}
             </div>
           </div>
@@ -405,7 +408,7 @@ export default function SettingsPage() {
   return (
     <>
       <DashGlobalStyles />
-      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap:24 }}>
+      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap: isMobile ? 14 : 24 }}>
 
       <PageHead
         icon={SettingsIcon}
@@ -414,19 +417,21 @@ export default function SettingsPage() {
         right={
           saveStatus === "success" ? (
             <div style={{
-              display:"inline-flex", alignItems:"center", gap:6,
-              padding:"8px 14px", borderRadius:12,
+              display:"inline-flex", alignItems:"center", justifyContent:"center", gap:6,
+              padding: isMobile ? "7px 12px" : "8px 14px", borderRadius:12,
               background:"rgba(0,200,83,.10)", color:GREEN, border:`0.5px solid ${GREEN}33`,
               fontSize:10, fontWeight:800, letterSpacing:"0.10em", textTransform:"uppercase",
+              width: isMobile ? "100%" : "auto",
             }}>
               <CheckCircle2 size={13}/> Saved
             </div>
           ) : saveStatus === "error" ? (
             <div style={{
-              display:"inline-flex", alignItems:"center", gap:6,
-              padding:"8px 14px", borderRadius:12,
+              display:"inline-flex", alignItems:"center", justifyContent:"center", gap:6,
+              padding: isMobile ? "7px 12px" : "8px 14px", borderRadius:12,
               background:"rgba(255,51,85,.10)", color:RED, border:`0.5px solid ${RED}33`,
               fontSize:10, fontWeight:800, letterSpacing:"0.10em", textTransform:"uppercase",
+              width: isMobile ? "100%" : "auto",
             }}>
               <AlertCircle size={13}/> Error
             </div>
@@ -447,32 +452,32 @@ export default function SettingsPage() {
       />
 
       {/* ── Section 1: Owner Profile ─────────────────────────────────────── */}
-      <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8 lg:p-10">
-        <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Owner Profile</h3>
+      <div className="bg-white rounded-2xl md:rounded-[32px] border border-slate-100 shadow-sm p-5 md:p-8 lg:p-10">
+        <h3 className="text-[11px] md:text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-5 md:mb-8">Owner Profile</h3>
 
         {/* Avatar / Logo zone */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 mb-8 p-6 bg-slate-50 rounded-2xl">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 md:gap-6 mb-5 md:mb-8 p-4 md:p-6 bg-slate-50 rounded-xl md:rounded-2xl">
           {/* Logo preview */}
           <div className="relative shrink-0">
-            <div className="w-20 h-20 rounded-2xl overflow-hidden bg-[#1e294b] flex items-center justify-center shadow-lg">
+            <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl md:rounded-2xl overflow-hidden bg-[#1e294b] flex items-center justify-center shadow-lg">
               {logoPreview ? (
                 <img src={logoPreview} alt="School logo" className="w-full h-full object-cover" />
               ) : (
-                <span className="text-white text-2xl font-black">{initials}</span>
+                <span className="text-white text-xl md:text-2xl font-black">{initials}</span>
               )}
             </div>
             {logoUploading && (
-              <div className="absolute inset-0 rounded-2xl bg-black/40 flex items-center justify-center">
-                <Loader2 className="w-6 h-6 text-white animate-spin" />
+              <div className="absolute inset-0 rounded-xl md:rounded-2xl bg-black/40 flex items-center justify-center">
+                <Loader2 className="w-5 h-5 md:w-6 md:h-6 text-white animate-spin" />
               </div>
             )}
           </div>
 
           {/* Info + upload buttons */}
-          <div className="flex-1 min-w-0">
-            <p className="text-base font-black text-[#1e293b]">{settings.ownerName || "—"}</p>
-            <p className="text-sm text-slate-400 font-medium">{settings.email}</p>
-            <p className="text-xs text-slate-300 mt-0.5">{settings.schoolName || "School name not set"}</p>
+          <div className="flex-1 min-w-0 w-full">
+            <p className="text-sm md:text-base font-black text-[#1e293b] truncate">{settings.ownerName || "—"}</p>
+            <p className="text-[12px] md:text-sm text-slate-400 font-medium truncate">{settings.email}</p>
+            <p className="text-[11px] md:text-xs text-slate-300 mt-0.5 truncate">{settings.schoolName || "School name not set"}</p>
             <div className="flex items-center gap-2 mt-3 flex-wrap">
               <input
                 ref={logoInputRef}
@@ -485,27 +490,27 @@ export default function SettingsPage() {
                 type="button"
                 onClick={() => logoInputRef.current?.click()}
                 disabled={logoUploading}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white border border-slate-200 text-xs font-black text-slate-600 hover:border-blue-300 hover:text-[#1e3a8a] transition-all disabled:opacity-60"
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 md:px-4 py-2 rounded-xl bg-white border border-slate-200 text-[11px] md:text-xs font-black text-slate-600 hover:border-blue-300 hover:text-[#1e3a8a] transition-all disabled:opacity-60"
               >
-                <Upload className="w-3.5 h-3.5" />
-                {logoPreview ? "Change Logo" : "Upload Logo"}
+                <Upload className="w-3.5 h-3.5 shrink-0" />
+                {logoPreview ? "Change" : "Upload"}
               </button>
               {logoPreview && (
                 <button
                   type="button"
                   onClick={handleRemoveLogo}
                   disabled={logoUploading}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white border border-rose-100 text-xs font-black text-rose-500 hover:bg-rose-50 transition-all disabled:opacity-60"
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 md:px-4 py-2 rounded-xl bg-white border border-rose-100 text-[11px] md:text-xs font-black text-rose-500 hover:bg-rose-50 transition-all disabled:opacity-60"
                 >
-                  <Trash2 className="w-3.5 h-3.5" /> Remove
+                  <Trash2 className="w-3.5 h-3.5 shrink-0" /> Remove
                 </button>
               )}
-              <p className="text-[10px] text-slate-300 font-medium">PNG/JPG, max 2MB</p>
+              <p className="text-[10px] text-slate-300 font-medium w-full sm:w-auto sm:ml-1">PNG/JPG, max 2MB</p>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
           <Field label="Owner / Chairman Name" icon={User}>
             <input
               type="text"
@@ -561,9 +566,9 @@ export default function SettingsPage() {
       </div>
 
       {/* ── Section 2: Preferences ───────────────────────────────────────── */}
-      <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8 lg:p-10">
-        <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-8">System Preferences</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="bg-white rounded-2xl md:rounded-[32px] border border-slate-100 shadow-sm p-5 md:p-8 lg:p-10">
+        <h3 className="text-[11px] md:text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-5 md:mb-8">System Preferences</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
           <Field label="Timezone" icon={Clock}>
             <select
               value={settings.timezone}
@@ -607,8 +612,8 @@ export default function SettingsPage() {
       </div>
 
       {/* ── Section 3: Notifications ─────────────────────────────────────── */}
-      <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8 lg:p-10">
-        <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Notification Preferences</h3>
+      <div className="bg-white rounded-2xl md:rounded-[32px] border border-slate-100 shadow-sm p-5 md:p-8 lg:p-10">
+        <h3 className="text-[11px] md:text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-5 md:mb-8">Notification Preferences</h3>
         <div className="space-y-1">
           {[
             {
@@ -638,9 +643,9 @@ export default function SettingsPage() {
           ].map(({ key, label, desc, icon: Icon }) => (
             <div
               key={key}
-              className="flex items-center justify-between py-5 border-b border-slate-50 last:border-0 gap-4"
+              className="flex items-center justify-between py-4 md:py-5 border-b border-slate-50 last:border-0 gap-3 md:gap-4"
             >
-              <div className="flex items-start gap-3 min-w-0">
+              <div className="flex items-start gap-3 min-w-0 flex-1">
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
                   settings.notifications[key] ? "bg-blue-50" : "bg-slate-50"
                 }`}>
@@ -650,8 +655,8 @@ export default function SettingsPage() {
                   }
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-black text-[#1e293b]">{label}</p>
-                  <p className="text-[11px] text-slate-400 font-medium mt-0.5 leading-relaxed">{desc}</p>
+                  <p className="text-[13px] md:text-sm font-black text-[#1e293b]">{label}</p>
+                  <p className="text-[10px] md:text-[11px] text-slate-400 font-medium mt-0.5 leading-relaxed">{desc}</p>
                 </div>
               </div>
               <Toggle
@@ -663,23 +668,23 @@ export default function SettingsPage() {
         </div>
 
         {/* WhatsApp notifications subsection */}
-        <div className="mt-6 pt-6 border-t border-slate-100 space-y-4">
-          <div className="flex items-center gap-2 mb-2">
-            <MessageCircle className="w-4 h-4 text-green-500" />
-            <p className="text-xs font-black text-slate-500 uppercase tracking-widest">WhatsApp Notifications</p>
-            <span className="text-[9px] font-black bg-green-50 text-green-600 border border-green-200 px-2 py-0.5 rounded-full">
+        <div className="mt-5 md:mt-6 pt-5 md:pt-6 border-t border-slate-100 space-y-4">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <MessageCircle className="w-4 h-4 text-green-500 shrink-0" />
+            <p className="text-[11px] md:text-xs font-black text-slate-500 uppercase tracking-widest">WhatsApp Notifications</p>
+            <span className="text-[9px] font-black bg-green-50 text-green-600 border border-green-200 px-2 py-0.5 rounded-full whitespace-nowrap">
               India — 95% open rate
             </span>
           </div>
           <div>
-            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1.5">
+            <label className="block text-[11px] md:text-xs font-black text-slate-400 uppercase tracking-widest mb-1.5">
               Your WhatsApp Number
             </label>
             <input
               value={settings.whatsappPhone}
               onChange={e => set("whatsappPhone" as any, e.target.value)}
               placeholder="+91 98765 43210"
-              className="w-full max-w-xs px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-[#1e294b] outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/10"
+              className="w-full md:max-w-xs px-4 py-2.5 rounded-xl border border-slate-200 text-[13px] md:text-sm font-medium text-[#1e294b] outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/10"
             />
             <p className="text-[10px] text-slate-400 mt-1">Include country code. Used for WhatsApp alerts below.</p>
           </div>
@@ -689,10 +694,10 @@ export default function SettingsPage() {
               whatsappDigest: { label: "Weekly Digest via WhatsApp",    desc: "Monday AHI summary + top 3 action items on WhatsApp" },
             }[key];
             return (
-              <div key={key} className="flex items-center justify-between gap-4 py-3 border-b border-slate-50 last:border-0">
-                <div>
-                  <p className="text-sm font-black text-[#1e293b]">{meta.label}</p>
-                  <p className="text-[11px] text-slate-400 font-medium mt-0.5">{meta.desc}</p>
+              <div key={key} className="flex items-center justify-between gap-3 md:gap-4 py-3 border-b border-slate-50 last:border-0">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] md:text-sm font-black text-[#1e293b]">{meta.label}</p>
+                  <p className="text-[10px] md:text-[11px] text-slate-400 font-medium mt-0.5">{meta.desc}</p>
                 </div>
                 <Toggle value={settings.notifications[key]} onChange={v => setNotif(key, v)} />
               </div>
@@ -702,12 +707,12 @@ export default function SettingsPage() {
       </div>
 
       {/* ── Section 4: Data Export ───────────────────────────────────────── */}
-      <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8 lg:p-10">
-        <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Data Export</h3>
-        <p className="text-xs text-slate-400 font-medium mb-8">
+      <div className="bg-white rounded-2xl md:rounded-[32px] border border-slate-100 shadow-sm p-5 md:p-8 lg:p-10">
+        <h3 className="text-[11px] md:text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Data Export</h3>
+        <p className="text-[11px] md:text-xs text-slate-400 font-medium mb-5 md:mb-8">
           Download your school data as CSV files for compliance, backup, or analysis.
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
           {[
             {
               key:     "students" as const,
@@ -736,20 +741,20 @@ export default function SettingsPage() {
           ].map(item => {
             const Icon = item.icon;
             return (
-              <div key={item.key} className={`rounded-2xl border p-6 space-y-4 ${item.color}`}>
+              <div key={item.key} className={`rounded-xl md:rounded-2xl border p-4 md:p-6 space-y-3 md:space-y-4 ${item.color}`}>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-white/60 flex items-center justify-center">
-                    <Icon className="w-5 h-5" />
+                  <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-white/60 flex items-center justify-center shrink-0">
+                    <Icon className="w-4 h-4 md:w-5 md:h-5" />
                   </div>
-                  <div>
-                    <p className="text-sm font-black text-[#1e294b]">{item.label}</p>
-                    <p className="text-[11px] font-medium opacity-70">{item.desc}</p>
+                  <div className="min-w-0">
+                    <p className="text-[13px] md:text-sm font-black text-[#1e294b] truncate">{item.label}</p>
+                    <p className="text-[10px] md:text-[11px] font-medium opacity-70 leading-snug">{item.desc}</p>
                   </div>
                 </div>
                 <button
                   onClick={() => handleExport(item.key)}
                   disabled={exporting === item.key}
-                  className={`w-full h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60 shadow-sm ${item.btnColor}`}
+                  className={`w-full h-11 md:h-10 rounded-xl text-[11px] md:text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60 shadow-sm ${item.btnColor}`}
                 >
                   {exporting === item.key
                     ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Exporting...</>
@@ -763,12 +768,12 @@ export default function SettingsPage() {
       </div>
 
       {/* ── Section 5: Risk Thresholds ───────────────────────────────────── */}
-      <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8 lg:p-10">
-        <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Risk Alert Thresholds</h3>
-        <p className="text-xs text-slate-400 font-medium mb-8">
+      <div className="bg-white rounded-2xl md:rounded-[32px] border border-slate-100 shadow-sm p-5 md:p-8 lg:p-10">
+        <h3 className="text-[11px] md:text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Risk Alert Thresholds</h3>
+        <p className="text-[11px] md:text-xs text-slate-400 font-medium mb-5 md:mb-8">
           Customize when students are flagged as at-risk. These thresholds power the Risks &amp; Alerts page.
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
           <div className="space-y-3">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
               Attendance Critical (%)
@@ -827,9 +832,9 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
-        <div className="mt-6 p-4 rounded-xl bg-blue-50 border border-blue-100 flex items-start gap-3">
-          <span className="text-base">💡</span>
-          <p className="text-xs text-blue-700 font-medium leading-relaxed">
+        <div className="mt-5 md:mt-6 p-3 md:p-4 rounded-xl bg-blue-50 border border-blue-100 flex items-start gap-2 md:gap-3">
+          <span className="text-sm md:text-base shrink-0">💡</span>
+          <p className="text-[11px] md:text-xs text-blue-700 font-medium leading-relaxed">
             Default: Critical &lt; {DEFAULT_THRESHOLDS.attendanceCritical}%, Warning &lt; {DEFAULT_THRESHOLDS.attendanceWarning}%, Fee overdue after {DEFAULT_THRESHOLDS.feeOverdueDays} days.
             Changes take effect on next risks calculation.
           </p>
@@ -837,25 +842,25 @@ export default function SettingsPage() {
       </div>
 
       {/* ── Save Bar ─────────────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 pb-8">
-        <div className="h-8 flex items-center">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 md:gap-4 pt-2 pb-4 md:pb-8">
+        <div className="min-h-[32px] flex items-center justify-center sm:justify-start">
           {saveStatus === "success" && (
-            <div className="flex items-center gap-2 text-emerald-600 text-sm font-bold animate-in fade-in">
+            <div className="flex items-center gap-2 text-emerald-600 text-[12px] md:text-sm font-bold animate-in fade-in">
               <CheckCircle2 className="w-4 h-4" /> Settings saved successfully
             </div>
           )}
           {saveStatus === "error" && (
-            <div className="flex items-center gap-2 text-rose-500 text-sm font-bold animate-in fade-in">
+            <div className="flex items-center gap-2 text-rose-500 text-[12px] md:text-sm font-bold animate-in fade-in">
               <AlertCircle className="w-4 h-4" /> Save failed — check your connection
             </div>
           )}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-400 hover:text-[#1e3a8a] hover:bg-slate-50 transition-all"
+            className="flex-1 sm:flex-initial h-11 md:h-auto px-5 md:px-6 py-0 md:py-3 rounded-xl md:rounded-2xl text-[11px] md:text-xs font-black uppercase tracking-widest text-slate-500 hover:text-[#1e3a8a] border border-slate-200 md:border-0 hover:bg-slate-50 transition-all"
           >
             Reset
           </button>
@@ -863,7 +868,7 @@ export default function SettingsPage() {
             type="button"
             onClick={handleSave}
             disabled={saving || logoUploading}
-            className="flex items-center gap-2 px-8 py-3 rounded-2xl bg-[#1e294b] text-white text-xs font-black uppercase tracking-widest shadow-lg shadow-slate-900/10 hover:bg-[#1e3a8a] transition-all hover:scale-105 active:scale-95 disabled:opacity-60 disabled:scale-100"
+            className="flex-[2] sm:flex-initial h-11 md:h-auto flex items-center justify-center gap-2 px-5 md:px-8 py-0 md:py-3 rounded-xl md:rounded-2xl bg-[#1e294b] text-white text-[11px] md:text-xs font-black uppercase tracking-widest shadow-lg shadow-slate-900/10 hover:bg-[#1e3a8a] transition-all active:scale-95 disabled:opacity-60 disabled:scale-100"
           >
             {saving
               ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>

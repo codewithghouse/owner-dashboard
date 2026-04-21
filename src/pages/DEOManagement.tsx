@@ -9,9 +9,10 @@ import {
 import {
   B1, T1, T3, T4, GREEN, RED, GOLD, VIOLET,
   GRAD_PRIMARY, GRAD_BLUE, GRAD_GREEN, GRAD_VIOLET, GRAD_GOLD, GRAD_RED,
-  SHADOW_SM, SHADOW_BTN, pageShellStyle,
+  SHADOW_SM, SHADOW_BTN, usePageShellStyle,
   DashGlobalStyles, PageHead, StatTile, DarkHero, Card3D, AIInsightCard,
 } from "@/lib/dashboardTokens";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { auth, db } from "@/lib/firebase";
 import {
   collection, query, where, onSnapshot, updateDoc, doc,
@@ -55,13 +56,13 @@ const PAGE_LABELS: Record<string, string> = {
 
 // ── Empty State ───────────────────────────────────────────────────────────────
 const EmptyDEO = ({ tab }: { tab: string }) => (
-  <div className="flex flex-col items-center justify-center py-24 gap-4">
-    <div className="w-20 h-20 rounded-3xl bg-slate-50 border border-slate-100 flex items-center justify-center">
-      <ShieldCheck className="w-10 h-10 text-slate-200" />
+  <div className="flex flex-col items-center justify-center py-14 md:py-24 gap-3 md:gap-4 px-4">
+    <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl md:rounded-3xl bg-slate-50 border border-slate-100 flex items-center justify-center">
+      <ShieldCheck className="w-8 h-8 md:w-10 md:h-10 text-slate-200" />
     </div>
     <div className="text-center">
-      <p className="text-sm font-bold text-slate-500">No {tab} DEO requests</p>
-      <p className="text-xs text-slate-300 mt-1">
+      <p className="text-xs md:text-sm font-bold text-slate-500">No {tab} DEO requests</p>
+      <p className="text-[11px] md:text-xs text-slate-300 mt-1 leading-snug">
         {tab === "pending"
           ? "New requests from principals will appear here"
           : tab === "approved"
@@ -76,6 +77,8 @@ const EmptyDEO = ({ tab }: { tab: string }) => (
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function DEOManagement() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
+  const pageShellStyle = usePageShellStyle();
   const [requests, setRequests]     = useState<DEORequest[]>([]);
   const [branches, setBranches]     = useState<Record<string, string>>({});
   const [loading, setLoading]       = useState(true);
@@ -214,7 +217,7 @@ export default function DEOManagement() {
   if (loading) {
     return (
       <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:14 }}>
-        <Loader2 className="animate-spin" size={38} color={B1}/>
+        <Loader2 className="animate-spin" size={isMobile ? 30 : 38} color={B1}/>
         <p style={{ fontSize:10, fontWeight:800, color:T4, letterSpacing:"0.14em", textTransform:"uppercase" }}>Loading DEO Data...</p>
       </div>
     );
@@ -226,30 +229,30 @@ export default function DEOManagement() {
   return (
     <>
       <DashGlobalStyles />
-      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap:24 }}>
+      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap: isMobile ? 16 : 24 }}>
 
       <PageHead
         icon={ShieldCheck}
         title="DEO Management"
-        subtitle="Data Entry Operators across all branches — real-time oversight"
+        subtitle={isMobile ? "Real-time oversight of all DEOs" : "Data Entry Operators across all branches — real-time oversight"}
         right={
-          <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+          <div style={{ display:"flex", gap: isMobile ? 6 : 8, flexWrap:"wrap", width: isMobile ? "100%" : "auto" }}>
             {(["pending", "approved", "rejected"] as const).map(s => {
               const cfg = STATUS_CONFIG[s];
               const grad = s === "pending" ? GRAD_GOLD : s === "approved" ? GRAD_GREEN : GRAD_RED;
               return (
                 <div key={s}
                   style={{
-                    display:"inline-flex", alignItems:"center", gap:6,
-                    padding:"8px 14px", borderRadius:12,
+                    display:"inline-flex", alignItems:"center", gap: isMobile ? 5 : 6,
+                    padding: isMobile ? "6px 10px" : "8px 14px", borderRadius: isMobile ? 10 : 12,
                     background:"#fff", border:"0.5px solid rgba(0,85,255,.1)",
-                    fontSize:10, fontWeight:800, color:T3,
+                    fontSize: isMobile ? 9 : 10, fontWeight:800, color:T3,
                     letterSpacing:"0.08em", textTransform:"uppercase",
-                    boxShadow:SHADOW_SM,
+                    boxShadow:SHADOW_SM, flex: isMobile ? 1 : "none", justifyContent: isMobile ? "center" : "flex-start",
                   }}
                 >
-                  <div style={{ width:8, height:8, borderRadius:"50%", background:grad }}/>
-                  {counts[s]} {cfg.label}
+                  <div style={{ width: isMobile ? 6 : 8, height: isMobile ? 6 : 8, borderRadius:"50%", background:grad, flexShrink:0 }}/>
+                  <span style={{ whiteSpace:"nowrap" }}>{counts[s]} {isMobile ? cfg.label.slice(0, 3) : cfg.label}</span>
                 </div>
               );
             })}
@@ -270,7 +273,7 @@ export default function DEOManagement() {
       />
 
       {/* Bright Stat Grid */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16 }}>
+      <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: isMobile ? 10 : 16 }}>
         <StatTile label="Total DEOs"         value={requests.length.toString()}     sub="All requests"       grad={GRAD_BLUE}   icon={Users}       onClick={()=>setTab("pending")} />
         <StatTile label="Active (Approved)"  value={counts.approved.toString()}     sub="Currently active"   grad={GRAD_GREEN}  icon={UserCheck}   onClick={()=>setTab("approved")} />
         <StatTile label="Awaiting Approval"  value={counts.pending.toString()}      sub="Pending review"     grad={GRAD_GOLD}   icon={Clock}       onClick={()=>setTab("pending")} />
@@ -280,7 +283,13 @@ export default function DEOManagement() {
       {/* Filters panel */}
       <Card3D padding={0} style={{ overflow:"hidden" }}>
         {/* Tabs */}
-        <div style={{ display:"flex", gap:4, borderBottom:"0.5px solid rgba(0,85,255,.08)", padding:"6px 8px" }}>
+        <div
+          style={{
+            display:"flex", gap:4, borderBottom:"0.5px solid rgba(0,85,255,.08)",
+            padding: isMobile ? "6px 6px" : "6px 8px",
+            overflowX:"auto", WebkitOverflowScrolling:"touch",
+          }}
+        >
           {(["pending", "approved", "rejected"] as const).map(s => {
             const cfg = STATUS_CONFIG[s];
             const active = tab === s;
@@ -290,19 +299,20 @@ export default function DEOManagement() {
                 onClick={() => setTab(s)}
                 className="dash-btn"
                 style={{
-                  display:"inline-flex", alignItems:"center", gap:8,
-                  padding:"10px 18px", borderRadius:12,
+                  display:"inline-flex", alignItems:"center", gap: isMobile ? 6 : 8,
+                  padding: isMobile ? "8px 12px" : "10px 18px", borderRadius: isMobile ? 10 : 12,
                   background: active ? GRAD_PRIMARY : "transparent",
                   color: active ? "#fff" : T3,
-                  fontSize:11, fontWeight:800, letterSpacing:"0.10em", textTransform:"uppercase",
+                  fontSize: isMobile ? 10 : 11, fontWeight:800, letterSpacing:"0.10em", textTransform:"uppercase",
                   border:"none", cursor:"pointer", fontFamily:"inherit",
                   boxShadow: active ? SHADOW_BTN : "none",
+                  whiteSpace:"nowrap", flexShrink:0,
                 }}
               >
                 {cfg.label}
                 {counts[s] > 0 && (
                   <span style={{
-                    fontSize:10, fontWeight:800, padding:"2px 7px", borderRadius:999,
+                    fontSize: isMobile ? 9 : 10, fontWeight:800, padding: isMobile ? "1px 6px" : "2px 7px", borderRadius:999,
                     background: active ? "rgba(255,255,255,.3)" : "rgba(0,85,255,.08)",
                     color: active ? "#fff" : B1,
                   }}>
@@ -315,32 +325,33 @@ export default function DEOManagement() {
         </div>
 
         {/* Search + branch filter */}
-        <div style={{ display:"flex", gap:10, padding:"14px 18px", borderBottom:"0.5px solid rgba(0,85,255,.08)", flexWrap:"wrap" }}>
-          <div style={{ position:"relative", flex:1, minWidth:220 }}>
+        <div style={{ display:"flex", gap: isMobile ? 8 : 10, padding: isMobile ? "10px 12px" : "14px 18px", borderBottom:"0.5px solid rgba(0,85,255,.08)", flexWrap:"wrap" }}>
+          <div style={{ position:"relative", flex:1, minWidth: isMobile ? "100%" : 220 }}>
             <Search size={14} color={T4} style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)" }}/>
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search by name or email..."
+              placeholder={isMobile ? "Search name or email" : "Search by name or email..."}
               style={{
-                width:"100%", padding:"10px 12px 10px 36px", borderRadius:12,
+                width:"100%", padding: isMobile ? "9px 10px 9px 34px" : "10px 12px 10px 36px", borderRadius:12,
                 border:"0.5px solid rgba(0,85,255,.14)", background:"#F5F9FF",
-                fontSize:13, fontWeight:500, color:T1, outline:"none", fontFamily:"inherit",
+                fontSize: isMobile ? 12 : 13, fontWeight:500, color:T1, outline:"none", fontFamily:"inherit",
               }}
             />
           </div>
           {branchList.length > 1 && (
-            <div style={{ position:"relative" }}>
+            <div style={{ position:"relative", width: isMobile ? "100%" : "auto" }}>
               <Filter size={14} color={T4} style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}/>
               <select
                 value={branchFilter}
                 onChange={e => setBranchFilter(e.target.value)}
                 style={{
-                  appearance:"none", padding:"10px 36px 10px 36px", borderRadius:12,
+                  appearance:"none", padding: isMobile ? "9px 34px 9px 34px" : "10px 36px 10px 36px", borderRadius:12,
                   border:"0.5px solid rgba(0,85,255,.14)", background:"#F5F9FF",
-                  fontSize:12, fontWeight:700, color:T3,
-                  outline:"none", fontFamily:"inherit", cursor:"pointer", minWidth:180,
+                  fontSize: isMobile ? 12 : 12, fontWeight:700, color:T3,
+                  outline:"none", fontFamily:"inherit", cursor:"pointer",
+                  minWidth: isMobile ? 0 : 180, width: isMobile ? "100%" : "auto",
                 }}
               >
                 <option value="all">All Branches</option>
@@ -361,29 +372,44 @@ export default function DEOManagement() {
             {filtered.map(req => {
               const cfg    = STATUS_CONFIG[req.status];
               const isOpen = expandedId === req.id;
+              const branchDisplay = req.branchName !== "—" ? req.branchName : (branches[req.branchId] || "—");
               return (
                 <div key={req.id} className="transition-all">
                   {/* Row */}
                   <div
-                    className="flex items-center justify-between px-6 py-5 hover:bg-slate-50/50 transition-colors cursor-pointer gap-4"
+                    className="flex items-center justify-between px-3 md:px-6 py-3.5 md:py-5 hover:bg-slate-50/50 transition-colors cursor-pointer gap-2.5 md:gap-4"
                     onClick={() => setExpandedId(isOpen ? null : req.id)}
                   >
                     {/* Left: avatar + info */}
-                    <div className="flex items-center gap-4 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-[#1e294b] text-white flex items-center justify-center text-sm font-black shrink-0">
+                    <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
+                      <div className="w-10 h-10 rounded-xl bg-[#1e294b] text-white flex items-center justify-center text-sm font-black shrink-0 relative">
                         {req.name.substring(0, 2).toUpperCase()}
+                        {/* Mobile status dot */}
+                        <span className={`md:hidden absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${cfg.dot}`} />
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-black text-[#1e293b] truncate">{req.name}</p>
-                        <p className="text-xs text-slate-400 font-medium truncate">{req.email}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13px] md:text-sm font-black text-[#1e293b] truncate">{req.name}</p>
+                        <p className="text-[11px] md:text-xs text-slate-400 font-medium truncate">{req.email}</p>
+                        {/* Mobile meta row */}
+                        <div className="flex items-center gap-2 mt-1 md:hidden">
+                          <span className="inline-flex items-center gap-1 text-[10px] text-slate-500 font-semibold min-w-0">
+                            <Building2 className="w-3 h-3 text-slate-300 shrink-0" />
+                            <span className="truncate">{branchDisplay}</span>
+                          </span>
+                          <span className="text-slate-200">·</span>
+                          <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 font-medium shrink-0">
+                            <Clock className="w-3 h-3 text-slate-300" />
+                            {formatDate(req.requestDate)}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Middle: branch + date */}
+                    {/* Middle: branch + date (desktop only) */}
                     <div className="hidden md:flex items-center gap-6 text-xs text-slate-400 font-medium shrink-0">
                       <div className="flex items-center gap-1.5">
                         <Building2 className="w-3.5 h-3.5 text-slate-300" />
-                        <span>{req.branchName !== "—" ? req.branchName : (branches[req.branchId] || "—")}</span>
+                        <span>{branchDisplay}</span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <Clock className="w-3.5 h-3.5 text-slate-300" />
@@ -392,7 +418,7 @@ export default function DEOManagement() {
                     </div>
 
                     {/* Right: status + expand */}
-                    <div className="flex items-center gap-3 shrink-0">
+                    <div className="flex items-center gap-2 md:gap-3 shrink-0">
                       <span className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] font-black uppercase tracking-widest ${cfg.bg} ${cfg.border} ${cfg.text}`}>
                         <cfg.icon className="w-3 h-3" /> {cfg.label}
                       </span>
@@ -402,20 +428,25 @@ export default function DEOManagement() {
 
                   {/* Expanded details */}
                   {isOpen && (
-                    <div className="px-6 pb-6 animate-in fade-in duration-200">
-                      <div className="bg-slate-50/80 rounded-2xl border border-slate-100 p-6 space-y-4">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                    <div className="px-3 md:px-6 pb-4 md:pb-6 animate-in fade-in duration-200">
+                      <div className="bg-slate-50/80 rounded-xl md:rounded-2xl border border-slate-100 p-3 md:p-6 space-y-3 md:space-y-4">
+                        {/* Mobile status pill (shown here since hidden in row) */}
+                        <span className={`sm:hidden inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-black uppercase tracking-widest ${cfg.bg} ${cfg.border} ${cfg.text}`}>
+                          <cfg.icon className="w-3 h-3" /> {cfg.label}
+                        </span>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 text-xs">
                           {[
                             { label: "Full Name",   value: req.name,                        icon: User },
                             { label: "Email",       value: req.email,                       icon: Mail },
                             { label: "Phone",       value: req.phone || "—",                icon: Phone },
-                            { label: "Branch",      value: req.branchName !== "—" ? req.branchName : (branches[req.branchId] || "—"), icon: Building2 },
+                            { label: "Branch",      value: branchDisplay, icon: Building2 },
                           ].map((f, i) => (
-                            <div key={i} className="space-y-1">
-                              <p className="font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                                <f.icon className="w-3 h-3" /> {f.label}
+                            <div key={i} className="space-y-1 min-w-0">
+                              <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                                <f.icon className="w-3 h-3 shrink-0" /> <span className="truncate">{f.label}</span>
                               </p>
-                              <p className="font-semibold text-[#1e293b] truncate">{f.value}</p>
+                              <p className="text-[11px] md:text-xs font-semibold text-[#1e293b] truncate">{f.value}</p>
                             </div>
                           ))}
                         </div>
@@ -424,9 +455,9 @@ export default function DEOManagement() {
                         {req.status === "approved" && req.allowedPages && req.allowedPages.length > 0 && (
                           <div>
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Allowed Pages</p>
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-1.5 md:gap-2">
                               {req.allowedPages.map(p => (
-                                <span key={p} className="px-3 py-1 rounded-lg bg-blue-50 border border-blue-100 text-[11px] font-bold text-[#1e3a8a]">
+                                <span key={p} className="px-2.5 md:px-3 py-1 rounded-lg bg-blue-50 border border-blue-100 text-[10px] md:text-[11px] font-bold text-[#1e3a8a]">
                                   {PAGE_LABELS[p] || p}
                                 </span>
                               ))}
@@ -436,22 +467,22 @@ export default function DEOManagement() {
 
                         {/* Rejection reason */}
                         {req.status === "rejected" && req.rejectionReason && (
-                          <div className="flex items-start gap-2 p-3 rounded-xl bg-rose-50 border border-rose-100">
+                          <div className="flex items-start gap-2 p-2.5 md:p-3 rounded-xl bg-rose-50 border border-rose-100">
                             <AlertCircle className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
-                            <div>
+                            <div className="min-w-0">
                               <p className="text-[11px] font-black text-rose-600 uppercase tracking-wide">Reason</p>
-                              <p className="text-xs text-rose-500 font-medium mt-0.5">{req.rejectionReason}</p>
+                              <p className="text-[11px] md:text-xs text-rose-500 font-medium mt-0.5 break-words">{req.rejectionReason}</p>
                             </div>
                           </div>
                         )}
 
                         {/* Action buttons — owner can revoke approved / reinstate rejected */}
                         {req.status === "approved" && (
-                          <div className="flex justify-end pt-2">
+                          <div className="flex justify-stretch md:justify-end pt-2">
                             <button
                               onClick={(e) => { e.stopPropagation(); handleRevoke(req); }}
                               disabled={revoking === req.id}
-                              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-50 border border-rose-100 text-rose-600 text-xs font-black hover:bg-rose-100 transition-all disabled:opacity-60"
+                              className="flex items-center justify-center gap-2 px-4 md:px-5 py-2.5 rounded-xl bg-rose-50 border border-rose-100 text-rose-600 text-[11px] md:text-xs font-black hover:bg-rose-100 transition-all disabled:opacity-60 w-full md:w-auto"
                             >
                               {revoking === req.id
                                 ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -462,11 +493,11 @@ export default function DEOManagement() {
                           </div>
                         )}
                         {req.status === "rejected" && (
-                          <div className="flex justify-end pt-2">
+                          <div className="flex justify-stretch md:justify-end pt-2">
                             <button
                               onClick={(e) => { e.stopPropagation(); handleReinstate(req); }}
                               disabled={revoking === req.id}
-                              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-50 border border-blue-100 text-[#1e3a8a] text-xs font-black hover:bg-blue-100 transition-all disabled:opacity-60"
+                              className="flex items-center justify-center gap-2 px-4 md:px-5 py-2.5 rounded-xl bg-blue-50 border border-blue-100 text-[#1e3a8a] text-[11px] md:text-xs font-black hover:bg-blue-100 transition-all disabled:opacity-60 w-full md:w-auto"
                             >
                               {revoking === req.id
                                 ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -477,9 +508,9 @@ export default function DEOManagement() {
                           </div>
                         )}
                         {req.status === "pending" && (
-                          <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-50 border border-amber-100">
-                            <Clock className="w-4 h-4 text-amber-400 shrink-0" />
-                            <p className="text-xs text-amber-600 font-semibold">
+                          <div className="flex items-start gap-2 p-2.5 md:p-3 rounded-xl bg-amber-50 border border-amber-100">
+                            <Clock className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                            <p className="text-[11px] md:text-xs text-amber-600 font-semibold leading-snug">
                               Awaiting approval by branch principal. You will be notified when they act.
                             </p>
                           </div>
@@ -497,17 +528,17 @@ export default function DEOManagement() {
       {/* Info banner */}
       <div
         style={{
-          background:"#fff", borderRadius:18, padding:"16px 18px",
+          background:"#fff", borderRadius: isMobile ? 14 : 18, padding: isMobile ? "12px 14px" : "16px 18px",
           border:"0.5px solid rgba(0,85,255,.1)", boxShadow:SHADOW_SM,
-          display:"flex", alignItems:"flex-start", gap:12,
+          display:"flex", alignItems:"flex-start", gap: isMobile ? 10 : 12,
         }}
       >
-        <div style={{ width:36, height:36, borderRadius:11, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(0,85,255,.28)", flexShrink:0 }}>
-          <ShieldCheck size={18} color="#fff" strokeWidth={2.3}/>
+        <div style={{ width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: isMobile ? 10 : 11, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(0,85,255,.28)", flexShrink:0 }}>
+          <ShieldCheck size={isMobile ? 16 : 18} color="#fff" strokeWidth={2.3}/>
         </div>
-        <div>
-          <p style={{ fontSize:13, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.2px" }}>DEO Access Flow</p>
-          <p style={{ fontSize:11, fontWeight:500, color:T3, margin:"4px 0 0 0", lineHeight:1.55 }}>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ fontSize: isMobile ? 12 : 13, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.2px" }}>DEO Access Flow</p>
+          <p style={{ fontSize: isMobile ? 10 : 11, fontWeight:500, color:T3, margin:"4px 0 0 0", lineHeight:1.55 }}>
             DEOs request access via their branch principal's dashboard. The principal approves or rejects with specific page permissions.
             As owner, you have oversight visibility and can revoke approved access or reinstate rejected requests across all branches.
           </p>

@@ -10,9 +10,10 @@ import {
 import {
   B1, T1, T3, T4, GREEN, RED, GOLD, VIOLET, ORANGE,
   GRAD_PRIMARY, GRAD_BLUE, GRAD_GREEN, GRAD_VIOLET, GRAD_GOLD, GRAD_RED, GRAD_ORANGE,
-  SHADOW_SM, SHADOW_LG, SHADOW_BTN, pageShellStyle,
+  SHADOW_SM, SHADOW_LG, SHADOW_BTN, usePageShellStyle,
   DashGlobalStyles, PageHead, StatTile, DarkHero, AIInsightCard,
 } from "@/lib/dashboardTokens";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { generateBoardReportPDF } from "@/lib/boardReportService";
 import { doc, getDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
@@ -168,6 +169,8 @@ function getStatColor(type: string, idx: number): string {
 
 export default function ReportsCenter() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
+  const pageShellStyle = usePageShellStyle();
   const [dashboard, setDashboard] = useState<ReportsDashboardData | null>(null);
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [reportData, setReportData] = useState<AnyReportData | null>(null);
@@ -296,41 +299,42 @@ export default function ReportsCenter() {
     const payload = buildExportPayload(reportData, reg?.label || "Report");
 
     return (
-      <div className="space-y-8 max-w-[1600px] mx-auto animate-in fade-in duration-500 pb-10">
+      <div style={pageShellStyle}>
+      <div className="space-y-4 md:space-y-8 max-w-[1600px] mx-auto animate-in fade-in duration-500 pb-6 md:pb-10">
         {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-sm font-bold">
-          <button onClick={() => { setSelectedSlug(null); setReportData(null); }} className="text-slate-400 hover:text-blue-600 transition-colors">Reports Center</button>
+        <div className="flex items-center gap-2 text-xs md:text-sm font-bold">
+          <button onClick={() => { setSelectedSlug(null); setReportData(null); }} className="text-slate-400 hover:text-blue-600 transition-colors">Reports</button>
           <span className="text-slate-300">/</span>
-          <span className="text-[#1e3a8a] font-bold">{reportTitle}</span>
+          <span className="text-[#1e3a8a] font-bold truncate">{reportTitle}</span>
         </div>
 
         {/* Main Report Card */}
-        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm">
-          <div className="p-8 lg:p-10">
+        <div className="bg-white rounded-2xl md:rounded-[2rem] border border-slate-100 shadow-sm">
+          <div className="p-4 md:p-8 lg:p-10">
             {/* Header */}
-            <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6 mb-8">
+            <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 md:gap-6 mb-6 md:mb-8">
               <div className="min-w-0">
-                <h2 className="text-xl md:text-2xl font-black text-[#111827] tracking-tight mb-2 truncate uppercase">{reportTitle}</h2>
-                <p className="text-slate-400 text-[10px] md:text-sm font-bold uppercase tracking-tight opacity-70 truncate">Generated on {(reportData as any).generatedOn}</p>
+                <h2 className="text-base md:text-2xl font-black text-[#111827] tracking-tight mb-1 md:mb-2 truncate uppercase">{reportTitle}</h2>
+                <p className="text-slate-400 text-[9px] md:text-sm font-bold uppercase tracking-tight opacity-70 truncate">Generated on {(reportData as any).generatedOn}</p>
               </div>
               <div className="flex items-center gap-2 md:gap-3 w-full lg:w-auto">
-                <Button variant="outline" onClick={printReport} className="flex-1 lg:flex-none h-10 px-4 rounded-xl border-slate-200 text-[10px] md:text-xs font-black text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-2 uppercase tracking-widest">
-                  <Printer className="w-4 h-4" /> Print
+                <Button variant="outline" onClick={printReport} className="flex-1 lg:flex-none h-10 px-3 md:px-4 rounded-xl border-slate-200 text-[10px] md:text-xs font-black text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-1.5 md:gap-2 uppercase tracking-widest">
+                  <Printer className="w-3.5 h-3.5 md:w-4 md:h-4" /> Print
                 </Button>
-                <Button onClick={() => handleExport("pdf")} className="flex-1 lg:flex-none h-10 px-4 rounded-xl bg-[#1e294b] text-white text-[10px] md:text-xs font-black hover:bg-[#1e3a8a] shadow-lg flex items-center justify-center gap-2 uppercase tracking-widest">
-                  <Download className="w-4 h-4" /> Export
+                <Button onClick={() => handleExport("pdf")} className="flex-1 lg:flex-none h-10 px-3 md:px-4 rounded-xl bg-[#1e294b] text-white text-[10px] md:text-xs font-black hover:bg-[#1e3a8a] shadow-lg flex items-center justify-center gap-1.5 md:gap-2 uppercase tracking-widest">
+                  <Download className="w-3.5 h-3.5 md:w-4 md:h-4" /> Export
                 </Button>
               </div>
             </div>
 
             {/* Tabs */}
-            <div className="flex items-center gap-2 md:gap-3 mb-10 overflow-x-auto pb-1">
+            <div className="flex items-center gap-1.5 md:gap-3 mb-6 md:mb-10 overflow-x-auto pb-1 -mx-1 px-1" style={{ WebkitOverflowScrolling: "touch" }}>
               {(["Preview", "Schedule", "Share", "Settings"] as const).map(tab => (
                 <button
                   key={tab}
                   type="button"
                   onClick={() => setActiveTab(tab)}
-                  className={`whitespace-nowrap px-6 md:px-8 py-2.5 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
+                  className={`whitespace-nowrap px-3.5 md:px-8 py-2 md:py-2.5 rounded-lg md:rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
                     activeTab === tab ? "bg-[#1e3a8a] text-white shadow-sm" : "bg-white text-slate-500 hover:bg-slate-50 border border-slate-100"
                   }`}
                 >
@@ -343,22 +347,22 @@ export default function ReportsCenter() {
             {activeTab === "Preview" && (
               <div className="animate-in fade-in duration-500">
                 {/* Stats Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5 mb-12">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5 mb-6 md:mb-12">
                   {payload.stats.map((stat, i) => (
-                    <div key={i} className="bg-[#f8fafc] border border-slate-100 p-5 md:p-6 rounded-xl md:rounded-[1.2rem] text-center transition-all hover:bg-white hover:shadow-lg">
-                      <p className="text-slate-400 text-[9px] md:text-[11px] font-black uppercase tracking-widest mb-3">{stat.label}</p>
-                      <h3 className={`text-2xl md:text-3xl font-black tracking-tighter ${getStatColor(reportData._type, i)}`}>{stat.value}</h3>
+                    <div key={i} className="bg-[#f8fafc] border border-slate-100 p-3.5 md:p-6 rounded-xl md:rounded-[1.2rem] text-center transition-all hover:bg-white hover:shadow-lg">
+                      <p className="text-slate-400 text-[9px] md:text-[11px] font-black uppercase tracking-widest mb-2 md:mb-3">{stat.label}</p>
+                      <h3 className={`text-lg md:text-3xl font-black tracking-tighter ${getStatColor(reportData._type, i)}`}>{stat.value}</h3>
                     </div>
                   ))}
                 </div>
 
                 {/* Charts */}
-                {renderCharts(reportData)}
+                {renderCharts(reportData, isMobile)}
 
                 {/* Summary */}
-                <div className="bg-[#f8fafc] border border-slate-100 p-8 rounded-[1.5rem] mb-6">
-                  <h4 className="text-base font-bold text-[#111827] mb-4">Report Summary</h4>
-                  <p className="text-slate-600 text-sm leading-relaxed">{(reportData as any).summary}</p>
+                <div className="bg-[#f8fafc] border border-slate-100 p-4 md:p-8 rounded-xl md:rounded-[1.5rem] mb-4 md:mb-6">
+                  <h4 className="text-sm md:text-base font-bold text-[#111827] mb-2 md:mb-4">Report Summary</h4>
+                  <p className="text-slate-600 text-xs md:text-sm leading-relaxed">{(reportData as any).summary}</p>
                 </div>
               </div>
             )}
@@ -366,16 +370,16 @@ export default function ReportsCenter() {
             {activeTab === "Schedule" && (
               <div className="animate-in fade-in duration-500 space-y-6">
                 {schedDone ? (
-                  <div className="flex flex-col items-center justify-center py-12 gap-4">
-                    <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center">
-                      <CheckCircle className="w-8 h-8 text-emerald-500" />
+                  <div className="flex flex-col items-center justify-center py-8 md:py-12 gap-3 md:gap-4 text-center">
+                    <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-emerald-100 flex items-center justify-center">
+                      <CheckCircle className="w-7 h-7 md:w-8 md:h-8 text-emerald-500" />
                     </div>
-                    <p className="text-base font-black text-[#111827]">Report Scheduled!</p>
-                    <p className="text-sm text-slate-400">Will send <strong>{schedFreq.toLowerCase()}</strong> to <strong>{schedEmail}</strong></p>
+                    <p className="text-sm md:text-base font-black text-[#111827]">Report Scheduled!</p>
+                    <p className="text-xs md:text-sm text-slate-400 px-4">Will send <strong>{schedFreq.toLowerCase()}</strong> to <strong className="break-all">{schedEmail}</strong></p>
                     <button
                       type="button"
                       onClick={() => { setSchedDone(false); setSchedEmail(""); }}
-                      className="text-xs font-black text-[#1e3a8a] uppercase tracking-widest hover:underline mt-2 cursor-pointer"
+                      className="text-[10px] md:text-xs font-black text-[#1e3a8a] uppercase tracking-widest hover:underline mt-2 cursor-pointer"
                     >
                       Schedule Another
                     </button>
@@ -383,25 +387,25 @@ export default function ReportsCenter() {
                 ) : (
                   <>
                     {/* Frequency picker */}
-                    <div className="bg-[#f8fafc] border border-slate-100 p-6 rounded-[1.5rem]">
-                      <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Frequency</p>
-                      <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-[#f8fafc] border border-slate-100 p-4 md:p-6 rounded-xl md:rounded-[1.5rem]">
+                      <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-widest mb-3 md:mb-4">Frequency</p>
+                      <div className="grid grid-cols-3 gap-2 md:gap-3">
                         {(["Weekly", "Monthly", "Quarterly"] as const).map(freq => (
                           <button
                             key={freq}
                             type="button"
                             onClick={() => setSchedFreq(freq)}
-                            className={`p-4 rounded-xl border-2 transition-all text-left cursor-pointer ${
+                            className={`p-2.5 md:p-4 rounded-lg md:rounded-xl border-2 transition-all text-left cursor-pointer ${
                               schedFreq === freq
                                 ? "border-[#1e3a8a] bg-blue-50"
                                 : "border-slate-200 bg-white hover:border-slate-300"
                             }`}
                           >
-                            <div className="flex items-center gap-2 mb-1">
-                              <Clock className={`w-4 h-4 ${schedFreq === freq ? "text-[#1e3a8a]" : "text-slate-400"}`} />
-                              <span className={`font-black text-sm ${schedFreq === freq ? "text-[#1e3a8a]" : "text-[#111827]"}`}>{freq}</span>
+                            <div className="flex items-center gap-1.5 md:gap-2 mb-1">
+                              <Clock className={`w-3.5 h-3.5 md:w-4 md:h-4 ${schedFreq === freq ? "text-[#1e3a8a]" : "text-slate-400"}`} />
+                              <span className={`font-black text-xs md:text-sm ${schedFreq === freq ? "text-[#1e3a8a]" : "text-[#111827]"}`}>{freq}</span>
                             </div>
-                            <p className="text-[10px] text-slate-400 font-medium">
+                            <p className="text-[9px] md:text-[10px] text-slate-400 font-medium leading-tight">
                               {freq === "Weekly" ? "Every Monday" : freq === "Monthly" ? "1st of month" : "End of quarter"}
                             </p>
                           </button>
@@ -410,9 +414,9 @@ export default function ReportsCenter() {
                     </div>
 
                     {/* Recipient email */}
-                    <div className="bg-[#f8fafc] border border-slate-100 p-6 rounded-[1.5rem]">
-                      <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Send To (Email)</p>
-                      <div className="flex gap-3">
+                    <div className="bg-[#f8fafc] border border-slate-100 p-4 md:p-6 rounded-xl md:rounded-[1.5rem]">
+                      <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-widest mb-2 md:mb-3">Send To (Email)</p>
+                      <div className="flex flex-col sm:flex-row gap-2 md:gap-3">
                         <input
                           type="email"
                           value={schedEmail}
@@ -424,7 +428,7 @@ export default function ReportsCenter() {
                           type="button"
                           onClick={handleSchedule}
                           disabled={scheduling || !schedEmail.trim()}
-                          className="flex items-center gap-2 px-6 h-11 rounded-xl bg-[#1e3a8a] text-white text-xs font-black uppercase tracking-widest hover:bg-[#1e294b] transition-all disabled:opacity-50 cursor-pointer"
+                          className="flex items-center justify-center gap-2 px-5 md:px-6 h-11 rounded-xl bg-[#1e3a8a] text-white text-xs font-black uppercase tracking-widest hover:bg-[#1e294b] transition-all disabled:opacity-50 cursor-pointer"
                         >
                           {scheduling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calendar className="w-4 h-4" />}
                           {scheduling ? "Saving..." : "Schedule"}
@@ -441,20 +445,20 @@ export default function ReportsCenter() {
 
             {activeTab === "Share" && (
               <div className="animate-in fade-in duration-500">
-                <div className="bg-[#f8fafc] border border-slate-100 p-8 rounded-[1.5rem]">
-                  <h4 className="text-base font-bold text-[#111827] mb-6">Share Report</h4>
-                  <div className="flex flex-col gap-4">
+                <div className="bg-[#f8fafc] border border-slate-100 p-4 md:p-8 rounded-xl md:rounded-[1.5rem]">
+                  <h4 className="text-sm md:text-base font-bold text-[#111827] mb-4 md:mb-6">Share Report</h4>
+                  <div className="flex flex-col gap-3 md:gap-4">
 
                     {/* Download PDF then share — most reliable */}
                     <button
                       type="button"
                       onClick={() => { handleExport("pdf"); toast.success("PDF downloaded — attach it to your email"); }}
-                      className="p-5 rounded-xl border border-slate-200 bg-white hover:border-[#1e3a8a] hover:shadow-lg transition-all flex items-center gap-4 cursor-pointer"
+                      className="p-3.5 md:p-5 rounded-xl border border-slate-200 bg-white hover:border-[#1e3a8a] hover:shadow-lg transition-all flex items-center gap-3 md:gap-4 cursor-pointer"
                     >
-                      <Mail className="w-5 h-5 text-[#1e3a8a]" />
-                      <div className="text-left">
-                        <p className="font-bold text-[#111827] text-sm">Download PDF to Share</p>
-                        <p className="text-xs text-slate-400">Export PDF → attach to email or WhatsApp</p>
+                      <Mail className="w-5 h-5 text-[#1e3a8a] shrink-0" />
+                      <div className="text-left min-w-0">
+                        <p className="font-bold text-[#111827] text-xs md:text-sm">Download PDF to Share</p>
+                        <p className="text-[10px] md:text-xs text-slate-400">Export PDF → attach to email or WhatsApp</p>
                       </div>
                     </button>
 
@@ -469,12 +473,12 @@ export default function ReportsCenter() {
                         );
                         return `mailto:?subject=${subject}&body=${body}`;
                       })()}
-                      className="p-5 rounded-xl border border-slate-200 bg-white hover:border-[#1e3a8a] hover:shadow-lg transition-all flex items-center gap-4 cursor-pointer no-underline"
+                      className="p-3.5 md:p-5 rounded-xl border border-slate-200 bg-white hover:border-[#1e3a8a] hover:shadow-lg transition-all flex items-center gap-3 md:gap-4 cursor-pointer no-underline"
                     >
-                      <FileText className="w-5 h-5 text-emerald-500" />
-                      <div className="text-left">
-                        <p className="font-bold text-[#111827] text-sm">Open Email Client</p>
-                        <p className="text-xs text-slate-400">Opens your mail app with report details pre-filled</p>
+                      <FileText className="w-5 h-5 text-emerald-500 shrink-0" />
+                      <div className="text-left min-w-0">
+                        <p className="font-bold text-[#111827] text-xs md:text-sm">Open Email Client</p>
+                        <p className="text-[10px] md:text-xs text-slate-400">Opens your mail app with report details pre-filled</p>
                       </div>
                     </a>
 
@@ -491,12 +495,12 @@ export default function ReportsCenter() {
                           prompt("Copy this link:", url);
                         }
                       }}
-                      className="p-5 rounded-xl border border-slate-200 bg-white hover:border-[#1e3a8a] hover:shadow-lg transition-all flex items-center gap-4 cursor-pointer"
+                      className="p-3.5 md:p-5 rounded-xl border border-slate-200 bg-white hover:border-[#1e3a8a] hover:shadow-lg transition-all flex items-center gap-3 md:gap-4 cursor-pointer"
                     >
-                      <BookOpen className="w-5 h-5 text-amber-500" />
-                      <div className="text-left">
-                        <p className="font-bold text-[#111827] text-sm">Copy Report Link</p>
-                        <p className="text-xs text-slate-400">Shareable URL for this report</p>
+                      <BookOpen className="w-5 h-5 text-amber-500 shrink-0" />
+                      <div className="text-left min-w-0">
+                        <p className="font-bold text-[#111827] text-xs md:text-sm">Copy Report Link</p>
+                        <p className="text-[10px] md:text-xs text-slate-400">Shareable URL for this report</p>
                       </div>
                     </button>
                   </div>
@@ -506,9 +510,9 @@ export default function ReportsCenter() {
 
             {activeTab === "Settings" && (
               <div className="animate-in fade-in duration-500">
-                <div className="bg-[#f8fafc] border border-slate-100 p-8 rounded-[1.5rem]">
-                  <h4 className="text-base font-bold text-[#111827] mb-6">Report Settings</h4>
-                  <div className="space-y-3">
+                <div className="bg-[#f8fafc] border border-slate-100 p-4 md:p-8 rounded-xl md:rounded-[1.5rem]">
+                  <h4 className="text-sm md:text-base font-bold text-[#111827] mb-4 md:mb-6">Report Settings</h4>
+                  <div className="space-y-2.5 md:space-y-3">
                     {[
                       {
                         label: "Include branch breakdown",
@@ -532,14 +536,14 @@ export default function ReportsCenter() {
                         set: setStgAutoRefresh,
                       },
                     ].map((setting) => (
-                      <div key={setting.label} className="flex items-center justify-between p-5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-all">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${setting.val ? "bg-blue-50" : "bg-slate-50"}`}>
+                      <div key={setting.label} className="flex items-center justify-between gap-3 p-3.5 md:p-5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-all">
+                        <div className="flex items-center gap-2.5 md:gap-3 min-w-0">
+                          <div className={`w-8 h-8 md:w-9 md:h-9 rounded-lg md:rounded-xl flex items-center justify-center shrink-0 ${setting.val ? "bg-blue-50" : "bg-slate-50"}`}>
                             <setting.icon className={`w-4 h-4 ${setting.val ? "text-[#1e3a8a]" : "text-slate-400"}`} />
                           </div>
-                          <div>
-                            <p className="font-bold text-sm text-[#111827]">{setting.label}</p>
-                            <p className="text-xs text-slate-400 mt-0.5">{setting.desc}</p>
+                          <div className="min-w-0">
+                            <p className="font-bold text-xs md:text-sm text-[#111827] leading-tight">{setting.label}</p>
+                            <p className="text-[10px] md:text-xs text-slate-400 mt-0.5 leading-snug">{setting.desc}</p>
                           </div>
                         </div>
                         <button
@@ -552,7 +556,7 @@ export default function ReportsCenter() {
                       </div>
                     ))}
                   </div>
-                  <p className="text-[10px] text-slate-400 mt-4 text-center">Settings apply to preview only — not to exported files</p>
+                  <p className="text-[10px] text-slate-400 mt-3 md:mt-4 text-center">Settings apply to preview only — not to exported files</p>
                 </div>
               </div>
             )}
@@ -560,22 +564,23 @@ export default function ReportsCenter() {
         </div>
 
         {/* Export Options */}
-        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-6 md:p-10">
-          <h3 className="text-lg md:text-xl font-black text-[#111827] mb-8 md:mb-10 uppercase tracking-widest">Export Options</h3>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <div className="bg-white rounded-2xl md:rounded-[2rem] border border-slate-100 shadow-sm p-4 md:p-10">
+          <h3 className="text-sm md:text-xl font-black text-[#111827] mb-5 md:mb-10 uppercase tracking-widest">Export Options</h3>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
             {[
-              { label: "PDF", icon: <FileText className="w-6 h-6 md:w-8 md:h-8" />, col: "text-[#ef4444]", format: "pdf" as const },
-              { label: "Excel", icon: <FileSpreadsheet className="w-6 h-6 md:w-8 md:h-8" />, col: "text-[#22c55e]", format: "excel" as const },
-              { label: "CSV", icon: <FileText className="w-6 h-6 md:w-8 md:h-8" />, col: "text-[#3b82f6]", format: "csv" as const },
-              { label: "Email", icon: <Mail className="w-6 h-6 md:w-8 md:h-8" />, col: "text-[#1e3a8a]", format: "email" as const },
+              { label: "PDF", icon: <FileText className="w-5 h-5 md:w-8 md:h-8" />, col: "text-[#ef4444]", format: "pdf" as const },
+              { label: "Excel", icon: <FileSpreadsheet className="w-5 h-5 md:w-8 md:h-8" />, col: "text-[#22c55e]", format: "excel" as const },
+              { label: "CSV", icon: <FileText className="w-5 h-5 md:w-8 md:h-8" />, col: "text-[#3b82f6]", format: "csv" as const },
+              { label: "Email", icon: <Mail className="w-5 h-5 md:w-8 md:h-8" />, col: "text-[#1e3a8a]", format: "email" as const },
             ].map((opt, i) => (
-              <button key={i} onClick={() => handleExport(opt.format)} className="bg-[#f8fafc] border border-slate-100 p-6 md:p-8 rounded-xl md:rounded-[1.5rem] flex flex-col items-center gap-3 md:gap-4 transition-all hover:bg-white hover:shadow-lg hover:border-slate-200 cursor-pointer group">
+              <button key={i} onClick={() => handleExport(opt.format)} className="bg-[#f8fafc] border border-slate-100 p-4 md:p-8 rounded-xl md:rounded-[1.5rem] flex flex-col items-center gap-2 md:gap-4 transition-all hover:bg-white hover:shadow-lg hover:border-slate-200 cursor-pointer group">
                 <div className={`${opt.col} group-hover:scale-110 transition-transform`}>{opt.icon}</div>
                 <span className="text-[10px] md:text-sm font-black text-slate-600 uppercase tracking-widest">{opt.label}</span>
               </button>
             ))}
           </div>
         </div>
+      </div>
       </div>
     );
   }
@@ -600,7 +605,7 @@ export default function ReportsCenter() {
   return (
     <>
       <DashGlobalStyles />
-      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap:24 }}>
+      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap: isMobile ? 16 : 24 }}>
 
       <PageHead
         icon={FileText}
@@ -610,14 +615,15 @@ export default function ReportsCenter() {
           <button
             className="dash-btn"
             style={{
-              display:"inline-flex", alignItems:"center", gap:7,
-              padding:"11px 18px", borderRadius:14,
+              display:"inline-flex", alignItems:"center", justifyContent:"center", gap: isMobile ? 6 : 7,
+              padding: isMobile ? "9px 12px" : "11px 18px", borderRadius: isMobile ? 12 : 14,
               background:GRAD_PRIMARY, color:"#fff",
-              fontSize:12, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
+              fontSize: isMobile ? 10 : 12, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
               border:"none", cursor:"pointer", boxShadow:SHADOW_BTN, fontFamily:"inherit",
+              whiteSpace:"nowrap",
             }}
           >
-            <Plus size={15} strokeWidth={2.4}/> Create Report
+            <Plus size={isMobile ? 13 : 15} strokeWidth={2.4}/> {isMobile ? "Create" : "Create Report"}
           </button>
         }
       />
@@ -635,7 +641,7 @@ export default function ReportsCenter() {
       />
 
       {/* Bright Stat Grid */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16 }}>
+      <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: isMobile ? 10 : 16 }}>
         <StatTile label="Total Reports"     value={totalReports.toString()}     sub={`${stats?.totalCategories || 3} categories`}  grad={GRAD_BLUE}   icon={FileText}     onClick={()=>navigate("/reports")} />
         <StatTile label="Scheduled"         value={scheduledCount.toString()}   sub="Auto-generated"                               grad={GRAD_GREEN}  icon={Clock}        onClick={()=>navigate("/reports")} />
         <StatTile label="Recent Downloads"  value={recentDownloads.toString()}  sub="Last 7 days"                                  grad={GRAD_VIOLET} icon={Download}     onClick={()=>navigate("/reports")} />
@@ -643,7 +649,7 @@ export default function ReportsCenter() {
       </div>
 
       {/* Report Categories */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:16 }}>
+      <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: isMobile ? 12 : 16 }}>
         {categoryBlocks.map(cat => {
           const Icon = cat.icon;
           return (
@@ -651,21 +657,21 @@ export default function ReportsCenter() {
               key={cat.key}
               className="dash3d"
               style={{
-                background:"#fff", borderRadius:22, padding:"22px 24px",
+                background:"#fff", borderRadius: isMobile ? 18 : 22, padding: isMobile ? "16px 16px" : "22px 24px",
                 boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
               }}
             >
-              <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16, paddingBottom:14, borderBottom:"0.5px solid rgba(0,85,255,.08)" }}>
+              <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 12, marginBottom: isMobile ? 12 : 16, paddingBottom: isMobile ? 10 : 14, borderBottom:"0.5px solid rgba(0,85,255,.08)" }}>
                 <div style={{
-                  width:42, height:42, borderRadius:13, background:cat.grad,
+                  width: isMobile ? 36 : 42, height: isMobile ? 36 : 42, borderRadius: isMobile ? 11 : 13, background:cat.grad,
                   display:"flex", alignItems:"center", justifyContent:"center",
                   boxShadow:"0 6px 14px rgba(0,85,255,.18)", flexShrink:0,
                 }}>
-                  <Icon size={20} color="#fff" strokeWidth={2.3}/>
+                  <Icon size={isMobile ? 17 : 20} color="#fff" strokeWidth={2.3}/>
                 </div>
-                <div>
-                  <h3 style={{ fontSize:15, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.3px" }}>{cat.title}</h3>
-                  <p style={{ fontSize:10, fontWeight:700, color:T4, margin:"2px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>{cat.items.length} templates</p>
+                <div style={{ minWidth: 0 }}>
+                  <h3 style={{ fontSize: isMobile ? 13 : 15, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.3px" }}>{cat.title}</h3>
+                  <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:700, color:T4, margin:"2px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>{cat.items.length} templates</p>
                 </div>
               </div>
               <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
@@ -676,14 +682,14 @@ export default function ReportsCenter() {
                     className="dash-row"
                     style={{
                       width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between",
-                      padding:"11px 12px", borderRadius:10,
+                      padding: isMobile ? "10px 10px" : "11px 12px", borderRadius:10,
                       background:"transparent", border:"none",
-                      fontSize:12, fontWeight:600, color:T3,
+                      fontSize: isMobile ? 12 : 12, fontWeight:600, color:T3,
                       cursor:"pointer", fontFamily:"inherit", textAlign:"left",
                     }}
                   >
-                    <span>{item}</span>
-                    <ChevronRight size={14} color={T4}/>
+                    <span style={{ minWidth:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", flex:1 }}>{item}</span>
+                    <ChevronRight size={14} color={T4} style={{ flexShrink: 0 }}/>
                   </button>
                 ))}
               </div>
@@ -692,67 +698,102 @@ export default function ReportsCenter() {
         })}
       </div>
 
-      {/* Scheduled Reports Table */}
+      {/* Scheduled Reports */}
       <div className="bg-white rounded-2xl md:rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-        <div className="p-6 md:p-10 border-b border-slate-50">
-          <h3 className="text-base md:text-xl font-black text-[#111827] uppercase tracking-widest">Scheduled Reports</h3>
+        <div className="p-4 md:p-10 border-b border-slate-50 flex items-center justify-between">
+          <h3 className="text-sm md:text-xl font-black text-[#111827] uppercase tracking-widest">Scheduled Reports</h3>
+          {isMobile && scheduled.length > 0 && (
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{scheduled.length}</span>
+          )}
         </div>
-        <div className="overflow-x-auto pb-4">
-          <table className="w-full text-left min-w-[700px]">
-            <thead>
-              <tr className="bg-slate-50/50">
-                <th className="py-5 px-6 md:px-10 text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Report Name</th>
-                <th className="py-5 px-6 md:px-10 text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Frequency</th>
-                <th className="py-5 px-6 md:px-10 text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest hidden md:table-cell">Next Run</th>
-                <th className="py-5 px-6 md:px-10 text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest hidden sm:table-cell">Users</th>
-                <th className="py-5 px-6 md:px-10 text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {scheduled.map((job, i) => (
-                <tr key={i} className="hover:bg-slate-50/30 transition-colors group cursor-pointer">
-                  <td className="py-6 px-6 md:px-10">
-                    <p className="font-black text-[#111827] text-xs md:text-sm tracking-tight group-hover:text-blue-600 transition-colors truncate">{job.name}</p>
-                  </td>
-                  <td className="py-6 px-6 md:px-10 text-slate-500 font-bold text-[10px] md:text-xs uppercase tracking-tight">{job.frequency}</td>
-                  <td className="py-6 px-6 md:px-10 text-slate-500 font-bold text-[10px] md:text-xs hidden md:table-cell uppercase tracking-tight">{job.nextRun}</td>
-                  <td className="py-6 px-6 md:px-10 text-slate-500 font-bold text-[10px] md:text-xs hidden sm:table-cell uppercase tracking-tight">{job.recipients} users</td>
-                  <td className="py-6 px-6 md:px-10">
-                    <span className={`text-[10px] md:text-xs font-black uppercase tracking-widest ${job.status === "Active" ? "text-blue-600" : "text-slate-400"}`}>{job.status}</span>
-                  </td>
+
+        {scheduled.length === 0 ? (
+          <div className="p-6 md:p-10 text-center text-xs md:text-sm text-slate-400 font-semibold">
+            No scheduled reports yet. Open a report &rarr; Schedule tab to set one up.
+          </div>
+        ) : isMobile ? (
+          <div className="flex flex-col divide-y divide-slate-50">
+            {scheduled.map((job, i) => (
+              <div key={i} className="p-4 hover:bg-slate-50/30 transition-colors">
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <p className="font-black text-[#111827] text-xs tracking-tight truncate flex-1 min-w-0">{job.name}</p>
+                  <span className={`text-[9px] font-black uppercase tracking-widest shrink-0 px-2 py-0.5 rounded-md ${job.status === "Active" ? "text-blue-600 bg-blue-50" : "text-slate-500 bg-slate-100"}`}>{job.status}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Frequency</p>
+                    <p className="text-[11px] font-bold text-slate-600 truncate">{job.frequency}</p>
+                  </div>
+                  <div>
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Next Run</p>
+                    <p className="text-[11px] font-bold text-slate-600 truncate">{job.nextRun}</p>
+                  </div>
+                  <div>
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Users</p>
+                    <p className="text-[11px] font-bold text-slate-600">{job.recipients}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="overflow-x-auto pb-4">
+            <table className="w-full text-left min-w-[700px]">
+              <thead>
+                <tr className="bg-slate-50/50">
+                  <th className="py-5 px-6 md:px-10 text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Report Name</th>
+                  <th className="py-5 px-6 md:px-10 text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Frequency</th>
+                  <th className="py-5 px-6 md:px-10 text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest hidden md:table-cell">Next Run</th>
+                  <th className="py-5 px-6 md:px-10 text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest hidden sm:table-cell">Users</th>
+                  <th className="py-5 px-6 md:px-10 text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {scheduled.map((job, i) => (
+                  <tr key={i} className="hover:bg-slate-50/30 transition-colors group cursor-pointer">
+                    <td className="py-6 px-6 md:px-10">
+                      <p className="font-black text-[#111827] text-xs md:text-sm tracking-tight group-hover:text-blue-600 transition-colors truncate">{job.name}</p>
+                    </td>
+                    <td className="py-6 px-6 md:px-10 text-slate-500 font-bold text-[10px] md:text-xs uppercase tracking-tight">{job.frequency}</td>
+                    <td className="py-6 px-6 md:px-10 text-slate-500 font-bold text-[10px] md:text-xs hidden md:table-cell uppercase tracking-tight">{job.nextRun}</td>
+                    <td className="py-6 px-6 md:px-10 text-slate-500 font-bold text-[10px] md:text-xs hidden sm:table-cell uppercase tracking-tight">{job.recipients} users</td>
+                    <td className="py-6 px-6 md:px-10">
+                      <span className={`text-[10px] md:text-xs font-black uppercase tracking-widest ${job.status === "Active" ? "text-blue-600" : "text-slate-400"}`}>{job.status}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* ── Board Report Section ─────────────────────────────────────────── */}
-      <div className="bg-gradient-to-br from-[#1e3a8a] to-[#2563eb] rounded-[2rem] p-8 text-white shadow-xl shadow-blue-900/20">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
-              <Building2 className="w-6 h-6 text-white" />
+      <div className="bg-gradient-to-br from-[#1e3a8a] to-[#2563eb] rounded-2xl md:rounded-[2rem] p-4 md:p-8 text-white shadow-xl shadow-blue-900/20">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 md:gap-6">
+          <div className="flex items-start gap-3 md:gap-4 min-w-0">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
+              <Building2 className="w-5 h-5 md:w-6 md:h-6 text-white" />
             </div>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="text-lg font-black">One-Click Board Report</h3>
+            <div className="min-w-0">
+              <div className="flex items-center flex-wrap gap-2 mb-1">
+                <h3 className="text-sm md:text-lg font-black">One-Click Board Report</h3>
                 <span className="text-[9px] font-black uppercase tracking-widest bg-white/20 text-white px-2 py-0.5 rounded-full">PDF</span>
               </div>
-              <p className="text-blue-100 text-sm font-medium">
+              <p className="text-blue-100 text-xs md:text-sm font-medium leading-snug">
                 Auto-generates a professional 12-page PDF with executive summary, branch heatmap,
                 fee waterfall, risk analysis &amp; action items — ready for your trustees.
               </p>
-              <div className="flex flex-wrap items-center gap-2 mt-3">
+              <div className="flex flex-wrap items-center gap-1.5 md:gap-2 mt-2 md:mt-3">
                 {["Executive Summary", "Branch Performance", "Risk Analysis", "Fee Collection", "Recommendations"].map(s => (
-                  <span key={s} className="text-[10px] font-bold bg-white/10 text-blue-100 px-2.5 py-1 rounded-full">{s}</span>
+                  <span key={s} className="text-[9px] md:text-[10px] font-bold bg-white/10 text-blue-100 px-2 md:px-2.5 py-0.5 md:py-1 rounded-full whitespace-nowrap">{s}</span>
                 ))}
               </div>
             </div>
           </div>
-          <div className="flex flex-col items-start md:items-end gap-3 shrink-0">
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-bold text-blue-200">Quarter:</label>
+          <div className="flex flex-col items-stretch lg:items-end gap-2.5 md:gap-3 shrink-0 w-full lg:w-auto">
+            <div className="flex items-center gap-2 justify-between lg:justify-end">
+              <label className="text-[11px] md:text-xs font-bold text-blue-200">Quarter:</label>
               <select
                 value={boardQuarter}
                 onChange={e => setBoardQuarter(e.target.value)}
@@ -792,14 +833,14 @@ export default function ReportsCenter() {
                 }
                 setBoardGenerating(false);
               }}
-              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white text-[#1e3a8a] text-xs font-black hover:bg-blue-50 transition-all disabled:opacity-50 shadow-lg"
+              className="flex items-center justify-center gap-2 px-4 md:px-6 py-2.5 md:py-3 rounded-xl bg-white text-[#1e3a8a] text-[11px] md:text-xs font-black hover:bg-blue-50 transition-all disabled:opacity-50 shadow-lg whitespace-nowrap"
             >
               {boardGenerating ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <Download className="w-4 h-4" />
               )}
-              {boardGenerating ? "Generating PDF…" : `Download ${boardQuarter} Report`}
+              {boardGenerating ? "Generating PDF…" : isMobile ? `Download ${boardQuarter}` : `Download ${boardQuarter} Report`}
             </button>
           </div>
         </div>
@@ -823,24 +864,28 @@ export default function ReportsCenter() {
 // CHART RENDERER (per report type)
 // ══════════════════════════════════════════════════════════════════════════════
 
-function renderCharts(data: AnyReportData): JSX.Element {
+function renderCharts(data: AnyReportData, isMobile: boolean = false): JSX.Element {
   const COLORS = ["#1e3a8a", "#3b82f6", "#f59e0b", "#22c55e", "#ef4444", "#8b5cf6"];
+  const H = isMobile ? "h-[220px]" : "h-[280px]";
+  const H_SMALL = isMobile ? "h-[210px]" : "h-[260px]";
+  const GRID = isMobile ? "grid grid-cols-1 gap-6 mb-6" : "grid grid-cols-1 lg:grid-cols-2 gap-10 mb-12";
+  const TITLE = isMobile ? "text-sm font-bold text-[#111827] mb-3" : "text-base font-bold text-[#111827] mb-8";
 
   if (data._type === "enrollment") {
     const hasGradeData = data.enrollmentByGrade.some(g => g.enrollment > 0);
     const hasTrendData = data.enrollmentTrend.length > 0;
 
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-12">
+      <div className={GRID}>
         <div>
-          <h3 className="text-base font-bold text-[#111827] mb-8">Enrollment by Grade</h3>
+          <h3 className={TITLE}>Enrollment by Grade</h3>
           {!hasGradeData ? (
-            <div className="h-[280px] flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-xl gap-2">
+            <div className={`${H} flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-xl gap-2`}>
               <p className="text-sm text-slate-400 font-semibold">No grade-level data available</p>
               <p className="text-xs text-slate-300">Appears once students have grade assignments</p>
             </div>
           ) : (
-            <div className="h-[280px]">
+            <div className={H}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.enrollmentByGrade} margin={{ left: -10, right: 10 }}>
                   <XAxis dataKey="grade" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: "bold" }} dy={10} />
@@ -855,13 +900,13 @@ function renderCharts(data: AnyReportData): JSX.Element {
           )}
         </div>
         <div>
-          <h3 className="text-base font-bold text-[#111827] mb-8">Enrollment Trend</h3>
+          <h3 className={TITLE}>Enrollment Trend</h3>
           {!hasTrendData ? (
-            <div className="h-[280px] flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-xl gap-2">
+            <div className={`${H} flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-xl gap-2`}>
               <p className="text-sm text-slate-400 font-semibold">No trend data yet</p>
             </div>
           ) : (
-            <div className="h-[280px]">
+            <div className={H}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={data.enrollmentTrend} margin={{ left: -10, right: 10 }}>
                   <defs>
@@ -888,13 +933,13 @@ function renderCharts(data: AnyReportData): JSX.Element {
     const hasTrend = data.monthlyTrend.some(m => m.rate > 0);
     const hasBranch = data.branchWise.some(b => b.rate > 0);
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-12">
+      <div className={GRID}>
         <div>
-          <h3 className="text-base font-bold text-[#111827] mb-8">Monthly Attendance Trend</h3>
+          <h3 className={TITLE}>Monthly Attendance Trend</h3>
           {!hasTrend ? (
             <EmptyChart message="No monthly trend data yet" />
           ) : (
-            <div className="h-[280px]">
+            <div className={H}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data.monthlyTrend} margin={{ left: -10, right: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -908,11 +953,11 @@ function renderCharts(data: AnyReportData): JSX.Element {
           )}
         </div>
         <div>
-          <h3 className="text-base font-bold text-[#111827] mb-8">Branch-wise Attendance</h3>
+          <h3 className={TITLE}>Branch-wise Attendance</h3>
           {!hasBranch ? (
             <EmptyChart message="No branch data" />
           ) : (
-            <div className="h-[280px]">
+            <div className={H}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.branchWise} margin={{ left: -10, right: 10 }}>
                   <XAxis dataKey="branch" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} dy={10} />
@@ -934,11 +979,11 @@ function renderCharts(data: AnyReportData): JSX.Element {
     const hasSubjects = data.subjectScores.length > 0;
     const hasDist = data.gradeDistribution.some(g => g.count > 0);
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-12">
+      <div className={GRID}>
         <div>
-          <h3 className="text-base font-bold text-[#111827] mb-8">Subject Performance</h3>
+          <h3 className={TITLE}>Subject Performance</h3>
           {!hasSubjects ? <EmptyChart message="No subject data" /> : (
-            <div className="h-[280px]">
+            <div className={H}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.subjectScores} layout="vertical" margin={{ left: 10, right: 20 }}>
                   <XAxis type="number" domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} />
@@ -953,9 +998,9 @@ function renderCharts(data: AnyReportData): JSX.Element {
           )}
         </div>
         <div>
-          <h3 className="text-base font-bold text-[#111827] mb-8">Score Distribution</h3>
+          <h3 className={TITLE}>Score Distribution</h3>
           {!hasDist ? <EmptyChart message="No distribution data" /> : (
-            <div className="h-[280px]">
+            <div className={H}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.gradeDistribution} margin={{ left: -10, right: 10 }}>
                   <XAxis dataKey="range" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 9, fontWeight: "bold" }} dy={10} />
@@ -975,11 +1020,11 @@ function renderCharts(data: AnyReportData): JSX.Element {
     const hasBranch = data.riskByBranch.length > 0;
     const hasCat = data.riskCategories.length > 0;
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-12">
+      <div className={GRID}>
         <div>
-          <h3 className="text-base font-bold text-[#111827] mb-8">Risk by Branch</h3>
+          <h3 className={TITLE}>Risk by Branch</h3>
           {!hasBranch ? <EmptyChart message="No at-risk data" /> : (
-            <div className="h-[280px]">
+            <div className={H}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.riskByBranch} margin={{ left: -10, right: 10 }}>
                   <XAxis dataKey="branch" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} dy={10} />
@@ -994,9 +1039,9 @@ function renderCharts(data: AnyReportData): JSX.Element {
           )}
         </div>
         <div>
-          <h3 className="text-base font-bold text-[#111827] mb-8">Risk Categories</h3>
+          <h3 className={TITLE}>Risk Categories</h3>
           {!hasCat ? <EmptyChart message="No category data" /> : (
-            <div className="h-[280px]">
+            <div className={H}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={data.riskCategories} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={3} dataKey="count" nameKey="category" label={({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`}>
@@ -1016,11 +1061,11 @@ function renderCharts(data: AnyReportData): JSX.Element {
     const hasBranch = data.byBranch.some(b => b.count > 0);
     const hasDist = data.distribution.some(d => d.count > 0);
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-12">
+      <div className={GRID}>
         <div>
-          <h3 className="text-base font-bold text-[#111827] mb-8">Teachers by Branch</h3>
+          <h3 className={TITLE}>Teachers by Branch</h3>
           {!hasBranch ? <EmptyChart message="No teacher data" /> : (
-            <div className="h-[280px]">
+            <div className={H}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.byBranch} margin={{ left: -10, right: 10 }}>
                   <XAxis dataKey="branch" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} dy={10} />
@@ -1033,9 +1078,9 @@ function renderCharts(data: AnyReportData): JSX.Element {
           )}
         </div>
         <div>
-          <h3 className="text-base font-bold text-[#111827] mb-8">Performance Distribution</h3>
+          <h3 className={TITLE}>Performance Distribution</h3>
           {!hasDist ? <EmptyChart message="No distribution data" /> : (
-            <div className="h-[280px]">
+            <div className={H}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={data.distribution} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={3} dataKey="count" nameKey="range" label={({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`}>
@@ -1056,11 +1101,11 @@ function renderCharts(data: AnyReportData): JSX.Element {
     const hasBranch = data.byBranch.some(b => b.total > 0);
     const hasTrend = data.monthlyTrend.some(m => m.amount > 0);
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-12">
+      <div className={GRID}>
         <div>
-          <h3 className="text-base font-bold text-[#111827] mb-8">Revenue by Branch</h3>
+          <h3 className={TITLE}>Revenue by Branch</h3>
           {!hasBranch ? <EmptyChart message="No revenue data" /> : (
-            <div className="h-[280px]">
+            <div className={H}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.byBranch} margin={{ left: -10, right: 10 }}>
                   <XAxis dataKey="branch" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} dy={10} />
@@ -1074,9 +1119,9 @@ function renderCharts(data: AnyReportData): JSX.Element {
           )}
         </div>
         <div>
-          <h3 className="text-base font-bold text-[#111827] mb-8">Monthly Collection Trend</h3>
+          <h3 className={TITLE}>Monthly Collection Trend</h3>
           {!hasTrend ? <EmptyChart message="No monthly data" /> : (
-            <div className="h-[280px]">
+            <div className={H}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={data.monthlyTrend} margin={{ left: -10, right: 10 }}>
                   <defs>
@@ -1103,11 +1148,11 @@ function renderCharts(data: AnyReportData): JSX.Element {
     const hasBranch = data.byBranch.some(b => b.pct > 0);
     const hasModes = data.paymentModes.length > 0;
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-12">
+      <div className={GRID}>
         <div>
-          <h3 className="text-base font-bold text-[#111827] mb-8">Collection Rate by Branch</h3>
+          <h3 className={TITLE}>Collection Rate by Branch</h3>
           {!hasBranch ? <EmptyChart message="No fee data" /> : (
-            <div className="h-[280px]">
+            <div className={H}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.byBranch} margin={{ left: -10, right: 10 }}>
                   <XAxis dataKey="branch" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} dy={10} />
@@ -1122,9 +1167,9 @@ function renderCharts(data: AnyReportData): JSX.Element {
           )}
         </div>
         <div>
-          <h3 className="text-base font-bold text-[#111827] mb-8">Payment Modes</h3>
+          <h3 className={TITLE}>Payment Modes</h3>
           {!hasModes ? <EmptyChart message="No payment data" /> : (
-            <div className="h-[280px]">
+            <div className={H}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={data.paymentModes} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={3} dataKey="count" nameKey="mode" label={({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`}>
@@ -1145,11 +1190,11 @@ function renderCharts(data: AnyReportData): JSX.Element {
     const hasDist = data.workloadDist.some(d => d.count > 0);
     const hasTop  = data.topByWorkload.length > 0;
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-12">
+      <div className={GRID}>
         <div>
-          <h3 className="text-base font-bold text-[#111827] mb-8">Workload Distribution</h3>
+          <h3 className={TITLE}>Workload Distribution</h3>
           {!hasDist ? <EmptyChart message="No class assignment data" /> : (
-            <div className="h-[280px]">
+            <div className={H}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.workloadDist} margin={{ left: -10, right: 10 }}>
                   <XAxis dataKey="range" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} dy={10} />
@@ -1162,9 +1207,9 @@ function renderCharts(data: AnyReportData): JSX.Element {
           )}
         </div>
         <div>
-          <h3 className="text-base font-bold text-[#111827] mb-8">Top Workload — Teachers</h3>
+          <h3 className={TITLE}>Top Workload — Teachers</h3>
           {!hasTop ? <EmptyChart message="No teacher data" /> : (
-            <div className="h-[280px]">
+            <div className={H}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.topByWorkload.slice(0, 6)} layout="vertical" margin={{ left: 60, right: 20 }}>
                   <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10 }} />
@@ -1191,12 +1236,12 @@ function renderCharts(data: AnyReportData): JSX.Element {
     const hasBranch  = data.byBranch.some(b => b.count > 0);
     const hasRecent  = data.recentItems.length > 0;
     return (
-      <div className="space-y-10 mb-12">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+      <div className={isMobile ? "space-y-6 mb-6" : "space-y-10 mb-12"}>
+        <div className={isMobile ? "grid grid-cols-1 gap-6" : "grid grid-cols-1 lg:grid-cols-2 gap-10"}>
           <div>
-            <h3 className="text-base font-bold text-[#111827] mb-8">Sentiment Breakdown</h3>
+            <h3 className={TITLE}>Sentiment Breakdown</h3>
             {sentimentData.length === 0 ? <EmptyChart message="No rated feedback" /> : (
-              <div className="h-[260px]">
+              <div className={H_SMALL}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie data={sentimentData} cx="50%" cy="50%" outerRadius={90} dataKey="value" label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`} labelLine={false}>
@@ -1209,9 +1254,9 @@ function renderCharts(data: AnyReportData): JSX.Element {
             )}
           </div>
           <div>
-            <h3 className="text-base font-bold text-[#111827] mb-8">Feedback by Branch</h3>
+            <h3 className={TITLE}>Feedback by Branch</h3>
             {!hasBranch ? <EmptyChart message="No branch feedback data" /> : (
-              <div className="h-[260px]">
+              <div className={H_SMALL}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={data.byBranch} margin={{ left: -10, right: 10 }}>
                     <XAxis dataKey="branch" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} dy={10} />
@@ -1226,20 +1271,20 @@ function renderCharts(data: AnyReportData): JSX.Element {
         </div>
         {hasRecent && (
           <div>
-            <h3 className="text-base font-bold text-[#111827] mb-4">Recent Feedback</h3>
-            <div className="space-y-3">
+            <h3 className={isMobile ? "text-sm font-bold text-[#111827] mb-3" : "text-base font-bold text-[#111827] mb-4"}>Recent Feedback</h3>
+            <div className="space-y-2 md:space-y-3">
               {data.recentItems.map((item, i) => (
-                <div key={i} className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
-                  <div className="w-8 h-8 rounded-full bg-[#1e3a8a] text-white flex items-center justify-center text-xs font-black shrink-0">
+                <div key={i} className="flex items-start gap-3 md:gap-4 p-3 md:p-4 bg-slate-50 rounded-xl border border-slate-100">
+                  <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-[#1e3a8a] text-white flex items-center justify-center text-[11px] md:text-xs font-black shrink-0">
                     {item.author.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-black text-[#111827]">{item.author}</span>
-                      <span className="text-[10px] px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full font-bold">{item.type}</span>
-                      <span className="text-[10px] text-slate-400 ml-auto">{item.date}</span>
+                    <div className="flex items-center flex-wrap gap-1.5 md:gap-2 mb-1">
+                      <span className="text-[11px] md:text-xs font-black text-[#111827] truncate">{item.author}</span>
+                      <span className="text-[9px] md:text-[10px] px-1.5 md:px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full font-bold whitespace-nowrap">{item.type}</span>
+                      <span className="text-[9px] md:text-[10px] text-slate-400 ml-auto whitespace-nowrap">{item.date}</span>
                     </div>
-                    <p className="text-xs text-slate-500 leading-relaxed truncate">{item.message || "—"}</p>
+                    <p className="text-[11px] md:text-xs text-slate-500 leading-relaxed truncate">{item.message || "—"}</p>
                   </div>
                 </div>
               ))}
@@ -1255,12 +1300,12 @@ function renderCharts(data: AnyReportData): JSX.Element {
     const hasSubj  = data.bySubject.length > 0;
     const hasRisk  = data.teachersAtRisk.length > 0;
     return (
-      <div className="space-y-10 mb-12">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+      <div className={isMobile ? "space-y-6 mb-6" : "space-y-10 mb-12"}>
+        <div className={isMobile ? "grid grid-cols-1 gap-6" : "grid grid-cols-1 lg:grid-cols-2 gap-10"}>
           <div>
-            <h3 className="text-base font-bold text-[#111827] mb-8">Weak Subjects (Avg Score)</h3>
+            <h3 className={TITLE}>Weak Subjects (Avg Score)</h3>
             {!hasSubj ? <EmptyChart message="No subject performance data" /> : (
-              <div className="h-[280px]">
+              <div className={H}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={data.bySubject} margin={{ left: -10, right: 10 }}>
                     <XAxis dataKey="subject" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} dy={10} />
@@ -1273,20 +1318,20 @@ function renderCharts(data: AnyReportData): JSX.Element {
             )}
           </div>
           <div>
-            <h3 className="text-base font-bold text-[#111827] mb-4">Teachers Needing Support</h3>
+            <h3 className={isMobile ? "text-sm font-bold text-[#111827] mb-3" : "text-base font-bold text-[#111827] mb-4"}>Teachers Needing Support</h3>
             {!hasRisk ? (
-              <div className="h-[280px] flex items-center justify-center border border-dashed border-slate-200 rounded-xl">
+              <div className={`${H} flex items-center justify-center border border-dashed border-slate-200 rounded-xl`}>
                 <p className="text-sm text-emerald-500 font-bold">All teachers performing well!</p>
               </div>
             ) : (
-              <div className="space-y-3 max-h-[280px] overflow-y-auto pr-1">
+              <div className={`space-y-2 md:space-y-3 ${isMobile ? "max-h-[220px]" : "max-h-[280px]"} overflow-y-auto pr-1`}>
                 {data.teachersAtRisk.map((t, i) => (
-                  <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
-                    <div>
-                      <p className="text-sm font-black text-[#111827]">{t.name}</p>
-                      <p className="text-[10px] text-slate-400">{t.subject} • {t.branch}</p>
+                  <div key={i} className="flex items-center justify-between gap-2 p-3 md:p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="min-w-0">
+                      <p className="text-xs md:text-sm font-black text-[#111827] truncate">{t.name}</p>
+                      <p className="text-[10px] text-slate-400 truncate">{t.subject} • {t.branch}</p>
                     </div>
-                    <span className={`text-xs font-black px-3 py-1 rounded-lg ${t.score < 50 ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600"}`}>
+                    <span className={`text-[11px] md:text-xs font-black px-2.5 md:px-3 py-1 rounded-lg shrink-0 ${t.score < 50 ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600"}`}>
                       {t.score}%
                     </span>
                   </div>
@@ -1308,11 +1353,11 @@ function renderCharts(data: AnyReportData): JSX.Element {
     ].filter(d => d.count > 0);
     const hasBranch = data.byBranch.length > 0;
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-12">
+      <div className={GRID}>
         <div>
-          <h3 className="text-base font-bold text-[#111827] mb-8">Aging Analysis</h3>
+          <h3 className={TITLE}>Aging Analysis</h3>
           {agingData.length === 0 ? <EmptyChart message="No overdue fees found" /> : (
-            <div className="h-[280px]">
+            <div className={H}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={agingData} margin={{ left: -10, right: 10 }}>
                   <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} dy={10} />
@@ -1327,9 +1372,9 @@ function renderCharts(data: AnyReportData): JSX.Element {
           )}
         </div>
         <div>
-          <h3 className="text-base font-bold text-[#111827] mb-8">Outstanding by Branch</h3>
+          <h3 className={TITLE}>Outstanding by Branch</h3>
           {!hasBranch ? <EmptyChart message="No outstanding data by branch" /> : (
-            <div className="h-[280px]">
+            <div className={H}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.byBranch} margin={{ left: -10, right: 10 }}>
                   <XAxis dataKey="branch" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} dy={10} />
@@ -1350,11 +1395,11 @@ function renderCharts(data: AnyReportData): JSX.Element {
     const hasCat   = data.byCategory.length > 0;
     const hasTrend = data.monthlyTrend.some(m => m.amount > 0);
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-12">
+      <div className={GRID}>
         <div>
-          <h3 className="text-base font-bold text-[#111827] mb-8">Expense by Category</h3>
+          <h3 className={TITLE}>Expense by Category</h3>
           {!hasCat ? <EmptyChart message="No expense data" /> : (
-            <div className="h-[280px]">
+            <div className={H}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={data.byCategory} cx="50%" cy="50%" outerRadius={90} dataKey="amount" nameKey="category" label={({ category, pct }) => `${category} ${pct}%`} labelLine={false}>
@@ -1368,9 +1413,9 @@ function renderCharts(data: AnyReportData): JSX.Element {
           )}
         </div>
         <div>
-          <h3 className="text-base font-bold text-[#111827] mb-8">Monthly Expense Trend</h3>
+          <h3 className={TITLE}>Monthly Expense Trend</h3>
           {!hasTrend ? <EmptyChart message="No monthly expense data" /> : (
-            <div className="h-[280px]">
+            <div className={H}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={data.monthlyTrend} margin={{ left: -10, right: 10 }}>
                   <defs>

@@ -12,6 +12,7 @@ import {
   LineChart, Line, Legend, AreaChart, Area
 } from "recharts";
 import { useParams, useNavigate } from "react-router-dom";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 /* ── constants ────────────────────────────────────────── */
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -33,6 +34,7 @@ function last6Months() {
 export default function TeacherPerformance() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   /* ── raw state ────────────────────────────────────── */
   const [loading,     setLoading]     = useState(true);
@@ -461,7 +463,7 @@ export default function TeacherPerformance() {
   /* ─────────────────────────────────────────────────── */
   if (loading) {
     return (
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:260, background:"#EEF4FF", minHeight:"100vh", margin:"-16px -24px 0" }}>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:260, background:"#EEF4FF", minHeight:"100vh", margin: isMobile ? "-12px -12px 0" : "-16px -24px 0" }}>
         <Loader2 className="animate-spin" size={32} color={B1}/>
       </div>
     );
@@ -478,7 +480,8 @@ export default function TeacherPerformance() {
           style={{
             fontFamily:"'DM Sans', -apple-system, sans-serif",
             background:"#EEF4FF", minHeight:"100vh",
-            margin:"-16px -24px 0", padding:"24px 32px 40px",
+            margin: isMobile ? "-12px -12px 0" : "-16px -24px 0",
+            padding: isMobile ? "14px 14px 28px" : "24px 32px 40px",
           }}
         >
           {/* ── Back Nav ──────────────────────────────── */}
@@ -487,59 +490,59 @@ export default function TeacherPerformance() {
             className="tp-btn"
             style={{
               display:"inline-flex", alignItems:"center", gap:7,
-              padding:"8px 14px", borderRadius:12,
+              padding: isMobile ? "7px 12px" : "8px 14px", borderRadius:12,
               background:"#fff", border:"0.5px solid rgba(0,85,255,.12)",
-              fontSize:11, fontWeight:700, color:T3,
+              fontSize: isMobile ? 10 : 11, fontWeight:700, color:T3,
               letterSpacing:"0.06em", textTransform:"uppercase",
-              cursor:"pointer", marginBottom:18, boxShadow:SHADOW_SM, fontFamily:"inherit",
+              cursor:"pointer", marginBottom: isMobile ? 14 : 18, boxShadow:SHADOW_SM, fontFamily:"inherit",
             }}
           >
-            <ArrowLeft size={14}/> Back to Teachers
+            <ArrowLeft size={isMobile ? 12 : 14}/> {isMobile ? "Back" : "Back to Teachers"}
           </button>
 
           {/* ── Hero Detail Card ──────────────────────── */}
           <div
             style={{
-              background:GRAD_HERO, borderRadius:24, padding:"24px 28px", color:"#fff",
-              marginBottom:24, position:"relative", overflow:"hidden",
+              background:GRAD_HERO, borderRadius: isMobile ? 18 : 24, padding: isMobile ? "18px 16px" : "24px 28px", color:"#fff",
+              marginBottom: isMobile ? 16 : 24, position:"relative", overflow:"hidden",
               boxShadow:"0 14px 40px rgba(0,8,60,.32), 0 0 0 .5px rgba(255,255,255,.12)",
             }}
           >
             <div style={{ position:"absolute", top:-60, right:-40, width:280, height:280, background:"radial-gradient(circle, rgba(255,255,255,.12) 0%, transparent 65%)", borderRadius:"50%", pointerEvents:"none" }}/>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:20, flexWrap:"wrap", position:"relative", zIndex:1 }}>
-              <div style={{ display:"flex", alignItems:"center", gap:16 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems: isMobile ? "flex-start" : "center", gap: isMobile ? 14 : 20, flexWrap:"wrap", position:"relative", zIndex:1 }}>
+              <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 12 : 16, minWidth:0, flex: isMobile ? "1 1 100%" : undefined }}>
                 <div
                   style={{
-                    width:64, height:64, borderRadius:18, background:sl.grad,
+                    width: isMobile ? 52 : 64, height: isMobile ? 52 : 64, borderRadius: isMobile ? 15 : 18, background:sl.grad,
                     display:"flex", alignItems:"center", justifyContent:"center",
-                    color:"#fff", fontSize:22, fontWeight:800,
+                    color:"#fff", fontSize: isMobile ? 18 : 22, fontWeight:800, flexShrink:0,
                     boxShadow:"0 10px 28px rgba(0,0,0,.26), 0 0 0 2px rgba(255,255,255,.2)",
                   }}
                 >
                   {initials(selectedTeacher.name)}
                 </div>
-                <div>
-                  <div style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"3px 10px", borderRadius:999, background:"rgba(255,255,255,.14)", border:"0.5px solid rgba(255,255,255,.22)", fontSize:9, fontWeight:800, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:8 }}>
+                <div style={{ minWidth:0 }}>
+                  <div style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"3px 10px", borderRadius:999, background:"rgba(255,255,255,.14)", border:"0.5px solid rgba(255,255,255,.22)", fontSize: isMobile ? 8 : 9, fontWeight:800, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:8 }}>
                     <Sparkles size={10}/> Teacher Profile
                   </div>
-                  <h2 style={{ fontSize:30, fontWeight:800, letterSpacing:"-0.8px", margin:0, color:"#fff", lineHeight:1 }}>
+                  <h2 style={{ fontSize: isMobile ? 20 : 30, fontWeight:800, letterSpacing: isMobile ? "-0.4px" : "-0.8px", margin:0, color:"#fff", lineHeight:1.1, whiteSpace: isMobile ? "normal" : "nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                     {selectedTeacher.name}
                   </h2>
-                  <p style={{ fontSize:12, color:"rgba(255,255,255,.72)", fontWeight:600, margin:"8px 0 0 0", letterSpacing:"0.06em", textTransform:"uppercase" }}>
+                  <p style={{ fontSize: isMobile ? 10 : 12, color:"rgba(255,255,255,.72)", fontWeight:600, margin:"8px 0 0 0", letterSpacing:"0.06em", textTransform:"uppercase" }}>
                     {selectedTeacher.subject || "—"} · {selectedTeacher.branchName}
                   </p>
                 </div>
               </div>
-              <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+              <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 6 : 10, flexWrap:"wrap", width: isMobile ? "100%" : "auto" }}>
                 <span style={{
-                  fontSize:10, fontWeight:800, padding:"8px 14px", borderRadius:10,
+                  fontSize: isMobile ? 9 : 10, fontWeight:800, padding: isMobile ? "6px 10px" : "8px 14px", borderRadius:10,
                   background:sl.grad, color:"#fff", letterSpacing:"0.12em", textTransform:"uppercase",
                   boxShadow:"0 4px 12px rgba(0,0,0,.24)",
                 }}>
                   {sl.label}
                 </span>
                 <span style={{
-                  fontSize:10, fontWeight:800, padding:"8px 14px", borderRadius:10,
+                  fontSize: isMobile ? 9 : 10, fontWeight:800, padding: isMobile ? "6px 10px" : "8px 14px", borderRadius:10,
                   background:selectedTeacher.status === "Active" ? "rgba(0,200,83,.25)" : "rgba(255,255,255,.14)",
                   color:"#fff", letterSpacing:"0.12em", textTransform:"uppercase",
                   border:"0.5px solid rgba(255,255,255,.22)",
@@ -550,11 +553,12 @@ export default function TeacherPerformance() {
                   onClick={()=>navigate(`/teachers/profile/${id}`)}
                   className="tp-btn"
                   style={{
-                    padding:"10px 18px", borderRadius:12,
+                    padding: isMobile ? "9px 14px" : "10px 18px", borderRadius:12,
                     background:"#fff", color:T1,
-                    fontSize:11, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
+                    fontSize: isMobile ? 10 : 11, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
                     border:"none", cursor:"pointer",
                     boxShadow:"0 4px 12px rgba(0,0,0,.18)", fontFamily:"inherit",
+                    marginLeft: isMobile ? "auto" : 0,
                   }}
                 >
                   Full Profile
@@ -570,7 +574,7 @@ export default function TeacherPerformance() {
           ) : (
             <>
               {/* ── Bright Stat Grid ─────────────────── */}
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16, marginBottom:24 }}>
+              <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: isMobile ? 10 : 16, marginBottom: isMobile ? 16 : 24 }}>
                 {[
                   {
                     label:"Effectiveness Score",
@@ -613,15 +617,15 @@ export default function TeacherPerformance() {
                       role="button" tabIndex={0}
                       className="tp-tile"
                       style={{
-                        background:s.grad, borderRadius:22, padding:"20px 22px", color:"#fff",
+                        background:s.grad, borderRadius: isMobile ? 16 : 22, padding: isMobile ? "14px 14px" : "20px 22px", color:"#fff",
                         cursor:"pointer", position:"relative", overflow:"hidden",
                         boxShadow:"0 0 0 .5px rgba(255,255,255,.15), 0 14px 38px rgba(0,85,255,.26), 0 4px 12px rgba(0,85,255,.18)",
                       }}
                     >
                       <div style={{ position:"absolute", top:-30, right:-20, width:110, height:110, background:"radial-gradient(circle, rgba(255,255,255,.22) 0%, transparent 70%)", borderRadius:"50%", pointerEvents:"none" }}/>
-                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14, position:"relative", zIndex:1 }}>
-                        <div style={{ width:38, height:38, borderRadius:12, background:"rgba(255,255,255,.22)", border:"0.5px solid rgba(255,255,255,.28)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                          <Icon size={19} color="#fff" strokeWidth={2.3}/>
+                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: isMobile ? 10 : 14, position:"relative", zIndex:1 }}>
+                        <div style={{ width: isMobile ? 32 : 38, height: isMobile ? 32 : 38, borderRadius: isMobile ? 10 : 12, background:"rgba(255,255,255,.22)", border:"0.5px solid rgba(255,255,255,.28)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                          <Icon size={isMobile ? 16 : 19} color="#fff" strokeWidth={2.3}/>
                         </div>
                         {s.delta && (
                           <div style={{ display:"inline-flex", alignItems:"center", gap:3, padding:"4px 8px", borderRadius:8, background:"rgba(255,255,255,.22)" }}>
@@ -629,22 +633,22 @@ export default function TeacherPerformance() {
                           </div>
                         )}
                       </div>
-                      <p style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,.75)", letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 4px 0", position:"relative", zIndex:1 }}>{s.label}</p>
-                      <p style={{ fontSize:30, fontWeight:800, color:"#fff", letterSpacing:"-0.6px", margin:0, lineHeight:1.1, position:"relative", zIndex:1 }}>{s.value}</p>
-                      <p style={{ fontSize:11, fontWeight:600, color:"rgba(255,255,255,.78)", margin:"6px 0 0 0", position:"relative", zIndex:1 }}>{s.sub}</p>
+                      <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:700, color:"rgba(255,255,255,.75)", letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 4px 0", position:"relative", zIndex:1 }}>{s.label}</p>
+                      <p style={{ fontSize: isMobile ? 22 : 30, fontWeight:800, color:"#fff", letterSpacing:"-0.6px", margin:0, lineHeight:1.1, position:"relative", zIndex:1 }}>{s.value}</p>
+                      <p style={{ fontSize: isMobile ? 10 : 11, fontWeight:600, color:"rgba(255,255,255,.78)", margin:"6px 0 0 0", position:"relative", zIndex:1 }}>{s.sub}</p>
                     </div>
                   );
                 })}
               </div>
 
               {/* ── Charts Row (2-col) ───────────────── */}
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(2, 1fr)", gap:16, marginBottom:24 }}>
+              <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)", gap: isMobile ? 12 : 16, marginBottom: isMobile ? 16 : 24 }}>
 
                 {/* Performance Timeline */}
                 <div
                   className="tp3d"
                   style={{
-                    background:"#fff", borderRadius:22, padding:"22px 24px",
+                    background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px" : "22px 24px",
                     boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
                   }}
                 >
@@ -658,9 +662,9 @@ export default function TeacherPerformance() {
                     </div>
                   </div>
                   {detailTimeline.every(d => d.score === 0) ? (
-                    <div style={{ height:220, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:T4 }}>No exam data yet</div>
+                    <div style={{ height: isMobile ? 180 : 220, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:T4 }}>No exam data yet</div>
                   ) : (
-                    <div style={{ height:220 }}>
+                    <div style={{ height: isMobile ? 190 : 220 }}>
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={detailTimeline} margin={{ left:-20, right:10, top:5 }}>
                           <defs>
@@ -685,7 +689,7 @@ export default function TeacherPerformance() {
                 <div
                   className="tp3d"
                   style={{
-                    background:"#fff", borderRadius:22, padding:"22px 24px",
+                    background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px" : "22px 24px",
                     boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
                   }}
                 >
@@ -699,9 +703,9 @@ export default function TeacherPerformance() {
                     </div>
                   </div>
                   {detailVsBranch.length === 0 ? (
-                    <div style={{ height:220, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:T4 }}>No comparison data</div>
+                    <div style={{ height: isMobile ? 180 : 220, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:T4 }}>No comparison data</div>
                   ) : (
-                    <div style={{ height:220 }}>
+                    <div style={{ height: isMobile ? 200 : 220 }}>
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={detailVsBranch} margin={{ left:-20, right:10, bottom:10 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,85,255,.07)"/>
@@ -721,38 +725,38 @@ export default function TeacherPerformance() {
               {/* ── Current Classes ──────────────────── */}
               <div
                 style={{
-                  background:"#fff", borderRadius:22, padding:"22px 24px",
+                  background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px" : "22px 24px",
                   boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
-                  marginBottom:24,
+                  marginBottom: isMobile ? 16 : 24,
                 }}
               >
-                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                    <div style={{ width:36, height:36, borderRadius:11, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(0,85,255,.28)" }}>
-                      <BookOpen size={18} color="#fff" strokeWidth={2.3}/>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: isMobile ? 12 : 16 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 12 }}>
+                    <div style={{ width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius:11, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(0,85,255,.28)" }}>
+                      <BookOpen size={isMobile ? 16 : 18} color="#fff" strokeWidth={2.3}/>
                     </div>
                     <div>
-                      <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Current Classes</h3>
-                      <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>{detailClasses.length} total</p>
+                      <h3 style={{ fontSize: isMobile ? 13 : 15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Current Classes</h3>
+                      <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>{detailClasses.length} total</p>
                     </div>
                   </div>
                 </div>
                 {detailClasses.length === 0 ? (
                   <p style={{ padding:"30px 0", textAlign:"center", fontSize:12, fontWeight:700, color:T4, letterSpacing:"0.08em" }}>No classes assigned yet</p>
                 ) : (
-                  <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:14 }}>
+                  <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: isMobile ? 10 : 14 }}>
                     {detailClasses.map(cls => (
                       <div key={cls.id}
                         className="tp-card"
                         style={{
-                          background:"#F5F9FF", borderRadius:16, padding:"16px 18px",
+                          background:"#F5F9FF", borderRadius: isMobile ? 14 : 16, padding: isMobile ? "13px 14px" : "16px 18px",
                           border:"0.5px solid rgba(0,85,255,.1)", cursor:"pointer",
                         }}
                       >
-                        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
-                          <h4 style={{ fontSize:14, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.2px" }}>{cls.name}</h4>
+                        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, marginBottom:10 }}>
+                          <h4 style={{ fontSize: isMobile ? 13 : 14, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.2px", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", minWidth:0 }}>{cls.name}</h4>
                           <span style={{
-                            fontSize:9, fontWeight:800, padding:"3px 9px", borderRadius:999,
+                            fontSize:9, fontWeight:800, padding:"3px 9px", borderRadius:999, flexShrink:0,
                             background: cls.status === "Active" ? "rgba(0,200,83,.12)" : "rgba(153,170,204,.16)",
                             color: cls.status === "Active" ? GREEN : T4,
                             letterSpacing:"0.10em", textTransform:"uppercase",
@@ -782,34 +786,36 @@ export default function TeacherPerformance() {
         style={{
           fontFamily:"'DM Sans', -apple-system, sans-serif",
           background:"#EEF4FF", minHeight:"100vh",
-          margin:"-16px -24px 0", padding:"24px 32px 40px",
+          margin: isMobile ? "-12px -12px 0" : "-16px -24px 0",
+          padding: isMobile ? "16px 14px 28px" : "24px 32px 40px",
         }}
       >
         {/* ── Page Head ─────────────────────────────── */}
-        <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:20, marginBottom:22, flexWrap:"wrap" }}>
-          <div style={{ display:"flex", alignItems:"center", gap:14 }}>
-            <div style={{ width:48, height:48, borderRadius:14, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 8px 22px rgba(0,85,255,.35)" }}>
-              <Award size={24} color="#fff" strokeWidth={2.2}/>
+        <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap: isMobile ? 12 : 20, marginBottom: isMobile ? 16 : 22, flexWrap:"wrap" }}>
+          <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 14, minWidth:0, flex: isMobile ? "1 1 auto" : undefined }}>
+            <div style={{ width: isMobile ? 40 : 48, height: isMobile ? 40 : 48, borderRadius: isMobile ? 12 : 14, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 8px 22px rgba(0,85,255,.35)", flexShrink:0 }}>
+              <Award size={isMobile ? 20 : 24} color="#fff" strokeWidth={2.2}/>
             </div>
-            <div>
-              <h1 style={{ fontSize:32, fontWeight:700, color:T1, letterSpacing:"-0.8px", margin:0, lineHeight:1.1 }}>
+            <div style={{ minWidth:0 }}>
+              <h1 style={{ fontSize: isMobile ? 20 : 32, fontWeight:700, color:T1, letterSpacing: isMobile ? "-0.4px" : "-0.8px", margin:0, lineHeight:1.1 }}>
                 Teacher Performance
               </h1>
-              <p style={{ fontSize:12, color:T3, fontWeight:500, margin:"5px 0 0 0", letterSpacing:"0.10em", textTransform:"uppercase" }}>
+              <p style={{ fontSize: isMobile ? 10 : 12, color:T3, fontWeight:500, margin:"5px 0 0 0", letterSpacing:"0.10em", textTransform:"uppercase" }}>
                 Effectiveness metrics &amp; evaluation analytics
               </p>
             </div>
           </div>
-          <div style={{ position:"relative" }}>
+          <div style={{ position:"relative", width: isMobile ? "100%" : "auto" }}>
             <select
               value={branchFilter}
               onChange={e => setBranchFilter(e.target.value)}
               style={{
-                appearance:"none", padding:"11px 40px 11px 16px",
-                borderRadius:14, border:"0.5px solid rgba(0,85,255,.12)",
+                appearance:"none", padding: isMobile ? "10px 36px 10px 14px" : "11px 40px 11px 16px",
+                borderRadius: isMobile ? 12 : 14, border:"0.5px solid rgba(0,85,255,.12)",
                 background:"#fff", boxShadow:SHADOW_SM,
                 fontSize:12, fontWeight:700, color:T3, letterSpacing:"0.04em",
-                outline:"none", fontFamily:"inherit", cursor:"pointer", minWidth:160,
+                outline:"none", fontFamily:"inherit", cursor:"pointer",
+                width: isMobile ? "100%" : "auto", minWidth: isMobile ? 0 : 160,
               }}
             >
               {branchList.map(b => <option key={b} value={b}>{b === "All" ? "All Branches" : b}</option>)}
@@ -821,38 +827,38 @@ export default function TeacherPerformance() {
         {/* ── Dark Hero Banner ───────────────────────── */}
         <div
           style={{
-            background:GRAD_HERO, borderRadius:24, padding:"24px 28px", color:"#fff",
-            marginBottom:24, position:"relative", overflow:"hidden",
+            background:GRAD_HERO, borderRadius: isMobile ? 18 : 24, padding: isMobile ? "18px 18px" : "24px 28px", color:"#fff",
+            marginBottom: isMobile ? 16 : 24, position:"relative", overflow:"hidden",
             boxShadow:"0 14px 40px rgba(0,8,60,.32), 0 0 0 .5px rgba(255,255,255,.12)",
           }}
         >
           <div style={{ position:"absolute", top:-60, right:-40, width:280, height:280, background:"radial-gradient(circle, rgba(255,255,255,.12) 0%, transparent 65%)", borderRadius:"50%", pointerEvents:"none" }}/>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:24, flexWrap:"wrap", position:"relative", zIndex:1 }}>
-            <div style={{ display:"flex", alignItems:"flex-start", gap:16, flex:1, minWidth:300 }}>
-              <div style={{ width:52, height:52, borderRadius:15, background:"rgba(255,255,255,.16)", border:"0.5px solid rgba(255,255,255,.26)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                <Award size={26} color="#fff" strokeWidth={2.2}/>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap: isMobile ? 14 : 24, flexWrap:"wrap", position:"relative", zIndex:1 }}>
+            <div style={{ display:"flex", alignItems:"flex-start", gap: isMobile ? 12 : 16, flex:1, minWidth: isMobile ? 0 : 300 }}>
+              <div style={{ width: isMobile ? 42 : 52, height: isMobile ? 42 : 52, borderRadius: isMobile ? 12 : 15, background:"rgba(255,255,255,.16)", border:"0.5px solid rgba(255,255,255,.26)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                <Award size={isMobile ? 20 : 26} color="#fff" strokeWidth={2.2}/>
               </div>
-              <div>
-                <div style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"4px 10px", borderRadius:999, background:"rgba(255,255,255,.14)", border:"0.5px solid rgba(255,255,255,.22)", fontSize:10, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:10 }}>
+              <div style={{ minWidth:0 }}>
+                <div style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"4px 10px", borderRadius:999, background:"rgba(255,255,255,.14)", border:"0.5px solid rgba(255,255,255,.22)", fontSize: isMobile ? 9 : 10, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:10 }}>
                   <Sparkles size={11}/> Teacher Intelligence
                 </div>
-                <h2 style={{ fontSize:38, fontWeight:800, letterSpacing:"-1px", margin:0, color:"#fff", lineHeight:1 }}>
+                <h2 style={{ fontSize: isMobile ? 28 : 38, fontWeight:800, letterSpacing: isMobile ? "-0.6px" : "-1px", margin:0, color:"#fff", lineHeight:1 }}>
                   {avgEffectiveness}{typeof avgEffectiveness === "string" && avgEffectiveness !== "—" ? "%" : ""}
                 </h2>
-                <p style={{ fontSize:13, color:"rgba(255,255,255,.72)", fontWeight:500, margin:"8px 0 0 0" }}>
+                <p style={{ fontSize: isMobile ? 11 : 13, color:"rgba(255,255,255,.72)", fontWeight:500, margin:"8px 0 0 0" }}>
                   Average effectiveness across {totalTeachers} teachers · {branchFilter === "All" ? "all branches" : branchFilter}
                 </p>
               </div>
             </div>
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(3, minmax(120px,1fr))", gap:10 }}>
+            <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : "repeat(3, minmax(120px,1fr))", gap: isMobile ? 8 : 10, width: isMobile ? "100%" : "auto" }}>
               {[
                 { label:"Total Teachers",     value:totalTeachers.toString() },
                 { label:"Top Performers",     value:topPerformers.toString() },
                 { label:"Needs Improvement",  value:needsImprovement.toString() },
               ].map(s=>(
-                <div key={s.label} style={{ background:"rgba(255,255,255,.10)", borderRadius:14, padding:"12px 14px", border:"0.5px solid rgba(255,255,255,.14)" }}>
-                  <p style={{ fontSize:9, fontWeight:700, color:"rgba(255,255,255,.65)", letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 6px 0" }}>{s.label}</p>
-                  <p style={{ fontSize:20, fontWeight:800, color:"#fff", margin:0, letterSpacing:"-0.4px" }}>{s.value}</p>
+                <div key={s.label} style={{ background:"rgba(255,255,255,.10)", borderRadius: isMobile ? 12 : 14, padding: isMobile ? "10px 10px" : "12px 14px", border:"0.5px solid rgba(255,255,255,.14)" }}>
+                  <p style={{ fontSize: isMobile ? 8 : 9, fontWeight:700, color:"rgba(255,255,255,.65)", letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 6px 0" }}>{s.label}</p>
+                  <p style={{ fontSize: isMobile ? 16 : 20, fontWeight:800, color:"#fff", margin:0, letterSpacing:"-0.4px" }}>{s.value}</p>
                 </div>
               ))}
             </div>
@@ -860,7 +866,7 @@ export default function TeacherPerformance() {
         </div>
 
         {/* ── Bright Stat Grid ───────────────────────── */}
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16, marginBottom:24 }}>
+        <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: isMobile ? 10 : 16, marginBottom: isMobile ? 16 : 24 }}>
           {[
             { label:"Total Teachers", value:totalTeachers.toString(), sub:`In ${branchFilter === "All" ? "all branches" : branchFilter}`, grad:GRAD_BLUE, icon:Users, route:"/teachers-directory" },
             { label:"Avg Effectiveness", value:`${avgEffectiveness}${typeof avgEffectiveness === "string" && avgEffectiveness !== "—" ? "%" : ""}`, sub:"Across all exams", grad:GRAD_GREEN, icon:Award, route:"/teachers" },
@@ -875,33 +881,33 @@ export default function TeacherPerformance() {
                 role="button" tabIndex={0}
                 className="tp-tile"
                 style={{
-                  background:s.grad, borderRadius:22, padding:"20px 22px", color:"#fff",
+                  background:s.grad, borderRadius: isMobile ? 16 : 22, padding: isMobile ? "14px 14px" : "20px 22px", color:"#fff",
                   cursor:"pointer", position:"relative", overflow:"hidden",
                   boxShadow:"0 0 0 .5px rgba(255,255,255,.15), 0 14px 38px rgba(0,85,255,.26), 0 4px 12px rgba(0,85,255,.18)",
                 }}
               >
                 <div style={{ position:"absolute", top:-30, right:-20, width:110, height:110, background:"radial-gradient(circle, rgba(255,255,255,.22) 0%, transparent 70%)", borderRadius:"50%", pointerEvents:"none" }}/>
-                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14, position:"relative", zIndex:1 }}>
-                  <div style={{ width:38, height:38, borderRadius:12, background:"rgba(255,255,255,.22)", border:"0.5px solid rgba(255,255,255,.28)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                    <Icon size={19} color="#fff" strokeWidth={2.3}/>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: isMobile ? 10 : 14, position:"relative", zIndex:1 }}>
+                  <div style={{ width: isMobile ? 32 : 38, height: isMobile ? 32 : 38, borderRadius: isMobile ? 10 : 12, background:"rgba(255,255,255,.22)", border:"0.5px solid rgba(255,255,255,.28)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                    <Icon size={isMobile ? 16 : 19} color="#fff" strokeWidth={2.3}/>
                   </div>
                 </div>
-                <p style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,.75)", letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 4px 0", position:"relative", zIndex:1 }}>{s.label}</p>
-                <p style={{ fontSize:30, fontWeight:800, color:"#fff", letterSpacing:"-0.6px", margin:0, lineHeight:1.1, position:"relative", zIndex:1 }}>{s.value}</p>
-                <p style={{ fontSize:11, fontWeight:600, color:"rgba(255,255,255,.78)", margin:"6px 0 0 0", position:"relative", zIndex:1 }}>{s.sub}</p>
+                <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:700, color:"rgba(255,255,255,.75)", letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 4px 0", position:"relative", zIndex:1 }}>{s.label}</p>
+                <p style={{ fontSize: isMobile ? 22 : 30, fontWeight:800, color:"#fff", letterSpacing:"-0.6px", margin:0, lineHeight:1.1, position:"relative", zIndex:1 }}>{s.value}</p>
+                <p style={{ fontSize: isMobile ? 10 : 11, fontWeight:600, color:"rgba(255,255,255,.78)", margin:"6px 0 0 0", position:"relative", zIndex:1 }}>{s.sub}</p>
               </div>
             );
           })}
         </div>
 
         {/* ── Charts Row (3-col) ────────────────────── */}
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:16, marginBottom:24 }}>
+        <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: isMobile ? 12 : 16, marginBottom: isMobile ? 16 : 24 }}>
 
           {/* Performance Distribution */}
           <div
             className="tp3d"
             style={{
-              background:"#fff", borderRadius:22, padding:"22px 24px",
+              background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px" : "22px 24px",
               boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
             }}
           >
@@ -914,13 +920,13 @@ export default function TeacherPerformance() {
                 <BarChart3 size={16} color={B1} strokeWidth={2.3}/>
               </div>
             </div>
-            <div style={{ height:240 }}>
+            <div style={{ height: isMobile ? 220 : 240 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={perfDist.length ? perfDist : [{ name:"No Data", value:1, fill:"#e2e8f0" }]}
                     cx="50%" cy="50%"
-                    innerRadius={55} outerRadius={85}
+                    innerRadius={isMobile ? 42 : 55} outerRadius={isMobile ? 68 : 85}
                     paddingAngle={4} dataKey="value"
                     label={({ name, value, midAngle, cx, cy, outerRadius: or }) => {
                       const R = Math.PI / 180;
@@ -946,7 +952,7 @@ export default function TeacherPerformance() {
           <div
             className="tp3d"
             style={{
-              background:"#fff", borderRadius:22, padding:"22px 24px",
+              background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px" : "22px 24px",
               boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
             }}
           >
@@ -959,15 +965,15 @@ export default function TeacherPerformance() {
                 <BookOpen size={16} color={GREEN} strokeWidth={2.3}/>
               </div>
             </div>
-            <div style={{ height:240 }}>
+            <div style={{ height: isMobile ? 220 : 240 }}>
               {subjectRatings.length === 0 ? (
                 <div style={{ height:"100%", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:T4 }}>No exam data yet</div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={subjectRatings} layout="vertical" margin={{ left:0, right:46, top:8, bottom:8 }}>
+                  <BarChart data={subjectRatings} layout="vertical" margin={{ left:0, right: isMobile ? 36 : 46, top:8, bottom:8 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(0,85,255,.07)"/>
                     <XAxis type="number" domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fill:T3, fontSize:10, fontWeight:600 }}/>
-                    <YAxis dataKey="subject" type="category" axisLine={false} tickLine={false} tick={{ fill:T3, fontSize:11, fontWeight:700 }} width={80}/>
+                    <YAxis dataKey="subject" type="category" axisLine={false} tickLine={false} tick={{ fill:T3, fontSize:isMobile ? 10 : 11, fontWeight:700 }} width={isMobile ? 62 : 80}/>
                     <Tooltip contentStyle={{ borderRadius:12, border:"none", boxShadow:SHADOW_LG, fontSize:11, fontWeight:700 }} cursor={{ fill:"rgba(0,85,255,.04)" }}/>
                     <Bar dataKey="rating" radius={[0, 6, 6, 0]} barSize={16}
                       label={{ position:"right", fill:T3, fontSize:11, fontWeight:700, formatter: (v: any) => `${v}%` }}>
@@ -985,9 +991,9 @@ export default function TeacherPerformance() {
           <div
             className="tp3d"
             style={{
-              background:"#fff", borderRadius:22, padding:"22px 24px",
+              background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px" : "22px 24px",
               boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
-              maxHeight:320, overflowY:"auto",
+              maxHeight: isMobile ? 380 : 320, overflowY:"auto",
             }}
           >
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14, position:"sticky", top:0, background:"#fff", zIndex:2 }}>
@@ -1042,25 +1048,25 @@ export default function TeacherPerformance() {
         <div
           className="tp3d"
           style={{
-            background:"#fff", borderRadius:22, padding:"22px 24px",
+            background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px" : "22px 24px",
             boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
-            marginBottom:24,
+            marginBottom: isMobile ? 16 : 24,
           }}
         >
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-              <div style={{ width:36, height:36, borderRadius:11, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(0,85,255,.28)" }}>
-                <TrendingUp size={18} color="#fff" strokeWidth={2.3}/>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: isMobile ? 12 : 16 }}>
+            <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 12, minWidth:0 }}>
+              <div style={{ width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius:11, background:GRAD_PRIMARY, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(0,85,255,.28)", flexShrink:0 }}>
+                <TrendingUp size={isMobile ? 16 : 18} color="#fff" strokeWidth={2.3}/>
               </div>
-              <div>
-                <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Performance vs Attendance Trend</h3>
-                <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Last 6 months</p>
+              <div style={{ minWidth:0 }}>
+                <h3 style={{ fontSize: isMobile ? 13 : 15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>{isMobile ? "Performance vs Attendance" : "Performance vs Attendance Trend"}</h3>
+                <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Last 6 months</p>
               </div>
             </div>
           </div>
-          <div style={{ height:260 }}>
+          <div style={{ height: isMobile ? 220 : 260 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={monthlyAgg} margin={{ top:5, right:30, left:-10, bottom:5 }}>
+              <LineChart data={monthlyAgg} margin={{ top:5, right: isMobile ? 10 : 30, left:-10, bottom:5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,85,255,.07)"/>
                 <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill:T3, fontSize:11, fontWeight:600 }} dy={8}/>
                 <YAxis axisLine={false} tickLine={false} tick={{ fill:T3, fontSize:11, fontWeight:600 }} domain={[0, 100]}/>
@@ -1078,31 +1084,31 @@ export default function TeacherPerformance() {
         {/* ── Teacher Cards Grid ────────────────────── */}
         <div
           style={{
-            background:"#fff", borderRadius:22,
+            background:"#fff", borderRadius: isMobile ? 16 : 22,
             boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
-            overflow:"hidden", marginBottom:24,
+            overflow:"hidden", marginBottom: isMobile ? 16 : 24,
           }}
         >
-          <div style={{ padding:"18px 24px", borderBottom:"0.5px solid rgba(0,85,255,.08)", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
-            <div style={{ position:"relative", flex:1, minWidth:220, maxWidth:360 }}>
+          <div style={{ padding: isMobile ? "14px 14px" : "18px 24px", borderBottom:"0.5px solid rgba(0,85,255,.08)", display:"flex", alignItems:"center", gap: isMobile ? 8 : 12, flexWrap:"wrap" }}>
+            <div style={{ position:"relative", flex:1, minWidth: isMobile ? 0 : 220, maxWidth: isMobile ? "100%" : 360 }}>
               <Search style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)" }} size={15} color={T4}/>
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Search teachers by name..."
                 style={{
-                  width:"100%", padding:"10px 12px 10px 36px", borderRadius:12,
+                  width:"100%", padding: isMobile ? "9px 10px 9px 34px" : "10px 12px 10px 36px", borderRadius:12,
                   border:"0.5px solid rgba(0,85,255,.14)", background:"#F5F9FF",
-                  fontSize:13, fontWeight:500, color:T1, outline:"none", fontFamily:"inherit",
+                  fontSize: isMobile ? 12 : 13, fontWeight:500, color:T1, outline:"none", fontFamily:"inherit",
                 }}
               />
             </div>
-            <p style={{ fontSize:10, fontWeight:700, color:T4, letterSpacing:"0.14em", textTransform:"uppercase", margin:0, marginLeft:"auto" }}>
-              {filtered.length} teachers
+            <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:700, color:T4, letterSpacing:"0.14em", textTransform:"uppercase", margin:0, marginLeft: isMobile ? 0 : "auto" }}>
+              {filtered.length} {isMobile ? "found" : "teachers"}
             </p>
           </div>
 
-          <div style={{ padding:22, display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:14 }}>
+          <div style={{ padding: isMobile ? 12 : 22, display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(4, 1fr)", gap: isMobile ? 10 : 14 }}>
             {filtered.map(t => {
               const tr = tierStyle(t.avgScore);
               return (
@@ -1110,15 +1116,15 @@ export default function TeacherPerformance() {
                   key={t.id}
                   className="tp-card"
                   style={{
-                    background:"#F5F9FF", borderRadius:18, padding:"18px 20px",
+                    background:"#F5F9FF", borderRadius: isMobile ? 14 : 18, padding: isMobile ? "14px 14px" : "18px 20px",
                     border:"0.5px solid rgba(0,85,255,.1)", cursor:"pointer",
                     position:"relative", overflow:"hidden",
                   }}
                   onClick={()=>navigate(`/teachers/${t.id}`)}
                 >
-                  <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:14 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 12, marginBottom: isMobile ? 12 : 14 }}>
                     <div style={{
-                      width:44, height:44, borderRadius:13, background:tr.grad,
+                      width: isMobile ? 40 : 44, height: isMobile ? 40 : 44, borderRadius: isMobile ? 12 : 13, background:tr.grad,
                       display:"flex", alignItems:"center", justifyContent:"center",
                       color:"#fff", fontSize:12, fontWeight:800,
                       boxShadow:"0 6px 14px rgba(0,85,255,.2)", flexShrink:0,
@@ -1129,28 +1135,53 @@ export default function TeacherPerformance() {
                       <p style={{ fontSize:13, fontWeight:800, color:T1, margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", letterSpacing:"-0.2px" }}>{t.name}</p>
                       <p style={{ fontSize:10, fontWeight:700, color:T4, margin:"2px 0 0 0", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", letterSpacing:"0.04em" }}>{t.subject || "—"}</p>
                     </div>
+                    {isMobile && (
+                      <span style={{
+                        fontSize:9, fontWeight:800, padding:"3px 9px", borderRadius:999, flexShrink:0,
+                        background:tr.bg, color:tr.color,
+                        letterSpacing:"0.10em", textTransform:"uppercase",
+                      }}>{tr.label}</span>
+                    )}
                   </div>
-                  <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:14 }}>
-                    {[
-                      ["Branch", t.branchName],
-                      ["Avg Score", t.avgScore > 0 ? `${t.avgScore}%` : "—"],
-                      ["Attendance", t.attPct > 0 ? `${t.attPct}%` : "—"],
-                      ["Classes", t.classCount.toString()],
-                    ].map(([k, v]) => (
-                      <div key={k} style={{ display:"flex", justifyContent:"space-between", fontSize:10 }}>
-                        <span style={{ fontWeight:600, color:T4, letterSpacing:"0.06em" }}>{k}</span>
-                        <span style={{ fontWeight:800, color: k==="Avg Score" ? tr.color : T3, maxWidth:110, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{v}</span>
+                  {isMobile ? (
+                    <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:6, paddingTop:10, borderTop:"0.5px solid rgba(0,85,255,.08)" }}>
+                      {[
+                        ["Score", t.avgScore > 0 ? `${t.avgScore}%` : "—", tr.color],
+                        ["Att.", t.attPct > 0 ? `${t.attPct}%` : "—", T1],
+                        ["Classes", t.classCount.toString(), T1],
+                        ["Branch", (t.branchName || "—").split(" ")[0], T3],
+                      ].map(([k, v, c]) => (
+                        <div key={k as string} style={{ minWidth:0 }}>
+                          <p style={{ fontSize:8, fontWeight:700, color:T4, letterSpacing:"0.10em", textTransform:"uppercase", margin:0 }}>{k}</p>
+                          <p style={{ fontSize:12, fontWeight:800, color: c as string, margin:"2px 0 0 0", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{v}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:14 }}>
+                        {[
+                          ["Branch", t.branchName],
+                          ["Avg Score", t.avgScore > 0 ? `${t.avgScore}%` : "—"],
+                          ["Attendance", t.attPct > 0 ? `${t.attPct}%` : "—"],
+                          ["Classes", t.classCount.toString()],
+                        ].map(([k, v]) => (
+                          <div key={k} style={{ display:"flex", justifyContent:"space-between", fontSize:10 }}>
+                            <span style={{ fontWeight:600, color:T4, letterSpacing:"0.06em" }}>{k}</span>
+                            <span style={{ fontWeight:800, color: k==="Avg Score" ? tr.color : T3, maxWidth:110, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{v}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", paddingTop:10, borderTop:"0.5px solid rgba(0,85,255,.08)" }}>
-                    <span style={{
-                      fontSize:9, fontWeight:800, padding:"3px 9px", borderRadius:999,
-                      background:tr.bg, color:tr.color,
-                      letterSpacing:"0.12em", textTransform:"uppercase",
-                    }}>{tr.label}</span>
-                    <ChevronRight size={14} color={T4}/>
-                  </div>
+                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", paddingTop:10, borderTop:"0.5px solid rgba(0,85,255,.08)" }}>
+                        <span style={{
+                          fontSize:9, fontWeight:800, padding:"3px 9px", borderRadius:999,
+                          background:tr.bg, color:tr.color,
+                          letterSpacing:"0.12em", textTransform:"uppercase",
+                        }}>{tr.label}</span>
+                        <ChevronRight size={14} color={T4}/>
+                      </div>
+                    </>
+                  )}
                 </div>
               );
             })}
@@ -1165,33 +1196,33 @@ export default function TeacherPerformance() {
         {/* ── AI Intelligence Card ──────────────────── */}
         <div
           style={{
-            background:GRAD_HERO, borderRadius:22, padding:"24px 26px", color:"#fff",
+            background:GRAD_HERO, borderRadius: isMobile ? 16 : 22, padding: isMobile ? "18px 16px" : "24px 26px", color:"#fff",
             position:"relative", overflow:"hidden",
             boxShadow:"0 14px 40px rgba(0,8,60,.32), 0 0 0 .5px rgba(255,255,255,.12)",
           }}
         >
           <div style={{ position:"absolute", bottom:-50, left:-40, width:240, height:240, background:"radial-gradient(circle, rgba(123,63,244,.28) 0%, transparent 65%)", borderRadius:"50%", pointerEvents:"none" }}/>
-          <div style={{ display:"flex", alignItems:"flex-start", gap:14, position:"relative", zIndex:1, marginBottom:16 }}>
-            <div style={{ width:44, height:44, borderRadius:13, background:"rgba(255,255,255,.16)", border:"0.5px solid rgba(255,255,255,.26)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-              <Sparkles size={22} color="#fff" strokeWidth={2.2}/>
+          <div style={{ display:"flex", alignItems:"flex-start", gap: isMobile ? 12 : 14, position:"relative", zIndex:1, marginBottom: isMobile ? 14 : 16 }}>
+            <div style={{ width: isMobile ? 38 : 44, height: isMobile ? 38 : 44, borderRadius: isMobile ? 11 : 13, background:"rgba(255,255,255,.16)", border:"0.5px solid rgba(255,255,255,.26)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+              <Sparkles size={isMobile ? 18 : 22} color="#fff" strokeWidth={2.2}/>
             </div>
-            <div>
+            <div style={{ minWidth:0 }}>
               <div style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:999, background:"rgba(255,255,255,.14)", border:"0.5px solid rgba(255,255,255,.22)", fontSize:9, fontWeight:800, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:8 }}>
                 AI Insights
               </div>
-              <h3 style={{ fontSize:18, fontWeight:700, color:"#fff", margin:0, letterSpacing:"-0.4px" }}>Teacher Performance Summary</h3>
+              <h3 style={{ fontSize: isMobile ? 15 : 18, fontWeight:700, color:"#fff", margin:0, letterSpacing:"-0.4px" }}>Teacher Performance Summary</h3>
             </div>
           </div>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:12, position:"relative", zIndex:1 }}>
+          <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: isMobile ? 10 : 12, position:"relative", zIndex:1 }}>
             {[
               { label:"Effectiveness Insight", value:typeof avgEffectiveness === "string" && avgEffectiveness !== "—" ? `${avgEffectiveness}% team avg` : "Collecting data", sub:topPerformers>0?`${topPerformers} top performers`:"Build evaluation base" },
               { label:"Training Priority",     value:needsImprovement > 0 ? `${needsImprovement} teacher${needsImprovement>1?"s":""}` : "All stable", sub:needsImprovement > 0 ? "Recommend coaching" : "No intervention needed" },
               { label:"Subject Strength",      value:subjectRatings.length > 0 ? subjectRatings[0].subject : "Pending data", sub:subjectRatings.length > 0 ? `${subjectRatings[0].rating}% avg rating` : "Upload exam scores" },
             ].map(c=>(
-              <div key={c.label} style={{ background:"rgba(255,255,255,.10)", borderRadius:14, padding:"14px 16px", border:"0.5px solid rgba(255,255,255,.14)" }}>
+              <div key={c.label} style={{ background:"rgba(255,255,255,.10)", borderRadius: isMobile ? 12 : 14, padding: isMobile ? "12px 14px" : "14px 16px", border:"0.5px solid rgba(255,255,255,.14)" }}>
                 <p style={{ fontSize:9, fontWeight:800, color:"rgba(255,255,255,.65)", letterSpacing:"0.14em", textTransform:"uppercase", margin:"0 0 8px 0" }}>{c.label}</p>
-                <p style={{ fontSize:15, fontWeight:700, color:"#fff", margin:0, letterSpacing:"-0.3px" }}>{c.value}</p>
-                <p style={{ fontSize:11, fontWeight:600, color:"rgba(255,255,255,.72)", margin:"6px 0 0 0" }}>{c.sub}</p>
+                <p style={{ fontSize: isMobile ? 14 : 15, fontWeight:700, color:"#fff", margin:0, letterSpacing:"-0.3px" }}>{c.value}</p>
+                <p style={{ fontSize: isMobile ? 10 : 11, fontWeight:600, color:"rgba(255,255,255,.72)", margin:"6px 0 0 0" }}>{c.sub}</p>
               </div>
             ))}
           </div>

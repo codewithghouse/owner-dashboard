@@ -10,9 +10,10 @@ import {
 import {
   B1, T1, T3, T4, GREEN, RED, GOLD, VIOLET,
   GRAD_PRIMARY, GRAD_BLUE, GRAD_GREEN, GRAD_VIOLET, GRAD_GOLD, GRAD_RED,
-  SHADOW_SM, SHADOW_BTN, pageShellStyle,
+  SHADOW_SM, SHADOW_BTN, usePageShellStyle,
   DashGlobalStyles, PageHead, StatTile, DarkHero, AIInsightCard,
 } from "@/lib/dashboardTokens";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { fetchFeePredictions, FeePrediction } from "@/lib/feePredictor";
 import { sendFeeReminderWA } from "@/lib/whatsappService";
 import { toast } from "sonner";
@@ -79,6 +80,8 @@ type Defaulter = {
 
 export default function FinanceFees() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
+  const pageShellStyle = usePageShellStyle();
   const [activeTab, setActiveTab] = useState<"Defaulters" | "History" | "Risk Analysis" | "Predictive Recovery">("Defaulters");
   const [loading,   setLoading]   = useState(true);
   const [search,    setSearch]    = useState("");
@@ -349,28 +352,32 @@ export default function FinanceFees() {
   return (
     <>
       <DashGlobalStyles />
-      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap:24 }}>
+      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap: isMobile ? 16 : 24 }}>
 
       <PageHead
         icon={Wallet}
         title="Finance & Fees"
         subtitle="Live fee collection · defaulter tracking · risk prediction"
         right={
-          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            <div style={{ display:"inline-flex", alignItems:"center", gap:5, fontSize:10, fontWeight:800, color:T4, letterSpacing:"0.12em", textTransform:"uppercase" }}>
-              <Filter size={12}/> Branch
-            </div>
-            <div style={{ position:"relative" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8, width: isMobile ? "100%" : "auto" }}>
+            {!isMobile && (
+              <div style={{ display:"inline-flex", alignItems:"center", gap:5, fontSize:10, fontWeight:800, color:T4, letterSpacing:"0.12em", textTransform:"uppercase" }}>
+                <Filter size={12}/> Branch
+              </div>
+            )}
+            <div style={{ position:"relative", width: isMobile ? "100%" : "auto" }}>
               <Building2 size={13} color={T4} style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}/>
               <select
                 value={branchFilter}
                 onChange={e => setBranchFilter(e.target.value)}
                 style={{
-                  appearance:"none", padding:"10px 34px 10px 34px",
+                  appearance:"none", padding: isMobile ? "10px 34px 10px 34px" : "10px 34px 10px 34px",
                   borderRadius:12, border:"0.5px solid rgba(0,85,255,.12)",
                   background:"#fff", boxShadow:SHADOW_SM,
                   fontSize:12, fontWeight:700, color:T3,
-                  outline:"none", fontFamily:"inherit", cursor:"pointer", minWidth:160,
+                  outline:"none", fontFamily:"inherit", cursor:"pointer",
+                  width: isMobile ? "100%" : "auto",
+                  minWidth: isMobile ? 0 : 160,
                 }}
               >
                 <option value="All">All Branches</option>
@@ -397,7 +404,7 @@ export default function FinanceFees() {
       )}
 
       {/* Tabs */}
-      <div style={{ display:"flex", gap:8, overflowX:"auto", paddingBottom:2 }}>
+      <div style={{ display:"flex", gap: isMobile ? 6 : 8, overflowX:"auto", paddingBottom:2, WebkitOverflowScrolling:"touch" }}>
         {(["Defaulters", "History", "Risk Analysis", "Predictive Recovery"] as const).map(tab => {
           const active = activeTab === tab;
           return (
@@ -405,25 +412,25 @@ export default function FinanceFees() {
               onClick={() => setActiveTab(tab)}
               className="dash-btn"
               style={{
-                display:"inline-flex", alignItems:"center", gap:6,
-                padding:"10px 18px", borderRadius:14,
+                display:"inline-flex", alignItems:"center", gap: isMobile ? 5 : 6,
+                padding: isMobile ? "8px 13px" : "10px 18px", borderRadius: isMobile ? 12 : 14,
                 background: active ? GRAD_PRIMARY : "#fff",
                 color: active ? "#fff" : T3,
-                fontSize:11, fontWeight:800, letterSpacing:"0.10em", textTransform:"uppercase",
+                fontSize: isMobile ? 10 : 11, fontWeight:800, letterSpacing:"0.10em", textTransform:"uppercase",
                 border: active ? "none" : "0.5px solid rgba(0,85,255,.12)",
                 boxShadow: active ? SHADOW_BTN : SHADOW_SM,
-                cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap",
+                cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap", flexShrink:0,
               }}
             >
-              {tab === "Predictive Recovery" && <Brain size={13}/>}
-              {tab}
+              {tab === "Predictive Recovery" && <Brain size={isMobile ? 12 : 13}/>}
+              {isMobile && tab === "Predictive Recovery" ? "Predict" : isMobile && tab === "Risk Analysis" ? "Risk" : tab}
             </button>
           );
         })}
       </div>
 
       {/* Bright Stat Grid */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16 }}>
+      <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: isMobile ? 10 : 16 }}>
         <StatTile label="Total Defaulters" value={loading ? "—" : stats.total.toString()} sub="Pending fees" grad={stats.total > 0 ? GRAD_RED : GRAD_GOLD} icon={XCircle} onClick={() => navigate("/fee-structure")} />
         <StatTile label="Critical (>60d)"  value={loading ? "—" : stats.critical.toString()} sub="Urgent attention" grad={stats.critical > 0 ? GRAD_RED : GRAD_GOLD} icon={ShieldAlert} onClick={() => navigate("/fee-structure")} />
         <StatTile label="Fee Collected"    value={loading ? "—" : `₹${(stats.collectedAmt/1000).toFixed(1)}K`} sub="Healthy inflow" grad={GRAD_GREEN} icon={IndianRupee} onClick={() => navigate("/fee-structure")} />
@@ -432,9 +439,9 @@ export default function FinanceFees() {
 
       {/* ── Charts row: Branch-wise Revenue + Monthly Collection Trend ── */}
       {!loading && (branchRevenue.length > 0 || historyData.some(h => h.collected > 0)) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
           {/* Branch-wise Revenue (horizontal bars) */}
-          <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm">
+          <div className="bg-white rounded-2xl md:rounded-3xl border border-slate-100 p-4 md:p-5 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-sm font-bold text-[#1e294b]">Branch-wise Revenue</h3>
@@ -487,7 +494,7 @@ export default function FinanceFees() {
           </div>
 
           {/* Monthly Collection Trend (line) */}
-          <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm">
+          <div className="bg-white rounded-2xl md:rounded-3xl border border-slate-100 p-4 md:p-5 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-sm font-bold text-[#1e294b]">Monthly Collection Trend</h3>
@@ -549,15 +556,15 @@ export default function FinanceFees() {
           .sort((a, b) => a.rate - b.rate)[0];
 
         return (
-        <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
+        <div className="bg-white rounded-2xl md:rounded-3xl border border-slate-100 p-4 md:p-6 shadow-sm">
           {/* Header with summary KPIs */}
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 md:gap-4 mb-4 md:mb-6">
             <div>
-              <h3 className="text-base font-extrabold text-[#1e294b] flex items-center gap-2">
+              <h3 className="text-sm md:text-base font-extrabold text-[#1e294b] flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-[#1e3a8a]" /> Branch-wise Finance Snapshot
               </h3>
-              <p className="text-xs text-slate-400 font-medium mt-0.5">
-                {branchRevenue.length} branch{branchRevenue.length !== 1 ? "es" : ""} · ₹ in thousands · click a branch to filter below
+              <p className="text-[11px] md:text-xs text-slate-400 font-medium mt-0.5">
+                {branchRevenue.length} branch{branchRevenue.length !== 1 ? "es" : ""} · ₹ in thousands · tap a branch to filter below
               </p>
             </div>
             <div className="grid grid-cols-3 gap-2 lg:min-w-[420px]">
@@ -713,9 +720,9 @@ export default function FinanceFees() {
 
       {/* ── DEFAULTERS TAB ─────────────────────────────────────────────────── */}
       {activeTab === "Defaulters" && (
-        <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+        <div className="space-y-4 md:space-y-6 animate-in slide-in-from-bottom-4 duration-500">
           <div className="flex items-center gap-3">
-            <div className="relative flex-1 max-w-sm">
+            <div className="relative flex-1 md:max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input value={search} onChange={e => setSearch(e.target.value)}
                 placeholder="Search by name or grade..."
@@ -723,7 +730,7 @@ export default function FinanceFees() {
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl md:rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
             {loading ? (
               <div className="flex items-center justify-center py-20">
                 <Loader2 className="w-6 h-6 animate-spin text-slate-300" />
@@ -733,6 +740,53 @@ export default function FinanceFees() {
                 <CheckCircle className="w-8 h-8 text-green-300 mb-2" />
                 <p className="text-sm font-semibold text-slate-400">No defaulters found</p>
                 <p className="text-xs text-slate-300 mt-1">All fee records are up to date</p>
+              </div>
+            ) : isMobile ? (
+              <div className="flex flex-col gap-2 p-3">
+                {filtered.map((d) => (
+                  <div key={d.sid} className="rounded-xl border border-slate-100 bg-slate-50/40 p-3">
+                    <div className="flex items-center gap-2.5 mb-2.5">
+                      <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-[11px] font-black text-slate-500 shrink-0">
+                        {d.name.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-extrabold text-[#1e294b] truncate">{d.name}</p>
+                        <p className="text-[10px] font-semibold text-slate-400 truncate">{d.grade} · {d.branch}</p>
+                      </div>
+                      <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-black shrink-0 ${d.risk.bg} ${d.risk.color}`}>
+                        <div className="w-1.5 h-1.5 rounded-full bg-current" />
+                        {d.risk.level}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 mb-2.5">
+                      <div>
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Due</p>
+                        <p className="text-[12px] font-extrabold text-[#1e294b]">₹{d.dueAmt.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Overdue</p>
+                        <p className={`text-[12px] font-extrabold ${d.daysOverdue > 60 ? "text-red-500" : d.daysOverdue > 30 ? "text-amber-500" : "text-slate-500"}`}>
+                          {d.daysOverdue > 0 ? `${d.daysOverdue}d` : "—"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Prev Late</p>
+                        <p className="text-[12px] font-extrabold text-slate-600">{d.prevLateCount}×</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleSendReminder(d)}
+                      disabled={sendingSid === d.sid}
+                      className="w-full flex items-center justify-center gap-1 text-[10px] font-black text-white bg-[#1e3a8a] hover:bg-[#1e294b] px-3 py-2 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {sendingSid === d.sid ? (
+                        <><Loader2 className="w-3 h-3 animate-spin" /> Sending...</>
+                      ) : (
+                        <><MessageCircle className="w-3 h-3" /> Send Reminder</>
+                      )}
+                    </button>
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -795,12 +849,12 @@ export default function FinanceFees() {
 
       {/* ── HISTORY TAB ─────────────────────────────────────────────────────── */}
       {activeTab === "History" && (
-        <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
+        <div className="space-y-4 md:space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+            <div className="bg-white rounded-2xl md:rounded-3xl border border-slate-100 p-4 md:p-6 shadow-sm">
               <h3 className="text-sm font-bold text-[#1e294b] mb-1">Monthly Collection vs Pending</h3>
-              <p className="text-xs text-slate-400 font-medium mb-5">₹ in thousands (K) — last 6 months</p>
-              <div className="h-[240px]">
+              <p className="text-xs text-slate-400 font-medium mb-4 md:mb-5">₹ in thousands (K) — last 6 months</p>
+              <div className="h-[220px] md:h-[240px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={historyData} margin={{ top:5, right:5, left:-20, bottom:0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -815,10 +869,10 @@ export default function FinanceFees() {
                 </ResponsiveContainer>
               </div>
             </div>
-            <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
+            <div className="bg-white rounded-2xl md:rounded-3xl border border-slate-100 p-4 md:p-6 shadow-sm">
               <h3 className="text-sm font-bold text-[#1e294b] mb-1">Branch-wise Revenue</h3>
-              <p className="text-xs text-slate-400 font-medium mb-5">Total collected per branch (₹K)</p>
-              <div className="h-[240px]">
+              <p className="text-xs text-slate-400 font-medium mb-4 md:mb-5">Total collected per branch (₹K)</p>
+              <div className="h-[220px] md:h-[240px]">
                 {branchRevenue.length === 0 ? (
                   <div className="flex items-center justify-center h-full">
                     <p className="text-xs text-slate-300 font-medium">No branch data available</p>
@@ -843,16 +897,16 @@ export default function FinanceFees() {
 
       {/* ── RISK ANALYSIS TAB ───────────────────────────────────────────────── */}
       {activeTab === "Risk Analysis" && (
-        <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+        <div className="space-y-4 md:space-y-6 animate-in slide-in-from-bottom-4 duration-500">
 
           {/* Risk explanation banner */}
-          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex items-start gap-4">
-            <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
-              <ShieldAlert className="w-5 h-5 text-amber-600" />
+          <div className="bg-amber-50 border border-amber-100 rounded-xl md:rounded-2xl p-3 md:p-5 flex items-start gap-3 md:gap-4">
+            <div className="w-8 h-8 md:w-9 md:h-9 rounded-lg md:rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+              <ShieldAlert className="w-4 h-4 md:w-5 md:h-5 text-amber-600" />
             </div>
             <div>
-              <h4 className="text-sm font-bold text-amber-800 mb-1">How Default Risk is Calculated</h4>
-              <p className="text-xs text-amber-700 leading-relaxed">
+              <h4 className="text-[13px] md:text-sm font-bold text-amber-800 mb-1">How Default Risk is Calculated</h4>
+              <p className="text-[11px] md:text-xs text-amber-700 leading-relaxed">
                 Each student receives a risk score (0–100) based on: <strong>days overdue</strong> (up to 80 pts),
                 <strong> previous late payment history</strong> (up to 15 pts), and <strong>outstanding amount</strong> (5 pts).
                 High risk (≥60) = intervention required. Medium (30–59) = send reminder. Low (&lt;30) = monitor only.
@@ -860,10 +914,10 @@ export default function FinanceFees() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6">
 
             {/* Risk pie */}
-            <div className="lg:col-span-5 bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
+            <div className="lg:col-span-5 bg-white rounded-2xl md:rounded-3xl border border-slate-100 p-4 md:p-6 shadow-sm">
               <h3 className="text-sm font-bold text-[#1e294b] mb-5">Risk Distribution</h3>
               {loading ? (
                 <div className="flex items-center justify-center h-52"><Loader2 className="w-5 h-5 animate-spin text-slate-300" /></div>
@@ -902,7 +956,7 @@ export default function FinanceFees() {
             </div>
 
             {/* High risk list */}
-            <div className="lg:col-span-7 bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
+            <div className="lg:col-span-7 bg-white rounded-2xl md:rounded-3xl border border-slate-100 p-4 md:p-6 shadow-sm">
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-sm font-bold text-[#1e294b]">High Risk Students</h3>
                 <span className="text-[10px] font-black text-red-500 bg-red-50 px-2.5 py-1 rounded-full">{highRisk.length} students</span>
@@ -952,22 +1006,22 @@ export default function FinanceFees() {
 
       {/* ── Predictive Recovery Tab ───────────────────────────────────────── */}
       {activeTab === "Predictive Recovery" && (
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
           {/* Header */}
-          <div className="flex items-center gap-3 bg-gradient-to-r from-violet-50 to-blue-50 border border-violet-100 rounded-2xl p-4">
-            <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center shrink-0">
-              <Brain className="w-5 h-5 text-white" />
+          <div className="flex items-center gap-3 bg-gradient-to-r from-violet-50 to-blue-50 border border-violet-100 rounded-xl md:rounded-2xl p-3 md:p-4">
+            <div className="w-9 h-9 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-violet-600 flex items-center justify-center shrink-0">
+              <Brain className="w-4 h-4 md:w-5 md:h-5 text-white" />
             </div>
-            <div className="flex-1">
-              <p className="text-sm font-black text-[#1e294b]">AI-Powered Fee Default Prediction</p>
-              <p className="text-xs text-slate-500 font-medium">
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] md:text-sm font-black text-[#1e294b]">AI-Powered Fee Default Prediction</p>
+              <p className="text-[10px] md:text-xs text-slate-500 font-medium leading-snug">
                 Students likely to default next month — based on payment history, attendance &amp; balance.
               </p>
             </div>
             {!predLoading && feePredictions.length > 0 && (
               <div className="text-right shrink-0">
-                <p className="text-xl font-black text-violet-600">{predStats.totalAtRisk}</p>
-                <p className="text-[10px] font-bold text-slate-400 uppercase">At Risk</p>
+                <p className="text-lg md:text-xl font-black text-violet-600">{predStats.totalAtRisk}</p>
+                <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase">At Risk</p>
               </div>
             )}
           </div>
@@ -1002,6 +1056,70 @@ export default function FinanceFees() {
             <div className="flex flex-col items-center justify-center h-48 gap-3 bg-white rounded-2xl border border-slate-100">
               <CheckCircle className="w-8 h-8 text-emerald-300" />
               <p className="text-sm font-bold text-slate-400">No fee default risks detected.</p>
+            </div>
+          ) : isMobile ? (
+            <div className="flex flex-col gap-2">
+              {feePredictions.map(p => (
+                <div key={p.studentId} className="bg-white rounded-xl border border-slate-100 shadow-sm p-3">
+                  <div className="flex items-center gap-2.5 mb-2.5">
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-black text-white shrink-0 ${
+                      p.riskLevel === "High" ? "bg-red-500" : p.riskLevel === "Medium" ? "bg-amber-500" : "bg-emerald-400"
+                    }`}>
+                      {p.studentName.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-extrabold text-[#1e294b] truncate">{p.studentName}</p>
+                      <p className="text-[10px] font-semibold text-slate-400 truncate">{p.grade} · {p.branch}</p>
+                    </div>
+                    <span className={`text-[9px] font-black px-2 py-1 rounded-full shrink-0 ${
+                      p.riskLevel === "High"   ? "bg-red-50 text-red-600" :
+                      p.riskLevel === "Medium" ? "bg-amber-50 text-amber-600" :
+                      "bg-emerald-50 text-emerald-600"
+                    }`}>
+                      {p.riskLevel} · {p.defaultProbability}%
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 mb-2.5">
+                    <div>
+                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Outstanding</p>
+                      <p className="text-[12px] font-extrabold text-slate-700">
+                        {p.outstandingAmt > 0 ? `₹${p.outstandingAmt.toLocaleString("en-IN")}` : "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Late Pays</p>
+                      <p className="text-[12px] font-extrabold text-slate-600">{p.latePayments}</p>
+                    </div>
+                    <div>
+                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Attendance</p>
+                      <p className={`text-[12px] font-extrabold ${p.attendancePct < 75 ? "text-red-600" : "text-slate-600"}`}>
+                        {p.attendancePct}%
+                      </p>
+                    </div>
+                  </div>
+                  {p.riskLevel !== "Low" && (
+                    <button
+                      onClick={() => {
+                        const phone = prompt(`Send WhatsApp reminder to parent of ${p.studentName}?\nEnter phone number (with country code, e.g. +919876543210):`);
+                        if (!phone) return;
+                        sendFeeReminderWA(phone, {
+                          parentName:  "Parent",
+                          studentName: p.studentName,
+                          amount:      p.outstandingAmt,
+                          schoolName:  p.branch,
+                        }).then(r => {
+                          if (r.success) toast.success("WhatsApp reminder sent!");
+                          else toast.error("Failed: " + (r.error || "Unknown error"));
+                        });
+                      }}
+                      className="w-full flex items-center justify-center gap-1 text-[10px] font-black text-white bg-green-500 hover:bg-green-600 px-3 py-2 rounded-lg transition-colors"
+                    >
+                      <MessageCircle className="w-3 h-3" />
+                      WhatsApp Remind
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
           ) : (
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">

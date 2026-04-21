@@ -11,9 +11,10 @@ import {
 import {
   B1, T1, T3, T4, GREEN, RED, GOLD, VIOLET,
   GRAD_PRIMARY, GRAD_BLUE, GRAD_GREEN, GRAD_VIOLET, GRAD_GOLD, GRAD_RED,
-  SHADOW_SM, SHADOW_BTN, pageShellStyle,
+  SHADOW_SM, SHADOW_BTN, usePageShellStyle,
   DashGlobalStyles, PageHead, StatTile, DarkHero, AIInsightCard,
 } from "@/lib/dashboardTokens";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { db, auth, storage } from "@/lib/firebase";
@@ -43,6 +44,8 @@ const branchColorOptions = [
 
 export default function PrincipalManagement() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
+  const pageShellStyle = usePageShellStyle();
   const [activeTab, setActiveTab] = useState<'principals' | 'branches'>('branches');
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
@@ -423,49 +426,50 @@ export default function PrincipalManagement() {
   return (
     <>
       <DashGlobalStyles />
-      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap:24 }}>
+      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap: isMobile ? 16 : 24 }}>
 
       <PageHead
         icon={Shield}
         title="Management Console"
         subtitle="Manage branches & assign principals"
         right={
-          <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+          <div style={{ display: isMobile ? "grid" : "flex", gridTemplateColumns: isMobile ? "1fr 1fr" : undefined, gap:8, flexWrap:"wrap", width: isMobile ? "100%" : "auto" }}>
             <button
               onClick={() => setShowAddBranchModal(true)}
               className="dash-btn"
               style={{
-                display:"inline-flex", alignItems:"center", gap:6,
-                padding:"10px 14px", borderRadius:12,
+                display:"inline-flex", alignItems:"center", justifyContent:"center", gap:6,
+                padding: isMobile ? "10px 12px" : "10px 14px", borderRadius:12,
                 background:"#fff", color:T3, border:"0.5px solid rgba(0,85,255,.12)",
-                fontSize:11, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
+                fontSize: isMobile ? 10 : 11, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
                 cursor:"pointer", boxShadow:SHADOW_SM, fontFamily:"inherit",
               }}
             >
-              <Building2 size={13}/> Add Branch
+              <Building2 size={13}/> {isMobile ? "Branch" : "Add Branch"}
             </button>
             <button
               onClick={() => setShowBulkModal(true)}
               className="dash-btn"
               style={{
-                display:"inline-flex", alignItems:"center", gap:6,
-                padding:"10px 14px", borderRadius:12,
+                display:"inline-flex", alignItems:"center", justifyContent:"center", gap:6,
+                padding: isMobile ? "10px 12px" : "10px 14px", borderRadius:12,
                 background:"rgba(123,63,244,.08)", color:VIOLET, border:"0.5px solid rgba(123,63,244,.22)",
-                fontSize:11, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
+                fontSize: isMobile ? 10 : 11, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
                 cursor:"pointer", boxShadow:SHADOW_SM, fontFamily:"inherit",
               }}
             >
-              <Hash size={13}/> Bulk Invite
+              <Hash size={13}/> {isMobile ? "Bulk" : "Bulk Invite"}
             </button>
             <button
               onClick={() => setShowInviteModal(true)}
               className="dash-btn"
               style={{
-                display:"inline-flex", alignItems:"center", gap:6,
-                padding:"10px 16px", borderRadius:12,
+                display:"inline-flex", alignItems:"center", justifyContent:"center", gap:6,
+                padding: isMobile ? "10px 12px" : "10px 16px", borderRadius:12,
                 background:GRAD_PRIMARY, color:"#fff",
-                fontSize:11, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
+                fontSize: isMobile ? 10 : 11, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
                 border:"none", cursor:"pointer", boxShadow:SHADOW_BTN, fontFamily:"inherit",
+                gridColumn: isMobile ? "1 / -1" : undefined,
               }}
             >
               <UserPlus size={13}/> Invite Principal
@@ -487,7 +491,7 @@ export default function PrincipalManagement() {
       />
 
       {/* Bright Stat Grid */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(5, 1fr)", gap:14 }}>
+      <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(5, 1fr)", gap: isMobile ? 10 : 14 }}>
         <StatTile label="Total Branches"    value={totalBranches.toString()}      sub={`${branches.filter(b => b.status === 'Active').length} active`} grad={GRAD_BLUE}   icon={Building2} onClick={()=>setActiveTab('branches')} />
         <StatTile label="Total Principals"  value={totalPrincipals.toString()}    sub="Across network"             grad={GRAD_VIOLET} icon={Users}     onClick={()=>setActiveTab('principals')} />
         <StatTile label="Active Principals" value={activePrincipals.toString()}   sub="Currently managing"         grad={GRAD_GREEN}  icon={CheckCircle2} onClick={()=>setActiveTab('principals')} />
@@ -496,7 +500,7 @@ export default function PrincipalManagement() {
       </div>
 
       {/* Tab Switcher */}
-      <div style={{ display:"flex", gap:8 }}>
+      <div style={{ display:"flex", gap:8, width: isMobile ? "100%" : "auto" }}>
         {[
           { key: 'branches', label: 'Branches', icon: Building2 },
           { key: 'principals', label: 'Principals', icon: Users },
@@ -508,17 +512,18 @@ export default function PrincipalManagement() {
               onClick={() => { setActiveTab(t.key as any); setSearchQuery(''); }}
               className="dash-btn"
               style={{
-                display:"inline-flex", alignItems:"center", gap:8,
-                padding:"11px 22px", borderRadius:14,
+                display:"inline-flex", alignItems:"center", justifyContent:"center", gap:8,
+                padding: isMobile ? "10px 16px" : "11px 22px", borderRadius: isMobile ? 12 : 14,
                 background: active ? GRAD_PRIMARY : "#fff",
                 color: active ? "#fff" : T3,
-                fontSize:12, fontWeight:800, letterSpacing:"0.10em", textTransform:"uppercase",
+                fontSize: isMobile ? 11 : 12, fontWeight:800, letterSpacing:"0.10em", textTransform:"uppercase",
                 border: active ? "none" : "0.5px solid rgba(0,85,255,.12)",
                 boxShadow: active ? SHADOW_BTN : SHADOW_SM,
                 cursor:"pointer", fontFamily:"inherit",
+                flex: isMobile ? 1 : undefined,
               }}
             >
-              <t.icon size={14}/> {t.label}
+              <t.icon size={isMobile ? 13 : 14}/> {t.label}
             </button>
           );
         })}
@@ -526,15 +531,15 @@ export default function PrincipalManagement() {
 
       {/* Search Bar */}
       <div style={{ position:"relative" }}>
-        <Search size={16} color={T4} style={{ position:"absolute", left:18, top:"50%", transform:"translateY(-50%)" }}/>
+        <Search size={16} color={T4} style={{ position:"absolute", left: isMobile ? 14 : 18, top:"50%", transform:"translateY(-50%)" }}/>
         <input
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder={activeTab === 'principals' ? "Search principals by name, email, or branch..." : "Search branches by name or location..."}
+          placeholder={activeTab === 'principals' ? "Search principals..." : "Search branches..."}
           style={{
-            width:"100%", padding:"14px 20px 14px 48px", borderRadius:16,
+            width:"100%", padding: isMobile ? "12px 16px 12px 40px" : "14px 20px 14px 48px", borderRadius: isMobile ? 14 : 16,
             border:"0.5px solid rgba(0,85,255,.1)", background:"#fff",
-            fontSize:13, fontWeight:500, color:T1, outline:"none",
+            fontSize: isMobile ? 12 : 13, fontWeight:500, color:T1, outline:"none",
             boxShadow:SHADOW_SM, fontFamily:"inherit",
           }}
         />
@@ -544,7 +549,7 @@ export default function PrincipalManagement() {
       {activeTab === 'branches' && (
         <>
           {/* Branches Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {filteredBranches.map(branch => {
               const assignedPrincipal = principals.find(p => p.branch === branch.name && (p.status === 'Active' || p.status === 'Invited'));
               const statusConf = getStatusConfig(branch.status);
@@ -554,75 +559,75 @@ export default function PrincipalManagement() {
                   onClick={() => navigate(`/branches/${branch.id}`)}
                   role="button"
                   tabIndex={0}
-                  className="clickable-card bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden transition-all group"
+                  className="clickable-card bg-white rounded-2xl md:rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden transition-all group"
                 >
                   {/* Branch Header Strip */}
                   <div className="h-2" style={{ backgroundColor: branch.color }}></div>
-                  <div className="p-8">
+                  <div className="p-5 md:p-8">
                     {/* Top Row */}
-                    <div className="flex items-center justify-between mb-6">
-                      <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg shrink-0" style={{ backgroundColor: branch.color }}>
-                          <Building2 className="w-7 h-7" />
+                    <div className="flex items-center justify-between gap-3 mb-4 md:mb-6">
+                      <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
+                        <div className="w-11 h-11 md:w-14 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center text-white shadow-lg shrink-0" style={{ backgroundColor: branch.color }}>
+                          <Building2 className="w-5 h-5 md:w-7 md:h-7" />
                         </div>
-                        <div>
-                          <h3 className="text-lg font-bold text-[#111827] group-hover:text-blue-600 transition-colors">{branch.name}</h3>
-                          <p className="text-xs text-slate-400 font-medium flex items-center gap-1.5 mt-0.5">
-                            <MapPin className="w-3 h-3" /> {branch.location}
+                        <div className="min-w-0">
+                          <h3 className="text-base md:text-lg font-bold text-[#111827] group-hover:text-blue-600 transition-colors truncate">{branch.name}</h3>
+                          <p className="text-[11px] md:text-xs text-slate-400 font-medium flex items-center gap-1.5 mt-0.5 truncate">
+                            <MapPin className="w-3 h-3 shrink-0" /> {branch.location}
                           </p>
                         </div>
                       </div>
-                      <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${statusConf.bg} ${statusConf.text} ${statusConf.border} border`}>
+                      <span className={`px-2.5 md:px-3 py-1 rounded-lg text-[8px] md:text-[9px] font-black uppercase tracking-widest shrink-0 ${statusConf.bg} ${statusConf.text} ${statusConf.border} border`}>
                         {branch.status}
                       </span>
                     </div>
 
                     {/* Stats */}
-                    <div className="grid grid-cols-3 gap-3 mb-6">
-                      <div className="bg-[#f8fafc] border border-slate-50 p-4 rounded-xl text-center">
-                        <p className="text-xl font-black text-[#111827] tracking-tighter">{(branch.students ?? 0).toLocaleString()}</p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">Students</p>
+                    <div className="grid grid-cols-3 gap-2 md:gap-3 mb-4 md:mb-6">
+                      <div className="bg-[#f8fafc] border border-slate-50 p-3 md:p-4 rounded-xl text-center">
+                        <p className="text-base md:text-xl font-black text-[#111827] tracking-tighter">{(branch.students ?? 0).toLocaleString()}</p>
+                        <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mt-1">Students</p>
                       </div>
-                      <div className="bg-[#f8fafc] border border-slate-50 p-4 rounded-xl text-center">
-                        <p className="text-xl font-black text-[#111827] tracking-tighter">{branch.teachers ?? 0}</p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">Teachers</p>
+                      <div className="bg-[#f8fafc] border border-slate-50 p-3 md:p-4 rounded-xl text-center">
+                        <p className="text-base md:text-xl font-black text-[#111827] tracking-tighter">{branch.teachers ?? 0}</p>
+                        <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mt-1">Teachers</p>
                       </div>
-                      <div className="bg-[#f8fafc] border border-slate-50 p-4 rounded-xl text-center">
-                        <p className="text-xl font-black text-[#111827] tracking-tighter">{branch.established ?? new Date().getFullYear()}</p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">Est.</p>
+                      <div className="bg-[#f8fafc] border border-slate-50 p-3 md:p-4 rounded-xl text-center">
+                        <p className="text-base md:text-xl font-black text-[#111827] tracking-tighter">{branch.established ?? new Date().getFullYear()}</p>
+                        <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mt-1">Est.</p>
                       </div>
                     </div>
 
                     {/* Assigned Principal */}
-                    <div className={`p-4 rounded-2xl border ${assignedPrincipal ? 'bg-[#f0fdf4] border-emerald-100' : 'bg-[#fef2f2] border-rose-100'}`}>
+                    <div className={`p-3 md:p-4 rounded-xl md:rounded-2xl border ${assignedPrincipal ? 'bg-[#f0fdf4] border-emerald-100' : 'bg-[#fef2f2] border-rose-100'}`}>
                       {assignedPrincipal ? (
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-[10px] shadow-sm" style={{ backgroundColor: branch.color }}>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2.5 md:gap-3 min-w-0 flex-1">
+                            <div className="w-8 h-8 md:w-9 md:h-9 rounded-lg md:rounded-xl flex items-center justify-center text-white font-bold text-[10px] shadow-sm shrink-0" style={{ backgroundColor: branch.color }}>
                               {assignedPrincipal.avatar}
                             </div>
-                            <div>
-                              <p className="text-sm font-bold text-[#111827]">{assignedPrincipal.name}</p>
-                              <p className="text-[10px] text-slate-400 font-medium">{assignedPrincipal.email}</p>
+                            <div className="min-w-0">
+                              <p className="text-[13px] md:text-sm font-bold text-[#111827] truncate">{assignedPrincipal.name}</p>
+                              <p className="text-[10px] text-slate-400 font-medium truncate">{assignedPrincipal.email}</p>
                             </div>
                           </div>
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${getStatusConfig(assignedPrincipal.status).bg} ${getStatusConfig(assignedPrincipal.status).text}`}>
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 md:px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0 ${getStatusConfig(assignedPrincipal.status).bg} ${getStatusConfig(assignedPrincipal.status).text}`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${getStatusConfig(assignedPrincipal.status).dot}`}></span>
                             {assignedPrincipal.status}
                           </span>
                         </div>
                       ) : (
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <AlertTriangle className="w-5 h-5 text-rose-400" />
-                            <div>
-                              <p className="text-sm font-bold text-rose-600">No Principal Assigned</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2.5 md:gap-3 min-w-0 flex-1">
+                            <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-[13px] md:text-sm font-bold text-rose-600">No Principal Assigned</p>
                               <p className="text-[10px] text-rose-400 font-medium">Dashboard access disabled</p>
                             </div>
                           </div>
                           <button
                             onClick={() => handleReassignPrincipal(branch.name, branch.color)}
-                            className="px-4 py-1.5 rounded-lg bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 transition-colors"
+                            className="px-3 md:px-4 py-1.5 rounded-lg bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 transition-colors shrink-0"
                           >
                             Assign
                           </button>
@@ -631,25 +636,25 @@ export default function PrincipalManagement() {
                     </div>
 
                     {/* Branch Actions */}
-                    <div className="flex items-center gap-2 mt-5">
+                    <div className="grid grid-cols-4 gap-1.5 md:gap-2 mt-4 md:mt-5">
                       <button
-                        onClick={() => { setEditBranchData({ ...branch }); setShowEditBranchModal(true); }}
-                        className="flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border border-slate-100 bg-[#f8fafc] hover:bg-white hover:shadow-md transition-all text-xs font-bold text-slate-500">
-                        <Edit3 className="w-3.5 h-3.5" /> Edit
+                        onClick={(e) => { e.stopPropagation(); setEditBranchData({ ...branch }); setShowEditBranchModal(true); }}
+                        className="flex items-center justify-center gap-1.5 p-2.5 md:p-3 rounded-xl border border-slate-100 bg-[#f8fafc] hover:bg-white hover:shadow-md transition-all text-[11px] md:text-xs font-bold text-slate-500">
+                        <Edit3 className="w-3.5 h-3.5 shrink-0" /> <span className="hidden sm:inline">Edit</span>
                       </button>
                       <button
-                        onClick={() => setManageBranch(manageBranch?.id === branch.id ? null : branch)}
-                        className="flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border border-slate-100 bg-[#f8fafc] hover:bg-white hover:shadow-md transition-all text-xs font-bold text-slate-500">
-                        <Users className="w-3.5 h-3.5" /> Manage
+                        onClick={(e) => { e.stopPropagation(); setManageBranch(manageBranch?.id === branch.id ? null : branch); }}
+                        className="flex items-center justify-center gap-1.5 p-2.5 md:p-3 rounded-xl border border-slate-100 bg-[#f8fafc] hover:bg-white hover:shadow-md transition-all text-[11px] md:text-xs font-bold text-slate-500">
+                        <Users className="w-3.5 h-3.5 shrink-0" /> <span className="hidden sm:inline">Manage</span>
                       </button>
-                      <button 
-                        onClick={() => handleReassignPrincipal(branch.name, branch.color)}
-                        className="flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border border-amber-100 bg-amber-50/50 hover:bg-white hover:shadow-md transition-all text-xs font-bold text-amber-600">
-                        <RefreshCcw className="w-3.5 h-3.5" /> Reassign
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleReassignPrincipal(branch.name, branch.color); }}
+                        className="flex items-center justify-center gap-1.5 p-2.5 md:p-3 rounded-xl border border-amber-100 bg-amber-50/50 hover:bg-white hover:shadow-md transition-all text-[11px] md:text-xs font-bold text-amber-600">
+                        <RefreshCcw className="w-3.5 h-3.5 shrink-0" /> <span className="hidden sm:inline">Reassign</span>
                       </button>
-                      <button 
-                        onClick={() => handleDeleteBranch(branch.id)}
-                        className="p-3 rounded-xl border border-rose-100 bg-[#fef2f2] hover:bg-rose-50 transition-all text-xs font-bold text-rose-400">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteBranch(branch.id); }}
+                        className="flex items-center justify-center p-2.5 md:p-3 rounded-xl border border-rose-100 bg-[#fef2f2] hover:bg-rose-50 transition-all text-[11px] md:text-xs font-bold text-rose-400">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -660,7 +665,7 @@ export default function PrincipalManagement() {
 
             {/* ── Manage Panel (shown below grid when a branch is selected) ── */}
             {manageBranch && (
-              <div className="md:col-span-2 lg:col-span-3 bg-white rounded-[2rem] border border-[#1e3a8a]/20 shadow-lg p-6 animate-in slide-in-from-top-2 duration-200">
+              <div className="md:col-span-2 lg:col-span-3 bg-white rounded-2xl md:rounded-[2rem] border border-[#1e3a8a]/20 shadow-lg p-4 md:p-6 animate-in slide-in-from-top-2 duration-200">
                 <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white shrink-0" style={{ backgroundColor: manageBranch.color }}>
@@ -722,34 +727,34 @@ export default function PrincipalManagement() {
             {/* Add New Branch Card */}
             <button
               onClick={() => setShowAddBranchModal(true)}
-              className="bg-white rounded-[2rem] border-2 border-dashed border-slate-200 p-8 flex flex-col items-center justify-center gap-4 text-slate-400 hover:border-blue-300 hover:text-blue-500 hover:bg-blue-50/30 transition-all min-h-[350px] group"
+              className="bg-white rounded-2xl md:rounded-[2rem] border-2 border-dashed border-slate-200 p-6 md:p-8 flex flex-col items-center justify-center gap-3 md:gap-4 text-slate-400 hover:border-blue-300 hover:text-blue-500 hover:bg-blue-50/30 transition-all min-h-[180px] md:min-h-[350px] group"
             >
-              <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center group-hover:bg-blue-100 group-hover:border-blue-200 transition-all">
-                <Plus className="w-8 h-8" />
+              <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center group-hover:bg-blue-100 group-hover:border-blue-200 transition-all">
+                <Plus className="w-6 h-6 md:w-8 md:h-8" />
               </div>
               <div className="text-center">
-                <p className="text-base font-bold">Add New Branch</p>
-                <p className="text-xs font-medium mt-1">Create and setup a new school branch</p>
+                <p className="text-sm md:text-base font-bold">Add New Branch</p>
+                <p className="text-[11px] md:text-xs font-medium mt-1">Create and setup a new school branch</p>
               </div>
             </button>
           </div>
 
           {/* Access Flow Info */}
-          <div className="bg-[#1e294b] rounded-[2rem] p-10 text-white shadow-xl overflow-hidden relative">
+          <div className="bg-[#1e294b] rounded-2xl md:rounded-[2rem] p-5 md:p-10 text-white shadow-xl overflow-hidden relative">
             <div className="absolute top-0 right-0 w-72 h-72 bg-blue-500/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
             <div className="relative z-10">
-              <h3 className="text-xl font-bold mb-3 tracking-tight">How Dashboard Access Works</h3>
-              <p className="text-blue-200/60 text-sm mb-8 max-w-2xl leading-relaxed font-medium">Principals can only access their dashboard after being invited and assigned to a branch by you. Here's the flow:</p>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <h3 className="text-base md:text-xl font-bold mb-2 md:mb-3 tracking-tight">How Dashboard Access Works</h3>
+              <p className="text-blue-200/60 text-[12px] md:text-sm mb-5 md:mb-8 max-w-2xl leading-relaxed font-medium">Principals can only access their dashboard after being invited and assigned to a branch by you. Here's the flow:</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                 {[
                   { step: '1', title: 'Create Branch', desc: 'Add a new school branch with location details' },
                   { step: '2', title: 'Invite Principal', desc: 'Send email invitation to the principal' },
                   { step: '3', title: 'Assign to Branch', desc: 'Link the principal to their branch' },
                   { step: '4', title: 'Access Granted', desc: 'Principal can now login & manage their dashboard' },
                 ].map((s, i) => (
-                  <div key={i} className="bg-white/5 border border-white/10 p-6 rounded-2xl">
-                    <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-300 font-black text-sm mb-4">{s.step}</div>
-                    <h4 className="text-sm font-bold text-white mb-1">{s.title}</h4>
+                  <div key={i} className="bg-white/5 border border-white/10 p-4 md:p-6 rounded-xl md:rounded-2xl">
+                    <div className="w-9 h-9 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-300 font-black text-sm mb-3 md:mb-4">{s.step}</div>
+                    <h4 className="text-[13px] md:text-sm font-bold text-white mb-1">{s.title}</h4>
                     <p className="text-[11px] text-blue-200/50 font-medium leading-relaxed">{s.desc}</p>
                   </div>
                 ))}
@@ -762,15 +767,63 @@ export default function PrincipalManagement() {
       {/* ==================== PRINCIPALS TAB ==================== */}
       {activeTab === 'principals' && (
         <>
-          {/* Principals Table */}
-          <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-            <div className="p-10 border-b border-slate-50 flex items-center justify-between">
-              <h3 className="text-xl font-bold text-[#111827]">All Principals</h3>
+          {/* Principals — Table (desktop) / Cards (mobile) */}
+          <div className="bg-white rounded-2xl md:rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+            <div className="p-5 md:p-10 border-b border-slate-50 flex items-center justify-between">
+              <h3 className="text-base md:text-xl font-bold text-[#111827]">All Principals</h3>
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Live status</span>
+                <span className="text-[10px] md:text-[11px] font-bold text-slate-400 uppercase tracking-widest">Live</span>
               </div>
             </div>
+
+            {/* Mobile card list */}
+            {isMobile ? (
+              <div className="p-3 flex flex-col gap-2">
+                {filteredPrincipals.length === 0 ? (
+                  <div className="py-12 text-center text-[12px] font-bold text-slate-400">No principals found</div>
+                ) : filteredPrincipals.map((p) => {
+                  const sc = getStatusConfig(p.status);
+                  return (
+                    <div
+                      key={p.id}
+                      onClick={() => setSelectedPrincipal(p)}
+                      className="rounded-xl border border-slate-100 bg-slate-50/40 p-3 cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3 mb-2.5">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-[11px] shadow-md shrink-0" style={{ backgroundColor: p.branchColor }}>
+                          {p.avatar}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-extrabold text-[#111827] truncate">{p.name}</p>
+                          <p className="text-[11px] text-slate-500 font-medium truncate">{p.email}</p>
+                        </div>
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0 ${sc.bg} ${sc.text} ${sc.border} border`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`}></span>
+                          {p.status}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: p.branchColor }}></div>
+                          <span className="text-[11px] font-bold text-slate-600 truncate">{p.branch}</span>
+                        </div>
+                        <div className="flex items-center justify-end gap-2">
+                          <span className="text-[10px] text-slate-400 font-medium">{p.joinDate}</span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDeletePrincipal(p.id); }}
+                            className="p-1.5 rounded-lg hover:bg-rose-50 text-rose-400"
+                            aria-label="Remove principal"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left min-w-[1100px]">
                 <thead>
@@ -848,6 +901,7 @@ export default function PrincipalManagement() {
                 </tbody>
               </table>
             </div>
+            )}
           </div>
         </>
       )}
@@ -855,65 +909,65 @@ export default function PrincipalManagement() {
       {/* ==================== ADD BRANCH MODAL ==================== */}
       {/* ── Edit Branch Modal ─────────────────────────────────────────────── */}
       {showEditBranchModal && editBranchData && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-300 overflow-hidden">
-            <div className="p-8 border-b border-slate-50 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: editBranchData.color }}>
-                  <Edit3 className="w-6 h-6" />
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-2xl md:rounded-[2.5rem] w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-300 overflow-hidden max-h-[92vh] flex flex-col">
+            <div className="p-5 md:p-8 border-b border-slate-50 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3 md:gap-4 min-w-0">
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center text-white shadow-lg shrink-0" style={{ backgroundColor: editBranchData.color }}>
+                  <Edit3 className="w-5 h-5 md:w-6 md:h-6" />
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-[#111827]">Edit Branch</h3>
-                  <p className="text-slate-400 text-xs font-medium">Update branch details</p>
+                <div className="min-w-0">
+                  <h3 className="text-base md:text-xl font-bold text-[#111827] truncate">Edit Branch</h3>
+                  <p className="text-slate-400 text-[11px] md:text-xs font-medium">Update branch details</p>
                 </div>
               </div>
-              <button onClick={() => { setShowEditBranchModal(false); setEditBranchData(null); }} className="p-2 rounded-xl hover:bg-slate-50 text-slate-400 transition-colors">
+              <button onClick={() => { setShowEditBranchModal(false); setEditBranchData(null); }} className="p-2 rounded-xl hover:bg-slate-50 text-slate-400 transition-colors shrink-0">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-8 space-y-6">
+            <div className="p-5 md:p-8 space-y-4 md:space-y-6 overflow-y-auto">
               <div>
-                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Branch Name</label>
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 md:mb-3 block">Branch Name</label>
                 <Input
                   value={editBranchData.name}
                   onChange={e => setEditBranchData({ ...editBranchData, name: e.target.value })}
-                  className="h-14 bg-[#f8fafc] border-slate-100 rounded-2xl text-sm font-medium"
+                  className="h-12 md:h-14 bg-[#f8fafc] border-slate-100 rounded-xl md:rounded-2xl text-sm font-medium"
                   placeholder="e.g. West Branch"
                 />
               </div>
               <div>
-                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Location / City</label>
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 md:mb-3 block">Location / City</label>
                 <Input
                   value={editBranchData.location}
                   onChange={e => setEditBranchData({ ...editBranchData, location: e.target.value })}
-                  className="h-14 bg-[#f8fafc] border-slate-100 rounded-2xl text-sm font-medium"
+                  className="h-12 md:h-14 bg-[#f8fafc] border-slate-100 rounded-xl md:rounded-2xl text-sm font-medium"
                   placeholder="e.g. Hyderabad"
                 />
               </div>
               <div>
-                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Branch Color</label>
-                <div className="flex flex-wrap gap-3">
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 md:mb-3 block">Branch Color</label>
+                <div className="flex flex-wrap gap-2.5 md:gap-3">
                   {branchColorOptions.map(color => (
                     <button
                       key={color}
                       onClick={() => setEditBranchData({ ...editBranchData, color })}
-                      className={`w-10 h-10 rounded-xl transition-all ${editBranchData.color === color ? 'ring-4 ring-offset-2 ring-blue-200 scale-110' : 'hover:scale-105'}`}
+                      className={`w-9 h-9 md:w-10 md:h-10 rounded-xl transition-all ${editBranchData.color === color ? 'ring-2 md:ring-4 ring-offset-2 ring-blue-200 scale-110' : 'hover:scale-105'}`}
                       style={{ backgroundColor: color }}
                     />
                   ))}
                 </div>
               </div>
             </div>
-            <div className="p-8 border-t border-slate-50 flex items-center justify-between gap-4">
-              <Button variant="outline" onClick={() => { setShowEditBranchModal(false); setEditBranchData(null); }} className="h-12 px-6 rounded-xl border-slate-200 text-sm font-bold">
+            <div className="p-5 md:p-8 border-t border-slate-50 flex items-center justify-between gap-3 md:gap-4 shrink-0">
+              <Button variant="outline" onClick={() => { setShowEditBranchModal(false); setEditBranchData(null); }} className="h-11 md:h-12 px-5 md:px-6 rounded-xl border-slate-200 text-[13px] md:text-sm font-bold flex-1 md:flex-initial">
                 Cancel
               </Button>
               <Button
                 disabled={loading}
                 onClick={handleUpdateBranch}
-                className="h-12 px-8 rounded-xl bg-[#1e3a8a] text-white text-sm font-bold hover:bg-[#1e40af] shadow-lg flex items-center gap-2"
+                className="h-11 md:h-12 px-5 md:px-8 rounded-xl bg-[#1e3a8a] text-white text-[13px] md:text-sm font-bold hover:bg-[#1e40af] shadow-lg flex items-center justify-center gap-2 flex-1 md:flex-initial"
               >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCheck className="w-4 h-4" />} Save Changes
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCheck className="w-4 h-4" />} Save
               </Button>
             </div>
           </div>
@@ -921,50 +975,50 @@ export default function PrincipalManagement() {
       )}
 
       {showAddBranchModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-300 overflow-hidden">
-            <div className="p-8 border-b border-slate-50 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-500 flex items-center justify-center text-white shadow-lg">
-                  <Building2 className="w-6 h-6" />
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-2xl md:rounded-[2.5rem] w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-300 overflow-hidden max-h-[92vh] flex flex-col">
+            <div className="p-5 md:p-8 border-b border-slate-50 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3 md:gap-4 min-w-0">
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shrink-0">
+                  <Building2 className="w-5 h-5 md:w-6 md:h-6" />
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-[#111827]">Add New Branch</h3>
-                  <p className="text-slate-400 text-xs font-medium">Create a new school branch</p>
+                <div className="min-w-0">
+                  <h3 className="text-base md:text-xl font-bold text-[#111827] truncate">Add New Branch</h3>
+                  <p className="text-slate-400 text-[11px] md:text-xs font-medium">Create a new school branch</p>
                 </div>
               </div>
-              <button onClick={() => setShowAddBranchModal(false)} className="p-2 rounded-xl hover:bg-slate-50 text-slate-400 transition-colors">
+              <button onClick={() => setShowAddBranchModal(false)} className="p-2 rounded-xl hover:bg-slate-50 text-slate-400 transition-colors shrink-0">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-8 space-y-6">
+            <div className="p-5 md:p-8 space-y-4 md:space-y-6 overflow-y-auto">
               <div>
-                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Branch Name</label>
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 md:mb-3 block">Branch Name</label>
                 <Input
                   value={branchForm.name}
                   onChange={(e) => setBranchForm({ ...branchForm, name: e.target.value })}
-                  className="h-14 bg-[#f8fafc] border-slate-100 rounded-2xl text-sm font-medium focus:ring-blue-900/5"
+                  className="h-12 md:h-14 bg-[#f8fafc] border-slate-100 rounded-xl md:rounded-2xl text-sm font-medium focus:ring-blue-900/5"
                   placeholder="e.g. West Branch"
                 />
               </div>
               <div>
-                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Location / Address</label>
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 md:mb-3 block">Location / Address</label>
                 <Input
                   value={branchForm.location}
                   onChange={(e) => setBranchForm({ ...branchForm, location: e.target.value })}
-                  className="h-14 bg-[#f8fafc] border-slate-100 rounded-2xl text-sm font-medium focus:ring-blue-900/5"
+                  className="h-12 md:h-14 bg-[#f8fafc] border-slate-100 rounded-xl md:rounded-2xl text-sm font-medium focus:ring-blue-900/5"
                   placeholder="e.g. Bandra West, Mumbai"
                 />
               </div>
               <div>
-                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Branch Color</label>
-                <div className="flex flex-wrap gap-3">
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 md:mb-3 block">Branch Color</label>
+                <div className="flex flex-wrap gap-2.5 md:gap-3">
                   {branchColorOptions.map((color) => (
                     <button
                       key={color}
                       onClick={() => setBranchForm({ ...branchForm, color })}
-                      className={`w-10 h-10 rounded-xl transition-all ${branchForm.color === color ? 'ring-4 ring-offset-2 ring-blue-200 scale-110' : 'hover:scale-105'}`}
+                      className={`w-9 h-9 md:w-10 md:h-10 rounded-xl transition-all ${branchForm.color === color ? 'ring-2 md:ring-4 ring-offset-2 ring-blue-200 scale-110' : 'hover:scale-105'}`}
                       style={{ backgroundColor: color }}
                     />
                   ))}
@@ -972,30 +1026,30 @@ export default function PrincipalManagement() {
               </div>
 
               {/* Preview */}
-              <div className="bg-[#f8fafc] border border-slate-100 p-6 rounded-2xl">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Preview</p>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: branchForm.color }}>
-                    <Building2 className="w-6 h-6" />
+              <div className="bg-[#f8fafc] border border-slate-100 p-4 md:p-6 rounded-xl md:rounded-2xl">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 md:mb-4">Preview</p>
+                <div className="flex items-center gap-3 md:gap-4">
+                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center text-white shadow-lg shrink-0" style={{ backgroundColor: branchForm.color }}>
+                    <Building2 className="w-5 h-5 md:w-6 md:h-6" />
                   </div>
-                  <div>
-                    <p className="text-base font-bold text-[#111827]">{branchForm.name || 'Branch Name'}</p>
-                    <p className="text-xs text-slate-400 font-medium">{branchForm.location || 'Location'}</p>
+                  <div className="min-w-0">
+                    <p className="text-[14px] md:text-base font-bold text-[#111827] truncate">{branchForm.name || 'Branch Name'}</p>
+                    <p className="text-[11px] md:text-xs text-slate-400 font-medium truncate">{branchForm.location || 'Location'}</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="p-8 border-t border-slate-50 flex items-center justify-between gap-4">
-              <Button variant="outline" onClick={() => setShowAddBranchModal(false)} className="h-12 px-6 rounded-xl border-slate-200 text-sm font-bold">
+            <div className="p-5 md:p-8 border-t border-slate-50 flex items-center justify-between gap-3 md:gap-4 shrink-0">
+              <Button variant="outline" onClick={() => setShowAddBranchModal(false)} className="h-11 md:h-12 px-5 md:px-6 rounded-xl border-slate-200 text-[13px] md:text-sm font-bold flex-1 md:flex-initial">
                 Cancel
               </Button>
               <Button
                 disabled={loading}
                 onClick={handleAddBranch}
-                className="h-12 px-8 rounded-xl bg-emerald-500 text-white text-sm font-bold hover:bg-emerald-600 shadow-lg flex items-center gap-2"
+                className="h-11 md:h-12 px-5 md:px-8 rounded-xl bg-emerald-500 text-white text-[13px] md:text-sm font-bold hover:bg-emerald-600 shadow-lg flex items-center justify-center gap-2 flex-1 md:flex-initial"
               >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Create Branch
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Create
               </Button>
             </div>
           </div>
@@ -1004,65 +1058,65 @@ export default function PrincipalManagement() {
 
       {/* ==================== INVITE PRINCIPAL MODAL ==================== */}
       {showInviteModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-300 overflow-hidden max-h-[90vh] overflow-y-auto">
-            <div className="p-8 border-b border-slate-50 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-[#1e3a8a] flex items-center justify-center text-white shadow-lg">
-                  <UserPlus className="w-6 h-6" />
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-2xl md:rounded-[2.5rem] w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-300 overflow-hidden max-h-[92vh] flex flex-col">
+            <div className="p-5 md:p-8 border-b border-slate-50 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3 md:gap-4 min-w-0">
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-[#1e3a8a] flex items-center justify-center text-white shadow-lg shrink-0">
+                  <UserPlus className="w-5 h-5 md:w-6 md:h-6" />
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-[#111827]">Invite Principal</h3>
-                  <p className="text-slate-400 text-xs font-medium">Send an email invitation & assign branch</p>
+                <div className="min-w-0">
+                  <h3 className="text-base md:text-xl font-bold text-[#111827] truncate">Invite Principal</h3>
+                  <p className="text-slate-400 text-[11px] md:text-xs font-medium">Send email & assign branch</p>
                 </div>
               </div>
-              <button onClick={() => setShowInviteModal(false)} className="p-2 rounded-xl hover:bg-slate-50 text-slate-400 transition-colors">
+              <button onClick={() => setShowInviteModal(false)} className="p-2 rounded-xl hover:bg-slate-50 text-slate-400 transition-colors shrink-0">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-8 space-y-6">
+            <div className="p-5 md:p-8 space-y-4 md:space-y-6 overflow-y-auto">
               <div>
-                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Full Name</label>
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 md:mb-3 block">Full Name</label>
                 <Input
                   value={inviteForm.name}
                   onChange={(e) => setInviteForm({ ...inviteForm, name: e.target.value })}
-                  className="h-14 bg-[#f8fafc] border-slate-100 rounded-2xl text-sm font-medium focus:ring-blue-900/5"
+                  className="h-12 md:h-14 bg-[#f8fafc] border-slate-100 rounded-xl md:rounded-2xl text-sm font-medium focus:ring-blue-900/5"
                   placeholder="e.g. Dr. Kavitha Reddy"
                 />
               </div>
               <div>
-                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Email Address</label>
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 md:mb-3 block">Email Address</label>
                 <Input
                   type="email"
                   value={inviteForm.email}
                   onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
-                  className="h-14 bg-[#f8fafc] border-slate-100 rounded-2xl text-sm font-medium focus:ring-blue-900/5"
+                  className="h-12 md:h-14 bg-[#f8fafc] border-slate-100 rounded-xl md:rounded-2xl text-sm font-medium focus:ring-blue-900/5"
                   placeholder="e.g. principal@example.com"
                 />
               </div>
               <div>
-                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Assign to Branch</label>
-                <div className="grid grid-cols-1 gap-3">
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 md:mb-3 block">Assign to Branch</label>
+                <div className="grid grid-cols-1 gap-2.5 md:gap-3">
                   {branches.map((branch, i) => (
                     <button
                       key={i}
                       onClick={() => setInviteForm({ ...inviteForm, branch: branch.name, branchId: branch.branchId || toSlug(branch.name), branchColor: branch.color })}
-                      className={`flex items-center gap-4 p-4 rounded-2xl border transition-all text-left ${
+                      className={`flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-xl md:rounded-2xl border transition-all text-left ${
                         inviteForm.branch === branch.name
                           ? 'border-blue-300 bg-blue-50/50 shadow-sm'
                           : 'border-slate-100 bg-[#f8fafc] hover:bg-white hover:border-slate-200'
                       }`}
                     >
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-sm" style={{ backgroundColor: branch.color }}>
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-sm shrink-0" style={{ backgroundColor: branch.color }}>
                         <Building2 className="w-4 h-4" />
                       </div>
-                      <div className="flex-1">
-                        <span className="text-sm font-bold text-[#111827]">{branch.name}</span>
-                        <p className="text-[10px] text-slate-400 font-medium">{branch.location}</p>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[13px] md:text-sm font-bold text-[#111827] block truncate">{branch.name}</span>
+                        <p className="text-[10px] text-slate-400 font-medium truncate">{branch.location}</p>
                       </div>
                       {inviteForm.branch === branch.name && (
-                        <CheckCircle2 className="w-4 h-4 text-blue-500" />
+                        <CheckCircle2 className="w-4 h-4 text-blue-500 shrink-0" />
                       )}
                     </button>
                   ))}
@@ -1070,16 +1124,16 @@ export default function PrincipalManagement() {
               </div>
             </div>
 
-            <div className="p-8 border-t border-slate-50 flex items-center justify-between gap-4">
-              <Button variant="outline" onClick={() => setShowInviteModal(false)} className="h-12 px-6 rounded-xl border-slate-200 text-sm font-bold">
+            <div className="p-5 md:p-8 border-t border-slate-50 flex items-center justify-between gap-3 md:gap-4 shrink-0">
+              <Button variant="outline" onClick={() => setShowInviteModal(false)} className="h-11 md:h-12 px-5 md:px-6 rounded-xl border-slate-200 text-[13px] md:text-sm font-bold flex-1 md:flex-initial">
                 Cancel
               </Button>
               <Button
                 disabled={loading}
                 onClick={handleInvitePrincipal}
-                className="h-12 px-8 rounded-xl bg-[#1e294b] text-white text-sm font-bold hover:bg-[#1e3a8a] shadow-lg flex items-center gap-2"
+                className="h-11 md:h-12 px-5 md:px-8 rounded-xl bg-[#1e294b] text-white text-[13px] md:text-sm font-bold hover:bg-[#1e3a8a] shadow-lg flex items-center justify-center gap-2 flex-1 md:flex-initial"
               >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Send Invitation
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} {isMobile ? "Send" : "Send Invitation"}
               </Button>
             </div>
           </div>
@@ -1088,52 +1142,52 @@ export default function PrincipalManagement() {
 
       {/* ==================== BULK INVITE MODAL ==================== */}
       {showBulkModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl animate-in zoom-in-95 duration-300 overflow-hidden max-h-[92vh] flex flex-col">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-2xl md:rounded-[2.5rem] w-full max-w-2xl shadow-2xl animate-in zoom-in-95 duration-300 overflow-hidden max-h-[92vh] flex flex-col">
 
             {/* Modal Header */}
-            <div className="p-8 border-b border-slate-50 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg">
-                  <FileSpreadsheet className="w-6 h-6" />
+            <div className="p-5 md:p-8 border-b border-slate-50 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3 md:gap-4 min-w-0">
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shrink-0">
+                  <FileSpreadsheet className="w-5 h-5 md:w-6 md:h-6" />
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-[#111827]">Bulk Principal Invite</h3>
-                  <p className="text-slate-400 text-xs font-medium">
+                <div className="min-w-0">
+                  <h3 className="text-base md:text-xl font-bold text-[#111827] truncate">Bulk Invite</h3>
+                  <p className="text-slate-400 text-[11px] md:text-xs font-medium truncate">
                     {bulkRows.length > 0
-                      ? `${bulkRows.length} principal${bulkRows.length > 1 ? "s" : ""} ready to invite`
-                      : "Upload an Excel file to invite multiple principals at once"}
+                      ? `${bulkRows.length} principal${bulkRows.length > 1 ? "s" : ""} ready`
+                      : "Upload Excel to invite many at once"}
                   </p>
                 </div>
               </div>
-              <button type="button" onClick={resetBulkModal} className="p-2 rounded-xl hover:bg-slate-50 text-slate-400 transition-colors">
+              <button type="button" onClick={resetBulkModal} className="p-2 rounded-xl hover:bg-slate-50 text-slate-400 transition-colors shrink-0">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto p-8 space-y-6">
+            <div className="flex-1 overflow-y-auto p-5 md:p-8 space-y-4 md:space-y-6">
 
               {/* Step 1 — Download Template + Upload */}
               {!bulkRows.length && (
                 <>
                   {/* Download template */}
-                  <div className="flex items-center justify-between bg-indigo-50 border border-indigo-100 rounded-2xl px-6 py-4">
-                    <div>
-                      <p className="text-sm font-bold text-indigo-900">Download Excel Template</p>
-                      <p className="text-xs font-medium text-indigo-500 mt-0.5">Pre-filled with correct column headers: name, email, branch</p>
+                  <div className="flex items-center justify-between gap-3 bg-indigo-50 border border-indigo-100 rounded-xl md:rounded-2xl px-4 md:px-6 py-3 md:py-4">
+                    <div className="min-w-0">
+                      <p className="text-[13px] md:text-sm font-bold text-indigo-900">Excel Template</p>
+                      <p className="text-[11px] md:text-xs font-medium text-indigo-500 mt-0.5">Columns: name, email, branch</p>
                     </div>
                     <button
                       type="button"
                       onClick={handleDownloadTemplate}
-                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-colors shrink-0"
+                      className="flex items-center gap-2 px-3.5 md:px-5 py-2 md:py-2.5 rounded-xl bg-indigo-600 text-white text-[10px] md:text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-colors shrink-0"
                     >
-                      <Download className="w-3.5 h-3.5" /> Template
+                      <Download className="w-3.5 h-3.5" /> {isMobile ? "Get" : "Template"}
                     </button>
                   </div>
 
                   {/* File drop zone */}
-                  <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] p-12 flex flex-col items-center justify-center gap-4 text-center cursor-pointer relative hover:border-indigo-400 hover:bg-indigo-50/30 transition-all group">
+                  <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl md:rounded-[2rem] p-6 md:p-12 flex flex-col items-center justify-center gap-3 md:gap-4 text-center cursor-pointer relative hover:border-indigo-400 hover:bg-indigo-50/30 transition-all group">
                     <input
                       ref={bulkFileRef}
                       type="file"
@@ -1141,27 +1195,27 @@ export default function PrincipalManagement() {
                       onChange={handleBulkFileChange}
                       className="absolute inset-0 opacity-0 cursor-pointer"
                     />
-                    <div className="w-16 h-16 rounded-2xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 shadow-sm group-hover:text-indigo-600 group-hover:border-indigo-100 group-hover:scale-110 transition-all">
-                      <FileSpreadsheet className="w-8 h-8" />
+                    <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 shadow-sm group-hover:text-indigo-600 group-hover:border-indigo-100 group-hover:scale-110 transition-all">
+                      <FileSpreadsheet className="w-6 h-6 md:w-8 md:h-8" />
                     </div>
                     <div>
-                      <p className="text-base font-bold text-slate-700">Click or drag & drop Excel file</p>
-                      <p className="text-xs font-medium text-slate-400 mt-1">.xlsx or .xls — columns: name, email, branch</p>
+                      <p className="text-sm md:text-base font-bold text-slate-700">{isMobile ? "Tap to choose Excel" : "Click or drag & drop Excel file"}</p>
+                      <p className="text-[11px] md:text-xs font-medium text-slate-400 mt-1">.xlsx or .xls — columns: name, email, branch</p>
                     </div>
                   </div>
 
                   {/* Available branches hint */}
                   {branches.length > 0 && (
-                    <div className="bg-amber-50 border border-amber-100 rounded-2xl px-6 py-4">
-                      <p className="text-xs font-black text-amber-700 uppercase tracking-widest mb-2">Your Branches</p>
+                    <div className="bg-amber-50 border border-amber-100 rounded-xl md:rounded-2xl px-4 md:px-6 py-3 md:py-4">
+                      <p className="text-[11px] md:text-xs font-black text-amber-700 uppercase tracking-widest mb-2">Your Branches</p>
                       <div className="flex flex-wrap gap-2">
                         {branches.map(b => (
-                          <span key={b.id} className="px-3 py-1 rounded-lg bg-white border border-amber-200 text-xs font-bold text-amber-800">
+                          <span key={b.id} className="px-2.5 md:px-3 py-0.5 md:py-1 rounded-lg bg-white border border-amber-200 text-[11px] md:text-xs font-bold text-amber-800">
                             {b.name}
                           </span>
                         ))}
                       </div>
-                      <p className="text-[10px] font-medium text-amber-500 mt-2">Branch names in Excel must exactly match the names above.</p>
+                      <p className="text-[10px] font-medium text-amber-500 mt-2">Branch names in Excel must match exactly.</p>
                     </div>
                   )}
                 </>
@@ -1169,17 +1223,17 @@ export default function PrincipalManagement() {
 
               {/* Step 2 — Preview + Progress */}
               {bulkRows.length > 0 && (
-                <div className="space-y-5">
+                <div className="space-y-4 md:space-y-5">
                   {/* Summary strip */}
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-3 gap-2 md:gap-3">
                     {[
                       { label: "Total",   value: bulkRows.length, color: "bg-slate-50 text-slate-700 border-slate-100"   },
                       { label: "Sent",    value: Object.values(bulkStatus).filter(s => s === "sent").length,   color: "bg-green-50 text-green-700 border-green-100"  },
                       { label: "Failed",  value: Object.values(bulkStatus).filter(s => s === "failed").length, color: "bg-rose-50 text-rose-700 border-rose-100"     },
                     ].map(c => (
-                      <div key={c.label} className={`${c.color} border rounded-2xl px-4 py-3 text-center`}>
-                        <p className="text-2xl font-black">{c.value}</p>
-                        <p className="text-[10px] font-black uppercase tracking-widest mt-0.5">{c.label}</p>
+                      <div key={c.label} className={`${c.color} border rounded-xl md:rounded-2xl px-3 md:px-4 py-2.5 md:py-3 text-center`}>
+                        <p className="text-xl md:text-2xl font-black">{c.value}</p>
+                        <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest mt-0.5">{c.label}</p>
                       </div>
                     ))}
                   </div>
@@ -1204,17 +1258,39 @@ export default function PrincipalManagement() {
                     );
                   })()}
 
-                  {/* Per-row table */}
-                  <div className="rounded-2xl border border-slate-100 overflow-hidden">
-                    <div className="grid grid-cols-[auto_1fr_1fr_80px] gap-0 text-[10px] font-black uppercase tracking-widest text-slate-400 bg-slate-50 px-5 py-3 border-b border-slate-100">
-                      <span className="w-8">#</span>
-                      <span>Name</span>
-                      <span>Email</span>
-                      <span className="text-right">Status</span>
-                    </div>
-                    <div className="divide-y divide-slate-50 max-h-64 overflow-y-auto">
+                  {/* Per-row list — responsive: table-like on desktop, compact cards on mobile */}
+                  <div className="rounded-xl md:rounded-2xl border border-slate-100 overflow-hidden">
+                    {!isMobile && (
+                      <div className="grid grid-cols-[auto_1fr_1fr_80px] gap-0 text-[10px] font-black uppercase tracking-widest text-slate-400 bg-slate-50 px-5 py-3 border-b border-slate-100">
+                        <span className="w-8">#</span>
+                        <span>Name</span>
+                        <span>Email</span>
+                        <span className="text-right">Status</span>
+                      </div>
+                    )}
+                    <div className="divide-y divide-slate-50 max-h-56 md:max-h-64 overflow-y-auto">
                       {bulkRows.map((row, i) => {
                         const st = bulkStatus[i] || "pending";
+                        const statusEl = (
+                          <>
+                            {st === "pending"  && <span className="px-2 md:px-2.5 py-1 rounded-lg bg-slate-100 text-slate-400 text-[9px] font-black uppercase tracking-widest">Pending</span>}
+                            {st === "sending"  && <span className="px-2 md:px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-600 text-[9px] font-black uppercase tracking-widest flex items-center gap-1"><Loader2 className="w-2.5 h-2.5 animate-spin" />Sending</span>}
+                            {st === "sent"     && <span className="px-2 md:px-2.5 py-1 rounded-lg bg-green-100 text-green-600 text-[9px] font-black uppercase tracking-widest flex items-center gap-1"><CheckCheck className="w-3 h-3" />Sent</span>}
+                            {st === "failed"   && <span className="px-2 md:px-2.5 py-1 rounded-lg bg-rose-100 text-rose-500 text-[9px] font-black uppercase tracking-widest flex items-center gap-1"><AlertCircle className="w-3 h-3" />Failed</span>}
+                          </>
+                        );
+                        if (isMobile) {
+                          return (
+                            <div key={i} className="flex items-center gap-2.5 px-3 py-2.5">
+                              <span className="w-5 text-[11px] font-bold text-slate-300 shrink-0">{i + 1}</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[12px] font-bold text-[#111827] truncate">{row.name}</p>
+                                <p className="text-[10px] text-slate-400 font-medium truncate">{row.email} · {row.branch}</p>
+                              </div>
+                              <div className="shrink-0">{statusEl}</div>
+                            </div>
+                          );
+                        }
                         return (
                           <div key={i} className="grid grid-cols-[auto_1fr_1fr_80px] gap-0 items-center px-5 py-3 hover:bg-slate-50/50 transition-colors">
                             <span className="w-8 text-xs font-bold text-slate-300">{i + 1}</span>
@@ -1223,12 +1299,7 @@ export default function PrincipalManagement() {
                               <p className="text-[10px] text-slate-400 font-medium truncate">{row.branch}</p>
                             </div>
                             <p className="text-xs text-slate-500 font-medium truncate pr-3">{row.email}</p>
-                            <div className="flex justify-end">
-                              {st === "pending"  && <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-400 text-[9px] font-black uppercase tracking-widest">Pending</span>}
-                              {st === "sending"  && <span className="px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-600 text-[9px] font-black uppercase tracking-widest flex items-center gap-1"><Loader2 className="w-2.5 h-2.5 animate-spin" />Sending</span>}
-                              {st === "sent"     && <span className="px-2.5 py-1 rounded-lg bg-green-100 text-green-600 text-[9px] font-black uppercase tracking-widest flex items-center gap-1"><CheckCheck className="w-3 h-3" />Sent</span>}
-                              {st === "failed"   && <span className="px-2.5 py-1 rounded-lg bg-rose-100 text-rose-500 text-[9px] font-black uppercase tracking-widest flex items-center gap-1"><AlertCircle className="w-3 h-3" />Failed</span>}
-                            </div>
+                            <div className="flex justify-end">{statusEl}</div>
                           </div>
                         );
                       })}
@@ -1250,12 +1321,12 @@ export default function PrincipalManagement() {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-8 border-t border-slate-50 flex items-center justify-between gap-4 shrink-0">
-              <Button type="button" variant="outline" onClick={resetBulkModal} className="h-12 px-6 rounded-xl border-slate-200 text-sm font-bold">
+            <div className="p-5 md:p-8 border-t border-slate-50 flex items-center justify-between gap-2 md:gap-4 shrink-0">
+              <Button type="button" variant="outline" onClick={resetBulkModal} className="h-11 md:h-12 px-4 md:px-6 rounded-xl border-slate-200 text-[13px] md:text-sm font-bold flex-1 md:flex-initial">
                 {bulkDone ? "Close" : "Cancel"}
               </Button>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 md:gap-3 flex-1 md:flex-initial">
                 {/* Retry failed */}
                 {bulkDone && Object.values(bulkStatus).some(s => s === "failed") && (
                   <Button
@@ -1263,9 +1334,9 @@ export default function PrincipalManagement() {
                     variant="outline"
                     onClick={handleRetryFailed}
                     disabled={bulkRunning}
-                    className="h-12 px-6 rounded-xl border-rose-200 text-rose-600 text-sm font-bold hover:bg-rose-50 flex items-center gap-2"
+                    className="h-11 md:h-12 px-4 md:px-6 rounded-xl border-rose-200 text-rose-600 text-[13px] md:text-sm font-bold hover:bg-rose-50 flex items-center justify-center gap-2 flex-1 md:flex-initial"
                   >
-                    <RotateCcw className="w-4 h-4" /> Retry Failed
+                    <RotateCcw className="w-4 h-4" /> {isMobile ? "Retry" : "Retry Failed"}
                   </Button>
                 )}
 
@@ -1275,11 +1346,11 @@ export default function PrincipalManagement() {
                     type="button"
                     disabled={bulkRunning || bulkRows.length === 0}
                     onClick={handleBulkInvite}
-                    className="h-12 px-8 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 shadow-lg flex items-center gap-2"
+                    className="h-11 md:h-12 px-4 md:px-8 rounded-xl bg-indigo-600 text-white text-[13px] md:text-sm font-bold hover:bg-indigo-700 shadow-lg flex items-center justify-center gap-2 flex-1 md:flex-initial"
                   >
                     {bulkRunning
                       ? <><Loader2 className="w-4 h-4 animate-spin" /> Inviting…</>
-                      : <><Send className="w-4 h-4" /> Send {bulkRows.length} Invite{bulkRows.length > 1 ? "s" : ""}</>
+                      : <><Send className="w-4 h-4" /> {isMobile ? `Send ${bulkRows.length}` : `Send ${bulkRows.length} Invite${bulkRows.length > 1 ? "s" : ""}`}</>
                     }
                   </Button>
                 )}
@@ -1291,98 +1362,98 @@ export default function PrincipalManagement() {
 
       {/* ==================== PRINCIPAL DETAIL MODAL ==================== */}
       {selectedPrincipal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl animate-in zoom-in-95 duration-300 overflow-hidden max-h-[90vh] overflow-y-auto">
-            <div className="p-8 border-b border-slate-50 flex items-center justify-between">
-              <div className="flex items-center gap-5">
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-xl" style={{ backgroundColor: selectedPrincipal.branchColor }}>
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-2xl md:rounded-[2.5rem] w-full max-w-2xl shadow-2xl animate-in zoom-in-95 duration-300 overflow-hidden max-h-[92vh] overflow-y-auto">
+            <div className="p-5 md:p-8 border-b border-slate-50 flex items-center justify-between">
+              <div className="flex items-center gap-3 md:gap-5 min-w-0">
+                <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl flex items-center justify-center text-white font-bold text-sm md:text-lg shadow-xl shrink-0" style={{ backgroundColor: selectedPrincipal.branchColor }}>
                   {selectedPrincipal.avatar}
                 </div>
-                <div>
-                  <h3 className="text-2xl font-bold text-[#111827] tracking-tight">{selectedPrincipal.name}</h3>
-                  <p className="text-slate-400 text-sm font-medium mt-1">Principal  •  {selectedPrincipal.branch}</p>
+                <div className="min-w-0">
+                  <h3 className="text-lg md:text-2xl font-bold text-[#111827] tracking-tight truncate">{selectedPrincipal.name}</h3>
+                  <p className="text-slate-400 text-[11px] md:text-sm font-medium mt-1 truncate">Principal  •  {selectedPrincipal.branch}</p>
                 </div>
               </div>
-              <button onClick={() => setSelectedPrincipal(null)} className="p-2 rounded-xl hover:bg-slate-50 text-slate-400 transition-colors">
+              <button onClick={() => setSelectedPrincipal(null)} className="p-2 rounded-xl hover:bg-slate-50 text-slate-400 transition-colors shrink-0">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-8 space-y-8">
-              <div className="grid grid-cols-2 gap-5">
-                <div className="bg-[#f8fafc] border border-slate-100 p-5 rounded-2xl">
+            <div className="p-5 md:p-8 space-y-5 md:space-y-8">
+              <div className="grid grid-cols-2 gap-3 md:gap-5">
+                <div className="bg-[#f8fafc] border border-slate-100 p-3 md:p-5 rounded-xl md:rounded-2xl">
                   <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">Status</p>
                   {(() => {
                     const sc = getStatusConfig(selectedPrincipal.status);
                     return (
-                      <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest ${sc.bg} ${sc.text} ${sc.border} border`}>
+                      <span className={`inline-flex items-center gap-2 px-3 md:px-4 py-1.5 rounded-lg text-[10px] md:text-[11px] font-black uppercase tracking-widest ${sc.bg} ${sc.text} ${sc.border} border`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`}></span>
                         {selectedPrincipal.status}
                       </span>
                     );
                   })()}
                 </div>
-                <div className="bg-[#f8fafc] border border-slate-100 p-5 rounded-2xl">
+                <div className="bg-[#f8fafc] border border-slate-100 p-3 md:p-5 rounded-xl md:rounded-2xl">
                   <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">Last Active</p>
-                  <p className="text-sm font-bold text-[#111827]">{selectedPrincipal.lastActive}</p>
+                  <p className="text-[13px] md:text-sm font-bold text-[#111827] truncate">{selectedPrincipal.lastActive}</p>
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Contact Information</h4>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-4 p-4 rounded-2xl bg-[#f8fafc] border border-slate-100">
-                    <Mail className="w-5 h-5 text-slate-400" />
-                    <span className="text-sm font-bold text-[#111827]">{selectedPrincipal.email}</span>
+              <div className="space-y-3 md:space-y-4">
+                <h4 className="text-[11px] md:text-sm font-bold text-slate-400 uppercase tracking-widest">Contact Information</h4>
+                <div className="space-y-2 md:space-y-3">
+                  <div className="flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-xl md:rounded-2xl bg-[#f8fafc] border border-slate-100">
+                    <Mail className="w-4 h-4 md:w-5 md:h-5 text-slate-400 shrink-0" />
+                    <span className="text-[12px] md:text-sm font-bold text-[#111827] truncate">{selectedPrincipal.email}</span>
                   </div>
                   {selectedPrincipal.phone && (
-                    <div className="flex items-center gap-4 p-4 rounded-2xl bg-[#f8fafc] border border-slate-100">
-                      <Phone className="w-5 h-5 text-slate-400" />
-                      <span className="text-sm font-bold text-[#111827]">{selectedPrincipal.phone}</span>
+                    <div className="flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-xl md:rounded-2xl bg-[#f8fafc] border border-slate-100">
+                      <Phone className="w-4 h-4 md:w-5 md:h-5 text-slate-400 shrink-0" />
+                      <span className="text-[12px] md:text-sm font-bold text-[#111827] truncate">{selectedPrincipal.phone}</span>
                     </div>
                   )}
-                  <div className="flex items-center gap-4 p-4 rounded-2xl bg-[#f8fafc] border border-slate-100">
-                    <Calendar className="w-5 h-5 text-slate-400" />
-                    <span className="text-sm font-bold text-[#111827]">{selectedPrincipal.joinDate}</span>
+                  <div className="flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-xl md:rounded-2xl bg-[#f8fafc] border border-slate-100">
+                    <Calendar className="w-4 h-4 md:w-5 md:h-5 text-slate-400 shrink-0" />
+                    <span className="text-[12px] md:text-sm font-bold text-[#111827]">{selectedPrincipal.joinDate}</span>
                   </div>
                 </div>
               </div>
 
               {selectedPrincipal.status === 'Active' && (
-                <div className="space-y-4">
-                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Branch Overview</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-6 rounded-2xl border border-slate-100 bg-[#f0fdf4] text-center">
-                      <p className="text-3xl font-black text-[#111827] tracking-tighter">{selectedPrincipal.studentsManaged.toLocaleString()}</p>
-                      <p className="text-xs font-bold text-emerald-600 mt-2">Students Managed</p>
+                <div className="space-y-3 md:space-y-4">
+                  <h4 className="text-[11px] md:text-sm font-bold text-slate-400 uppercase tracking-widest">Branch Overview</h4>
+                  <div className="grid grid-cols-2 gap-3 md:gap-4">
+                    <div className="p-4 md:p-6 rounded-xl md:rounded-2xl border border-slate-100 bg-[#f0fdf4] text-center">
+                      <p className="text-2xl md:text-3xl font-black text-[#111827] tracking-tighter">{selectedPrincipal.studentsManaged.toLocaleString()}</p>
+                      <p className="text-[11px] md:text-xs font-bold text-emerald-600 mt-2">Students Managed</p>
                     </div>
-                    <div className="p-6 rounded-2xl border border-slate-100 bg-[#eff6ff] text-center">
-                      <p className="text-3xl font-black text-[#111827] tracking-tighter">{selectedPrincipal.teachersManaged}</p>
-                      <p className="text-xs font-bold text-blue-600 mt-2">Teachers Managed</p>
+                    <div className="p-4 md:p-6 rounded-xl md:rounded-2xl border border-slate-100 bg-[#eff6ff] text-center">
+                      <p className="text-2xl md:text-3xl font-black text-[#111827] tracking-tighter">{selectedPrincipal.teachersManaged}</p>
+                      <p className="text-[11px] md:text-xs font-bold text-blue-600 mt-2">Teachers Managed</p>
                     </div>
                   </div>
                 </div>
               )}
 
               <div className="space-y-3">
-                <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Quick Actions</h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <button className="flex items-center gap-3 p-4 rounded-2xl border border-slate-100 bg-[#f8fafc] hover:bg-white hover:shadow-lg transition-all text-sm font-bold text-slate-600">
-                    <Mail className="w-4 h-4 text-blue-500" /> Send Email
+                <h4 className="text-[11px] md:text-sm font-bold text-slate-400 uppercase tracking-widest">Quick Actions</h4>
+                <div className="grid grid-cols-2 gap-2 md:gap-3">
+                  <button className="flex items-center gap-2 md:gap-3 p-3 md:p-4 rounded-xl md:rounded-2xl border border-slate-100 bg-[#f8fafc] hover:bg-white hover:shadow-lg transition-all text-[12px] md:text-sm font-bold text-slate-600">
+                    <Mail className="w-4 h-4 text-blue-500 shrink-0" /> Send Email
                   </button>
-                  <button className="flex items-center gap-3 p-4 rounded-2xl border border-slate-100 bg-[#f8fafc] hover:bg-white hover:shadow-lg transition-all text-sm font-bold text-slate-600">
-                    <Building2 className="w-4 h-4 text-amber-500" /> Reassign Branch
+                  <button className="flex items-center gap-2 md:gap-3 p-3 md:p-4 rounded-xl md:rounded-2xl border border-slate-100 bg-[#f8fafc] hover:bg-white hover:shadow-lg transition-all text-[12px] md:text-sm font-bold text-slate-600">
+                    <Building2 className="w-4 h-4 text-amber-500 shrink-0" /> Reassign
                   </button>
-                  <button className="flex items-center gap-3 p-4 rounded-2xl border border-slate-100 bg-[#f8fafc] hover:bg-white hover:shadow-lg transition-all text-sm font-bold text-slate-600">
-                    <Shield className="w-4 h-4 text-emerald-500" /> Edit Permissions
+                  <button className="flex items-center gap-2 md:gap-3 p-3 md:p-4 rounded-xl md:rounded-2xl border border-slate-100 bg-[#f8fafc] hover:bg-white hover:shadow-lg transition-all text-[12px] md:text-sm font-bold text-slate-600">
+                    <Shield className="w-4 h-4 text-emerald-500 shrink-0" /> {isMobile ? "Permissions" : "Edit Permissions"}
                   </button>
-                  <button 
+                  <button
                     onClick={() => handleDeletePrincipal(selectedPrincipal.id)}
-                    className="flex items-center gap-3 p-4 rounded-2xl border border-rose-100 bg-rose-50/50 hover:bg-white hover:shadow-lg transition-all text-sm font-bold text-rose-600">
-                    <Trash2 className="w-4 h-4" /> Delete Account
+                    className="flex items-center gap-2 md:gap-3 p-3 md:p-4 rounded-xl md:rounded-2xl border border-rose-100 bg-rose-50/50 hover:bg-white hover:shadow-lg transition-all text-[12px] md:text-sm font-bold text-rose-600">
+                    <Trash2 className="w-4 h-4 shrink-0" /> Delete
                   </button>
-                  <button className="flex items-center gap-3 p-4 rounded-2xl border border-slate-100 bg-[#f8fafc] hover:bg-white hover:shadow-lg transition-all text-sm font-bold text-slate-400">
-                    <Ban className="w-4 h-4" /> {selectedPrincipal.status === 'Deactivated' ? 'Reactivate' : 'Deactivate'}
+                  <button className="col-span-2 flex items-center justify-center gap-2 md:gap-3 p-3 md:p-4 rounded-xl md:rounded-2xl border border-slate-100 bg-[#f8fafc] hover:bg-white hover:shadow-lg transition-all text-[12px] md:text-sm font-bold text-slate-400">
+                    <Ban className="w-4 h-4 shrink-0" /> {selectedPrincipal.status === 'Deactivated' ? 'Reactivate' : 'Deactivate'}
                   </button>
                 </div>
               </div>

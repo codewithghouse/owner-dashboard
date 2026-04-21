@@ -1,4 +1,5 @@
 import React from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 /* ─── Principal/Owner dashboard design tokens ─── */
 export const B1 = "#0055FF";
@@ -32,6 +33,18 @@ export const pageShellStyle: React.CSSProperties = {
   margin: "-16px -24px 0",
   padding: "24px 32px 40px",
 };
+
+/* Hook-based responsive version of pageShellStyle. Use instead of importing pageShellStyle directly. */
+export function usePageShellStyle(): React.CSSProperties {
+  const isMobile = useIsMobile();
+  return {
+    fontFamily: "'DM Sans', -apple-system, sans-serif",
+    background: "#EEF4FF",
+    minHeight: "100vh",
+    margin: isMobile ? "-12px -12px 0" : "-16px -24px 0",
+    padding: isMobile ? "16px 14px 28px" : "24px 32px 40px",
+  };
+}
 
 /* Shared hover / 3D CSS — inject once per page by rendering <DashGlobalStyles/> at the top of the return */
 export function DashGlobalStyles() {
@@ -89,19 +102,20 @@ export function PageHead({
   subtitle: string;
   right?: React.ReactNode;
 }) {
+  const isMobile = useIsMobile();
   return (
-    <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:20, marginBottom:22, flexWrap:"wrap" }}>
-      <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+    <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap: isMobile ? 12 : 20, marginBottom: isMobile ? 16 : 22, flexWrap:"wrap" }}>
+      <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 14, minWidth:0, flex: isMobile ? "1 1 auto" : undefined }}>
         <div style={{
-          width:48, height:48, borderRadius:14, background:GRAD_PRIMARY,
+          width: isMobile ? 40 : 48, height: isMobile ? 40 : 48, borderRadius: isMobile ? 12 : 14, background:GRAD_PRIMARY,
           display:"flex", alignItems:"center", justifyContent:"center",
-          boxShadow:"0 8px 22px rgba(0,85,255,.35)",
+          boxShadow:"0 8px 22px rgba(0,85,255,.35)", flexShrink:0,
         }}>
-          <Icon size={24} color="#fff" strokeWidth={2.2}/>
+          <Icon size={isMobile ? 20 : 24} color="#fff" strokeWidth={2.2}/>
         </div>
-        <div>
-          <h1 style={{ fontSize:32, fontWeight:700, color:T1, letterSpacing:"-0.8px", margin:0, lineHeight:1.1 }}>{title}</h1>
-          <p style={{ fontSize:12, color:T3, fontWeight:500, margin:"5px 0 0 0", letterSpacing:"0.10em", textTransform:"uppercase" }}>
+        <div style={{ minWidth:0 }}>
+          <h1 style={{ fontSize: isMobile ? 20 : 32, fontWeight:700, color:T1, letterSpacing: isMobile ? "-0.4px" : "-0.8px", margin:0, lineHeight:1.1 }}>{title}</h1>
+          <p style={{ fontSize: isMobile ? 10 : 12, color:T3, fontWeight:500, margin:"5px 0 0 0", letterSpacing:"0.10em", textTransform:"uppercase" }}>
             {subtitle}
           </p>
         </div>
@@ -129,6 +143,7 @@ export function StatTile({
   onClick?: () => void;
   delta?: "up" | "down" | null;
 }) {
+  const isMobile = useIsMobile();
   return (
     <div
       onClick={onClick}
@@ -136,15 +151,15 @@ export function StatTile({
       tabIndex={onClick ? 0 : undefined}
       className="dash-tile"
       style={{
-        background:grad, borderRadius:22, padding:"20px 22px", color:"#fff",
+        background:grad, borderRadius: isMobile ? 16 : 22, padding: isMobile ? "14px 14px" : "20px 22px", color:"#fff",
         position:"relative", overflow:"hidden",
         boxShadow:"0 0 0 .5px rgba(255,255,255,.15), 0 14px 38px rgba(0,85,255,.26), 0 4px 12px rgba(0,85,255,.18)",
       }}
     >
       <div style={{ position:"absolute", top:-30, right:-20, width:110, height:110, background:"radial-gradient(circle, rgba(255,255,255,.22) 0%, transparent 70%)", borderRadius:"50%", pointerEvents:"none" }}/>
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14, position:"relative", zIndex:1 }}>
-        <div style={{ width:38, height:38, borderRadius:12, background:"rgba(255,255,255,.22)", border:"0.5px solid rgba(255,255,255,.28)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-          <Icon size={19} color="#fff" strokeWidth={2.3}/>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: isMobile ? 10 : 14, position:"relative", zIndex:1 }}>
+        <div style={{ width: isMobile ? 32 : 38, height: isMobile ? 32 : 38, borderRadius: isMobile ? 10 : 12, background:"rgba(255,255,255,.22)", border:"0.5px solid rgba(255,255,255,.28)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <Icon size={isMobile ? 16 : 19} color="#fff" strokeWidth={2.3}/>
         </div>
         {delta && (
           <div style={{ display:"inline-flex", alignItems:"center", gap:3, padding:"4px 8px", borderRadius:8, background:"rgba(255,255,255,.22)", fontSize:10, fontWeight:800, color:"#fff" }}>
@@ -152,10 +167,10 @@ export function StatTile({
           </div>
         )}
       </div>
-      <p style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,.75)", letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 4px 0", position:"relative", zIndex:1 }}>{label}</p>
-      <p style={{ fontSize:30, fontWeight:800, color:"#fff", letterSpacing:"-0.6px", margin:0, lineHeight:1.1, position:"relative", zIndex:1 }}>{value}</p>
+      <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:700, color:"rgba(255,255,255,.75)", letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 4px 0", position:"relative", zIndex:1 }}>{label}</p>
+      <p style={{ fontSize: isMobile ? 22 : 30, fontWeight:800, color:"#fff", letterSpacing:"-0.6px", margin:0, lineHeight:1.1, position:"relative", zIndex:1 }}>{value}</p>
       {sub && (
-        <p style={{ fontSize:11, fontWeight:600, color:"rgba(255,255,255,.78)", margin:"6px 0 0 0", position:"relative", zIndex:1 }}>{sub}</p>
+        <p style={{ fontSize: isMobile ? 10 : 11, fontWeight:600, color:"rgba(255,255,255,.78)", margin:"6px 0 0 0", position:"relative", zIndex:1 }}>{sub}</p>
       )}
     </div>
   );
@@ -175,42 +190,43 @@ export function DarkHero({
   subtitle?: string;
   stats?: { label: string; value: React.ReactNode }[];
 }) {
+  const isMobile = useIsMobile();
   return (
     <div
       style={{
-        background:GRAD_HERO, borderRadius:24, padding:"24px 28px", color:"#fff",
-        marginBottom:24, position:"relative", overflow:"hidden",
+        background:GRAD_HERO, borderRadius: isMobile ? 18 : 24, padding: isMobile ? "18px 18px" : "24px 28px", color:"#fff",
+        marginBottom: isMobile ? 16 : 24, position:"relative", overflow:"hidden",
         boxShadow:"0 14px 40px rgba(0,8,60,.32), 0 0 0 .5px rgba(255,255,255,.12)",
       }}
     >
       <div style={{ position:"absolute", top:-60, right:-40, width:280, height:280, background:"radial-gradient(circle, rgba(255,255,255,.12) 0%, transparent 65%)", borderRadius:"50%", pointerEvents:"none" }}/>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:24, flexWrap:"wrap", position:"relative", zIndex:1 }}>
-        <div style={{ display:"flex", alignItems:"flex-start", gap:16, flex:1, minWidth:300 }}>
-          <div style={{ width:52, height:52, borderRadius:15, background:"rgba(255,255,255,.16)", border:"0.5px solid rgba(255,255,255,.26)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-            <Icon size={26} color="#fff" strokeWidth={2.2}/>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap: isMobile ? 14 : 24, flexWrap:"wrap", position:"relative", zIndex:1 }}>
+        <div style={{ display:"flex", alignItems:"flex-start", gap: isMobile ? 12 : 16, flex:1, minWidth: isMobile ? 0 : 300 }}>
+          <div style={{ width: isMobile ? 42 : 52, height: isMobile ? 42 : 52, borderRadius: isMobile ? 12 : 15, background:"rgba(255,255,255,.16)", border:"0.5px solid rgba(255,255,255,.26)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+            <Icon size={isMobile ? 20 : 26} color="#fff" strokeWidth={2.2}/>
           </div>
-          <div>
+          <div style={{ minWidth:0 }}>
             {eyebrow && (
-              <div style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"4px 10px", borderRadius:999, background:"rgba(255,255,255,.14)", border:"0.5px solid rgba(255,255,255,.22)", fontSize:10, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:10 }}>
+              <div style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"4px 10px", borderRadius:999, background:"rgba(255,255,255,.14)", border:"0.5px solid rgba(255,255,255,.22)", fontSize: isMobile ? 9 : 10, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:10 }}>
                 {eyebrow}
               </div>
             )}
-            <h2 style={{ fontSize:38, fontWeight:800, letterSpacing:"-1px", margin:0, color:"#fff", lineHeight:1 }}>
+            <h2 style={{ fontSize: isMobile ? 28 : 38, fontWeight:800, letterSpacing: isMobile ? "-0.6px" : "-1px", margin:0, color:"#fff", lineHeight:1 }}>
               {title}
             </h2>
             {subtitle && (
-              <p style={{ fontSize:13, color:"rgba(255,255,255,.72)", fontWeight:500, margin:"8px 0 0 0" }}>
+              <p style={{ fontSize: isMobile ? 11 : 13, color:"rgba(255,255,255,.72)", fontWeight:500, margin:"8px 0 0 0" }}>
                 {subtitle}
               </p>
             )}
           </div>
         </div>
         {stats && stats.length > 0 && (
-          <div style={{ display:"grid", gridTemplateColumns:`repeat(${stats.length}, minmax(120px,1fr))`, gap:10 }}>
+          <div style={{ display:"grid", gridTemplateColumns: isMobile ? `repeat(${stats.length}, 1fr)` : `repeat(${stats.length}, minmax(120px,1fr))`, gap: isMobile ? 8 : 10, width: isMobile ? "100%" : "auto" }}>
             {stats.map(s=>(
-              <div key={s.label} style={{ background:"rgba(255,255,255,.10)", borderRadius:14, padding:"12px 14px", border:"0.5px solid rgba(255,255,255,.14)" }}>
-                <p style={{ fontSize:9, fontWeight:700, color:"rgba(255,255,255,.65)", letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 6px 0" }}>{s.label}</p>
-                <p style={{ fontSize:20, fontWeight:800, color:"#fff", margin:0, letterSpacing:"-0.4px" }}>{s.value}</p>
+              <div key={s.label} style={{ background:"rgba(255,255,255,.10)", borderRadius: isMobile ? 12 : 14, padding: isMobile ? "10px 10px" : "12px 14px", border:"0.5px solid rgba(255,255,255,.14)" }}>
+                <p style={{ fontSize: isMobile ? 8 : 9, fontWeight:700, color:"rgba(255,255,255,.65)", letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 6px 0" }}>{s.label}</p>
+                <p style={{ fontSize: isMobile ? 16 : 20, fontWeight:800, color:"#fff", margin:0, letterSpacing:"-0.4px" }}>{s.value}</p>
               </div>
             ))}
           </div>
@@ -256,33 +272,34 @@ export function AIInsightCard({
   title: string;
   items: { label: string; value: string; sub?: string }[];
 }) {
+  const isMobile = useIsMobile();
   return (
     <div
       style={{
-        background:GRAD_HERO, borderRadius:22, padding:"24px 26px", color:"#fff",
+        background:GRAD_HERO, borderRadius: isMobile ? 16 : 22, padding: isMobile ? "18px 16px" : "24px 26px", color:"#fff",
         position:"relative", overflow:"hidden",
         boxShadow:"0 14px 40px rgba(0,8,60,.32), 0 0 0 .5px rgba(255,255,255,.12)",
       }}
     >
       <div style={{ position:"absolute", bottom:-50, left:-40, width:240, height:240, background:"radial-gradient(circle, rgba(123,63,244,.28) 0%, transparent 65%)", borderRadius:"50%", pointerEvents:"none" }}/>
-      <div style={{ display:"flex", alignItems:"flex-start", gap:14, position:"relative", zIndex:1, marginBottom:16 }}>
-        <div style={{ width:44, height:44, borderRadius:13, background:"rgba(255,255,255,.16)", border:"0.5px solid rgba(255,255,255,.26)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:22 }}>
+      <div style={{ display:"flex", alignItems:"flex-start", gap: isMobile ? 12 : 14, position:"relative", zIndex:1, marginBottom: isMobile ? 14 : 16 }}>
+        <div style={{ width: isMobile ? 38 : 44, height: isMobile ? 38 : 44, borderRadius: isMobile ? 11 : 13, background:"rgba(255,255,255,.16)", border:"0.5px solid rgba(255,255,255,.26)", display:"flex", alignItems:"center", justifyContent:"center", fontSize: isMobile ? 18 : 22, flexShrink:0 }}>
           ✨
         </div>
-        <div>
+        <div style={{ minWidth:0 }}>
           <div style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:999, background:"rgba(255,255,255,.14)", border:"0.5px solid rgba(255,255,255,.22)", fontSize:9, fontWeight:800, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:8 }}>
             AI Insights
           </div>
-          <h3 style={{ fontSize:18, fontWeight:700, color:"#fff", margin:0, letterSpacing:"-0.4px" }}>{title}</h3>
+          <h3 style={{ fontSize: isMobile ? 15 : 18, fontWeight:700, color:"#fff", margin:0, letterSpacing:"-0.4px" }}>{title}</h3>
         </div>
       </div>
-      <div style={{ display:"grid", gridTemplateColumns:`repeat(${items.length}, 1fr)`, gap:12, position:"relative", zIndex:1 }}>
+      <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : `repeat(${items.length}, 1fr)`, gap: isMobile ? 10 : 12, position:"relative", zIndex:1 }}>
         {items.map(c=>(
-          <div key={c.label} style={{ background:"rgba(255,255,255,.10)", borderRadius:14, padding:"14px 16px", border:"0.5px solid rgba(255,255,255,.14)" }}>
+          <div key={c.label} style={{ background:"rgba(255,255,255,.10)", borderRadius: isMobile ? 12 : 14, padding: isMobile ? "12px 14px" : "14px 16px", border:"0.5px solid rgba(255,255,255,.14)" }}>
             <p style={{ fontSize:9, fontWeight:800, color:"rgba(255,255,255,.65)", letterSpacing:"0.14em", textTransform:"uppercase", margin:"0 0 8px 0" }}>{c.label}</p>
-            <p style={{ fontSize:15, fontWeight:700, color:"#fff", margin:0, letterSpacing:"-0.3px" }}>{c.value}</p>
+            <p style={{ fontSize: isMobile ? 14 : 15, fontWeight:700, color:"#fff", margin:0, letterSpacing:"-0.3px" }}>{c.value}</p>
             {c.sub && (
-              <p style={{ fontSize:11, fontWeight:600, color:"rgba(255,255,255,.72)", margin:"6px 0 0 0" }}>{c.sub}</p>
+              <p style={{ fontSize: isMobile ? 10 : 11, fontWeight:600, color:"rgba(255,255,255,.72)", margin:"6px 0 0 0" }}>{c.sub}</p>
             )}
           </div>
         ))}
