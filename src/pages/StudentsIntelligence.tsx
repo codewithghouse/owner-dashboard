@@ -461,11 +461,11 @@ export default function StudentsIntelligence() {
   const GREEN = "#00C853", RED = "#FF3355", GOLD = "#FFAA00", VIOLET = "#7B3FF4";
   const GRAD_PRIMARY = `linear-gradient(135deg, ${B1}, ${B2})`;
   const GRAD_HERO = "linear-gradient(135deg,#001040 0%,#001888 35%,#0033CC 70%,#0055FF 100%)";
-  const GRAD_BLUE = "linear-gradient(135deg,#0055FF 0%,#2277FF 100%)";
-  const GRAD_GREEN = "linear-gradient(135deg,#00C853 0%,#33DD77 100%)";
-  const GRAD_VIOLET = "linear-gradient(135deg,#7B3FF4 0%,#A060FF 100%)";
-  const GRAD_GOLD = "linear-gradient(135deg,#FFAA00 0%,#FFCC33 100%)";
-  const GRAD_RED = "linear-gradient(135deg,#FF3355 0%,#FF6677 100%)";
+  const GRAD_BLUE = "linear-gradient(140deg,#F0F5FF 0%,#DCE7FF 55%,#C8D8FF 100%)";
+  const GRAD_GREEN = "linear-gradient(140deg,#EAFBF1 0%,#CFEEDA 55%,#B4E2C2 100%)";
+  const GRAD_VIOLET = "linear-gradient(140deg,#F6EEFF 0%,#E7D6FF 55%,#D6BEFF 100%)";
+  const GRAD_GOLD = "linear-gradient(140deg,#FFFAE0 0%,#FFEEB0 55%,#FFE082 100%)";
+  const GRAD_RED = "linear-gradient(140deg,#FFECEE 0%,#FFCAD2 55%,#FFA8B4 100%)";
   const SHADOW_SM = "0 0 0 .5px rgba(0,85,255,.08), 0 2px 8px rgba(0,85,255,.08), 0 10px 26px rgba(0,85,255,.10)";
   const SHADOW_LG = "0 0 0 .5px rgba(0,85,255,.10), 0 4px 16px rgba(0,85,255,.11), 0 18px 44px rgba(0,85,255,.13)";
   const SHADOW_BTN = "0 6px 22px rgba(0,85,255,.40), 0 2px 5px rgba(0,85,255,.20)";
@@ -593,26 +593,25 @@ export default function StudentsIntelligence() {
                   tabIndex={0}
                   {...tilt3D}
                   style={{
-                    background:s.grad, borderRadius: isMobile ? 16 : 22, padding: isMobile ? "14px 14px" : "20px 22px", color:"#fff",
+                    background:s.grad, borderRadius: isMobile ? 16 : 22, padding: isMobile ? "14px 14px" : "20px 22px", color:T1,
                     cursor:"pointer", position:"relative", overflow:"hidden",
-                    boxShadow:"0 0 0 .5px rgba(255,255,255,.15), 0 14px 38px rgba(0,85,255,.26), 0 4px 12px rgba(0,85,255,.18)",
+                    boxShadow:"0 0 0 .5px rgba(0,16,64,.06), 0 10px 28px rgba(0,85,255,.12), 0 4px 12px rgba(0,85,255,.08)",
                     ...tilt3DStyle,
                   }}
                 >
-                  <div style={{ position:"absolute", top:-30, right:-20, width:110, height:110, background:"radial-gradient(circle, rgba(255,255,255,.22) 0%, transparent 70%)", borderRadius:"50%", pointerEvents:"none" }}/>
                   <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: isMobile ? 10 : 14, position:"relative", zIndex:1 }}>
-                    <div style={{ width: isMobile ? 32 : 38, height: isMobile ? 32 : 38, borderRadius: isMobile ? 10 : 12, background:"rgba(255,255,255,.22)", border:"0.5px solid rgba(255,255,255,.28)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                      <Icon size={isMobile ? 16 : 19} color="#fff" strokeWidth={2.3}/>
+                    <div style={{ width: isMobile ? 32 : 38, height: isMobile ? 32 : 38, borderRadius: isMobile ? 10 : 12, background:"rgba(255,255,255,.65)", border:"0.5px solid rgba(0,16,64,.08)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                      <Icon size={isMobile ? 16 : 19} color={T1} strokeWidth={2.4}/>
                     </div>
                     {s.delta && (
-                      <div style={{ display:"inline-flex", alignItems:"center", gap:3, padding:"4px 8px", borderRadius:8, background:"rgba(255,255,255,.22)", fontSize:10, fontWeight:800, color:"#fff" }}>
+                      <div style={{ display:"inline-flex", alignItems:"center", gap:3, padding:"4px 8px", borderRadius:8, background:"rgba(255,255,255,.55)", fontSize:10, fontWeight:800, color:T1 }}>
                         {s.delta === "up" ? <ArrowUpRight size={11}/> : <ArrowDownRight size={11}/>}
                       </div>
                     )}
                   </div>
-                  <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:700, color:"rgba(255,255,255,.75)", letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 4px 0", position:"relative", zIndex:1 }}>{s.label}</p>
-                  <p style={{ fontSize: isMobile ? 22 : 30, fontWeight:800, color:"#fff", letterSpacing:"-0.6px", margin:0, lineHeight:1.1, position:"relative", zIndex:1 }}>{s.value}</p>
-                  <p style={{ fontSize: isMobile ? 10 : 11, fontWeight:600, color:"rgba(255,255,255,.78)", margin:"6px 0 0 0", position:"relative", zIndex:1 }}>{s.sub}</p>
+                  <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:800, color:T3, letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 4px 0", position:"relative", zIndex:1 }}>{s.label}</p>
+                  <p style={{ fontSize: isMobile ? 22 : 30, fontWeight:800, color:T1, letterSpacing:"-0.6px", margin:0, lineHeight:1.1, position:"relative", zIndex:1 }}>{s.value}</p>
+                  <p style={{ fontSize: isMobile ? 10 : 11, fontWeight:600, color:T3, margin:"6px 0 0 0", position:"relative", zIndex:1 }}>{s.sub}</p>
                 </div>
               );
             })}

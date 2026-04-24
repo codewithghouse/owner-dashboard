@@ -777,8 +777,8 @@ export default function Dashboard() {
             value: loading ? "—" : ahi.toString(),
             sub: ahiDelta != null ? `${ahiDelta >= 0 ? "+" : ""}${ahiDelta} vs last month` : "No prior data",
             up: ahiDelta == null ? true : ahiDelta >= 0,
-            bg: "linear-gradient(140deg,#DDEAFF 0%,#A8C5FF 55%,#7AA5FF 100%)",
-            border: "0.5px solid rgba(0,85,255,.4)",
+            bg: "linear-gradient(140deg,#F0F5FF 0%,#DCE7FF 55%,#C8D8FF 100%)",
+            border: "0.5px solid rgba(0,85,255,.22)",
             lblColor: "#002080",
             valColor: "#001055",
             subColor: "#002080",
@@ -790,8 +790,8 @@ export default function Dashboard() {
             value: loading ? "—" : totalStudents.toLocaleString(),
             sub: branches.length > 0 ? `Across ${branches.length} branch${branches.length !== 1 ? "es" : ""}` : "No branches yet",
             up: true,
-            bg: "linear-gradient(140deg,#EEE0FF 0%,#C9A8FF 55%,#A880FF 100%)",
-            border: "0.5px solid rgba(123,63,244,.4)",
+            bg: "linear-gradient(140deg,#F6EEFF 0%,#E7D6FF 55%,#D6BEFF 100%)",
+            border: "0.5px solid rgba(123,63,244,.22)",
             lblColor: "#3A1580",
             valColor: "#280C5C",
             subColor: "#3A1580",
@@ -803,8 +803,8 @@ export default function Dashboard() {
             value: loading ? "—" : `${feeRate}%`,
             sub: feeDelta != null ? `${feeDelta >= 0 ? "+" : ""}${feeDelta}% vs last month` : "No prior data",
             up: feeDelta == null ? true : feeDelta >= 0,
-            bg: "linear-gradient(140deg,#DEFCE8 0%,#8CF0B0 55%,#50E088 100%)",
-            border: "0.5px solid rgba(0,200,83,.4)",
+            bg: "linear-gradient(140deg,#EAFBF1 0%,#CFEEDA 55%,#B4E2C2 100%)",
+            border: "0.5px solid rgba(0,200,83,.22)",
             lblColor: "#005A20",
             valColor: "#004018",
             subColor: "#005A20",
@@ -816,8 +816,8 @@ export default function Dashboard() {
             value: loading ? "—" : displayAlertsCount.toString(),
             sub: criticalAlerts > 0 ? `${criticalAlerts} critical` : "No critical issues",
             up: criticalAlerts === 0,
-            bg: criticalAlerts > 0 ? "linear-gradient(140deg,#FFE3E8 0%,#FFA8B8 55%,#FF7085 100%)" : "linear-gradient(140deg,#FFF6D1 0%,#FFE488 55%,#FFCC33 100%)",
-            border: criticalAlerts > 0 ? "0.5px solid rgba(255,51,85,.4)" : "0.5px solid rgba(255,170,0,.4)",
+            bg: criticalAlerts > 0 ? "linear-gradient(140deg,#FFECEE 0%,#FFCAD2 55%,#FFA8B4 100%)" : "linear-gradient(140deg,#FFFAE0 0%,#FFEEB0 55%,#FFE082 100%)",
+            border: criticalAlerts > 0 ? "0.5px solid rgba(255,51,85,.22)" : "0.5px solid rgba(255,170,0,.22)",
             lblColor: criticalAlerts > 0 ? "#8A0A22" : "#664400",
             valColor: criticalAlerts > 0 ? "#60081A" : "#472A00",
             subColor: criticalAlerts > 0 ? "#8A0A22" : "#664400",
@@ -843,7 +843,6 @@ export default function Dashboard() {
               ...tilt3DStyle,
             }}
           >
-            <div style={{ position: "absolute", top: -24, right: -20, width: 110, height: 110, borderRadius: "50%", background: "radial-gradient(circle, rgba(255,255,255,.65) 0%, transparent 70%)", pointerEvents: "none" }} />
             <div style={{ position: "absolute", top: isMobile ? 12 : 16, right: isMobile ? 12 : 16, width: isMobile ? 32 : 38, height: isMobile ? 32 : 38, borderRadius: isMobile ? 10 : 12, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,.75)", border: "0.5px solid rgba(255,255,255,.95)", boxShadow: "0 2px 6px rgba(0,0,0,.05)" }}>
               {s.icon}
             </div>
