@@ -4,6 +4,7 @@
  * Fetches once on mount, shows percentile rank + comparison bars.
  */
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { fetchBenchmarkData, BenchmarkData } from "@/lib/benchmarkService";
 import { Trophy, TrendingUp, Users, Loader2, BarChart3 } from "lucide-react";
 
@@ -45,6 +46,7 @@ function CompareBar({ label, myVal, avgVal, topVal }: { label: string; myVal: nu
 }
 
 export default function BenchmarkCard() {
+  const navigate = useNavigate();
   const [data,    setData]    = useState<BenchmarkData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -74,7 +76,12 @@ export default function BenchmarkCard() {
   const tierCfg = TIER_CONFIG[data.tier];
 
   return (
-    <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-6 space-y-5">
+    <div
+      onClick={() => navigate("/reports")}
+      role="button"
+      tabIndex={0}
+      className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-6 space-y-5 cursor-pointer hover:shadow-md transition-shadow"
+    >
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

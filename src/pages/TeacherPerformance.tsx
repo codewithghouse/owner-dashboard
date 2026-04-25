@@ -482,10 +482,13 @@ export default function TeacherPerformance() {
           {/* ── Hero Detail Card ──────────────────────── */}
           <div
             {...tilt3D}
+            onClick={()=>navigate(`/teachers/profile/${id}`)}
+            role="button" tabIndex={0}
             style={{
               background:GRAD_HERO, borderRadius: isMobile ? 18 : 24, padding: isMobile ? "18px 16px" : "24px 28px", color:"#fff",
               marginBottom: isMobile ? 16 : 24, position:"relative", overflow:"hidden",
               boxShadow:"0 14px 40px rgba(0,8,60,.32), 0 0 0 .5px rgba(255,255,255,.12)",
+              cursor:"pointer",
               ...tilt3DStyle,
             }}
           >
@@ -531,7 +534,7 @@ export default function TeacherPerformance() {
                   {selectedTeacher.status || "—"}
                 </span>
                 <button
-                  onClick={()=>navigate(`/teachers/profile/${id}`)}
+                  onClick={(e)=>{e.stopPropagation();navigate(`/teachers/profile/${id}`);}}
                   className="tp-btn"
                   style={{
                     padding: isMobile ? "9px 14px" : "10px 18px", borderRadius:12,
@@ -628,9 +631,12 @@ export default function TeacherPerformance() {
                 {/* Performance Timeline */}
                 <div
                   {...tilt3D}
+                  onClick={()=>navigate(`/teachers/profile/${id}`)}
+                  role="button" tabIndex={0}
                   style={{
                     background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px" : "22px 24px",
                     boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
+                    cursor:"pointer",
                     ...tilt3DStyle,
                   }}
                 >
@@ -670,9 +676,12 @@ export default function TeacherPerformance() {
                 {/* vs Branch Average */}
                 <div
                   {...tilt3D}
+                  onClick={()=>navigate(selectedTeacher?.branchId ? `/branches/${selectedTeacher.branchId}` : "/branches")}
+                  role="button" tabIndex={0}
                   style={{
                     background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px" : "22px 24px",
                     boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
+                    cursor:"pointer",
                     ...tilt3DStyle,
                   }}
                 >
@@ -708,10 +717,13 @@ export default function TeacherPerformance() {
               {/* ── Current Classes ──────────────────── */}
               <div
                 {...tilt3D}
+                onClick={()=>navigate(`/teachers/profile/${id}`)}
+                role="button" tabIndex={0}
                 style={{
                   background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px" : "22px 24px",
                   boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
                   marginBottom: isMobile ? 16 : 24, perspective:"1200px",
+                  cursor:"pointer",
                   ...tilt3DStyle,
                 }}
               >
@@ -733,6 +745,8 @@ export default function TeacherPerformance() {
                     {detailClasses.map(cls => (
                       <div key={cls.id}
                         {...tilt3D}
+                        onClick={(e)=>{e.stopPropagation();navigate(`/teachers/profile/${id}`);}}
+                        role="button" tabIndex={0}
                         style={{
                           background:"#F5F9FF", borderRadius: isMobile ? 14 : 16, padding: isMobile ? "13px 14px" : "16px 18px",
                           border:"0.5px solid rgba(0,85,255,.1)", cursor:"pointer",
@@ -813,10 +827,13 @@ export default function TeacherPerformance() {
         {/* ── Dark Hero Banner ───────────────────────── */}
         <div
           {...tilt3D}
+          onClick={()=>navigate("/teachers")}
+          role="button" tabIndex={0}
           style={{
             background:GRAD_HERO, borderRadius: isMobile ? 18 : 24, padding: isMobile ? "18px 18px" : "24px 28px", color:"#fff",
             marginBottom: isMobile ? 16 : 24, position:"relative", overflow:"hidden",
             boxShadow:"0 14px 40px rgba(0,8,60,.32), 0 0 0 .5px rgba(255,255,255,.12)",
+            cursor:"pointer",
             ...tilt3DStyle,
           }}
         >
@@ -840,11 +857,16 @@ export default function TeacherPerformance() {
             </div>
             <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : "repeat(3, minmax(120px,1fr))", gap: isMobile ? 8 : 10, width: isMobile ? "100%" : "auto" }}>
               {[
-                { label:"Total Teachers",     value:totalTeachers.toString() },
-                { label:"Top Performers",     value:topPerformers.toString() },
-                { label:"Needs Improvement",  value:needsImprovement.toString() },
+                { label:"Total Teachers",     value:totalTeachers.toString(), route:"/teachers-directory" },
+                { label:"Top Performers",     value:topPerformers.toString(), route:"/teacher-leaderboard" },
+                { label:"Needs Improvement",  value:needsImprovement.toString(), route:"/teachers-directory" },
               ].map(s=>(
-                <div key={s.label} style={{ background:"rgba(255,255,255,.10)", borderRadius: isMobile ? 12 : 14, padding: isMobile ? "10px 10px" : "12px 14px", border:"0.5px solid rgba(255,255,255,.14)" }}>
+                <div
+                  key={s.label}
+                  onClick={(e)=>{ e.stopPropagation(); navigate(s.route); }}
+                  role="button" tabIndex={0}
+                  style={{ background:"rgba(255,255,255,.10)", borderRadius: isMobile ? 12 : 14, padding: isMobile ? "10px 10px" : "12px 14px", border:"0.5px solid rgba(255,255,255,.14)", cursor:"pointer" }}
+                >
                   <p style={{ fontSize: isMobile ? 8 : 9, fontWeight:700, color:"rgba(255,255,255,.65)", letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 6px 0" }}>{s.label}</p>
                   <p style={{ fontSize: isMobile ? 16 : 20, fontWeight:800, color:"#fff", margin:0, letterSpacing:"-0.4px" }}>{s.value}</p>
                 </div>
@@ -894,9 +916,12 @@ export default function TeacherPerformance() {
           {/* Performance Distribution */}
           <div
             {...tilt3D}
+            onClick={()=>navigate("/teachers-directory")}
+            role="button" tabIndex={0}
             style={{
               background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px" : "22px 24px",
               boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
+              cursor:"pointer",
               ...tilt3DStyle,
             }}
           >
@@ -940,9 +965,12 @@ export default function TeacherPerformance() {
           {/* Subject Ratings */}
           <div
             {...tilt3D}
+            onClick={()=>navigate("/academics")}
+            role="button" tabIndex={0}
             style={{
               background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px" : "22px 24px",
               boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
+              cursor:"pointer",
               ...tilt3DStyle,
             }}
           >
@@ -980,10 +1008,13 @@ export default function TeacherPerformance() {
           {/* Top Performers */}
           <div
             {...tilt3D}
+            onClick={()=>navigate("/teacher-leaderboard")}
+            role="button" tabIndex={0}
             style={{
               background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px" : "22px 24px",
               boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
               maxHeight: isMobile ? 380 : 320, overflowY:"auto",
+              cursor:"pointer",
               ...tilt3DStyle,
             }}
           >
@@ -1010,7 +1041,7 @@ export default function TeacherPerformance() {
                         display:"flex", alignItems:"center", gap:10,
                         padding:"10px 12px", borderRadius:12, cursor:"pointer",
                       }}
-                      onClick={()=>navigate(`/teachers/${t.id}`)}
+                      onClick={(e)=>{e.stopPropagation();navigate(`/teachers/${t.id}`);}}
                     >
                       <span style={{ fontSize:14, fontWeight:800, color: i===0 ? GOLD : i===1 ? T3 : i===2 ? "#CD7F32" : T4, width:20, flexShrink:0 }}>{i + 1}</span>
                       <div style={{
@@ -1038,10 +1069,13 @@ export default function TeacherPerformance() {
         {/* ── Performance vs Attendance Trend ────────── */}
         <div
           {...tilt3D}
+          onClick={()=>navigate("/teachers")}
+          role="button" tabIndex={0}
           style={{
             background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px" : "22px 24px",
             boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
             marginBottom: isMobile ? 16 : 24, perspective:"1200px",
+            cursor:"pointer",
             ...tilt3DStyle,
           }}
         >
@@ -1076,10 +1110,13 @@ export default function TeacherPerformance() {
         {/* ── Teacher Cards Grid ────────────────────── */}
         <div
           {...tilt3D}
+          onClick={()=>navigate("/teachers-directory")}
+          role="button" tabIndex={0}
           style={{
             background:"#fff", borderRadius: isMobile ? 16 : 22,
             boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
             overflow:"hidden", marginBottom: isMobile ? 16 : 24, perspective:"1200px",
+            cursor:"pointer",
             ...tilt3DStyle,
           }}
         >
@@ -1089,6 +1126,7 @@ export default function TeacherPerformance() {
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
+                onClick={e => e.stopPropagation()}
                 placeholder="Search teachers by name..."
                 style={{
                   width:"100%", padding: isMobile ? "9px 10px 9px 34px" : "10px 12px 10px 36px", borderRadius:12,
@@ -1115,7 +1153,7 @@ export default function TeacherPerformance() {
                     position:"relative", overflow:"hidden",
                     ...tilt3DStyle,
                   }}
-                  onClick={()=>navigate(`/teachers/${t.id}`)}
+                  onClick={(e)=>{e.stopPropagation();navigate(`/teachers/${t.id}`);}}
                 >
                   <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 12, marginBottom: isMobile ? 12 : 14 }}>
                     <div style={{
@@ -1191,10 +1229,13 @@ export default function TeacherPerformance() {
         {/* ── AI Intelligence Card ──────────────────── */}
         <div
           {...tilt3D}
+          onClick={()=>navigate("/ai-predictor")}
+          role="button" tabIndex={0}
           style={{
             background:GRAD_HERO, borderRadius: isMobile ? 16 : 22, padding: isMobile ? "18px 16px" : "24px 26px", color:"#fff",
             position:"relative", overflow:"hidden",
             boxShadow:"0 14px 40px rgba(0,8,60,.32), 0 0 0 .5px rgba(255,255,255,.12)",
+            cursor:"pointer",
             ...tilt3DStyle,
           }}
         >

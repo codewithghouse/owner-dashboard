@@ -612,13 +612,16 @@ export default function Dashboard() {
             }}
           >
             {[
-              { step: "1", label: "Add Branches" },
-              { step: "2", label: "Invite Principals" },
-              { step: "3", label: "Enroll Students" },
-              { step: "4", label: "Start Analytics" },
+              { step: "1", label: "Add Branches",      href: "/branches" },
+              { step: "2", label: "Invite Principals", href: "/principals" },
+              { step: "3", label: "Enroll Students",   href: "/students" },
+              { step: "4", label: "Start Analytics",   href: "/" },
             ].map((s) => (
               <div
                 key={s.step}
+                onClick={() => navigate(s.href)}
+                role="button"
+                tabIndex={0}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -627,6 +630,7 @@ export default function Dashboard() {
                   borderRadius: 14,
                   padding: "12px 16px",
                   border: "0.5px solid rgba(255,255,255,.14)",
+                  cursor: "pointer",
                 }}
               >
                 <div
@@ -659,6 +663,9 @@ export default function Dashboard() {
       {!isFreshSchool && (
         <div
           {...tilt3D}
+          onClick={() => navigate("/academics")}
+          role="button"
+          tabIndex={0}
           style={{
             background: GRAD_HERO,
             borderRadius: isMobile ? 20 : 24,
@@ -667,6 +674,7 @@ export default function Dashboard() {
             overflow: "hidden",
             boxShadow: "0 12px 36px rgba(0,8,60,.28), 0 0 0 .5px rgba(255,255,255,.12)",
             marginBottom: isMobile ? 14 : 18,
+            cursor: "pointer",
             ...tilt3DStyle,
           }}
         >
@@ -751,11 +759,17 @@ export default function Dashboard() {
               }}
             >
               {[
-                { v: branches.length, l: "Branches", c: "#fff" },
-                { v: totalStudents.toLocaleString(), l: "Students", c: "#AACCFF" },
-                { v: `${feeRate}%`, l: "Fee Rate", c: "#66EE88" },
+                { v: branches.length, l: "Branches", c: "#fff", href: "/branches" },
+                { v: totalStudents.toLocaleString(), l: "Students", c: "#AACCFF", href: "/students" },
+                { v: `${feeRate}%`, l: "Fee Rate", c: "#66EE88", href: "/finance" },
               ].map((s, i) => (
-                <div key={i} style={{ background: "rgba(255,255,255,.08)", padding: isMobile ? "12px 10px" : "14px 18px", textAlign: "center", minWidth: isMobile ? 0 : 100 }}>
+                <div
+                  key={i}
+                  onClick={(e) => { e.stopPropagation(); navigate(s.href); }}
+                  role="button"
+                  tabIndex={0}
+                  style={{ background: "rgba(255,255,255,.08)", padding: isMobile ? "12px 10px" : "14px 18px", textAlign: "center", minWidth: isMobile ? 0 : 100, cursor: "pointer" }}
+                >
                   <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, color: s.c, letterSpacing: "-0.5px", lineHeight: 1, marginBottom: 4 }}>
                     {s.v}
                   </div>
@@ -871,7 +885,7 @@ export default function Dashboard() {
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : isTablet ? "repeat(2, 1fr)" : "repeat(12, 1fr)", gap: isMobile ? 12 : 14, marginBottom: isMobile ? 16 : 20, perspective: "1200px" }}>
 
         {/* Branch Overview */}
-        <div {...tilt3D} style={{ gridColumn: isMobile ? "span 1" : isTablet ? "span 1" : "span 4", background: "#fff", borderRadius: isMobile ? 20 : 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: isMobile ? "18px 18px" : "22px 24px", ...tilt3DStyle }}>
+        <div {...tilt3D} onClick={() => navigate("/branches")} role="button" tabIndex={0} style={{ gridColumn: isMobile ? "span 1" : isTablet ? "span 1" : "span 4", background: "#fff", borderRadius: isMobile ? 20 : 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: isMobile ? "18px 18px" : "22px 24px", cursor: "pointer", ...tilt3DStyle }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
             <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: 0 }}>Branch Overview</h3>
             {branches.length > 0 && (
@@ -897,7 +911,9 @@ export default function Dashboard() {
                 return (
                   <div
                     key={branch.id}
-                    onClick={() => navigate("/branches")}
+                    onClick={(e) => { e.stopPropagation(); navigate(`/branches/${branch.id}`); }}
+                    role="button"
+                    tabIndex={0}
                     style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", padding: "10px 14px", borderRadius: 14, border: "0.5px solid rgba(0,85,255,.07)", background: "rgba(0,85,255,.02)", transition: "background .15s" }}
                   >
                     <div style={{ minWidth: 0 }}>
@@ -919,7 +935,7 @@ export default function Dashboard() {
         </div>
 
         {/* Risk Distribution */}
-        <div {...tilt3D} style={{ gridColumn: isMobile ? "span 1" : isTablet ? "span 1" : "span 4", background: "#fff", borderRadius: isMobile ? 20 : 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: isMobile ? "18px 18px" : "22px 24px", ...tilt3DStyle }}>
+        <div {...tilt3D} onClick={() => navigate("/risks")} role="button" tabIndex={0} style={{ gridColumn: isMobile ? "span 1" : isTablet ? "span 1" : "span 4", background: "#fff", borderRadius: isMobile ? 20 : 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: isMobile ? "18px 18px" : "22px 24px", cursor: "pointer", ...tilt3DStyle }}>
           <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: "0 0 18px 0" }}>Risk Distribution</h3>
           {riskData.every(r => r.value === 0) ? (
             <div style={{ height: 220, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, borderRadius: 18, border: "0.5px dashed rgba(0,85,255,.2)", background: "rgba(0,200,83,.03)" }}>
@@ -962,7 +978,7 @@ export default function Dashboard() {
         </div>
 
         {/* Revenue Trend */}
-        <div {...tilt3D} style={{ gridColumn: isMobile ? "span 1" : isTablet ? "span 2" : "span 4", background: "#fff", borderRadius: isMobile ? 20 : 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: isMobile ? "18px 18px" : "22px 24px", ...tilt3DStyle }}>
+        <div {...tilt3D} onClick={() => navigate("/finance")} role="button" tabIndex={0} style={{ gridColumn: isMobile ? "span 1" : isTablet ? "span 2" : "span 4", background: "#fff", borderRadius: isMobile ? 20 : 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: isMobile ? "18px 18px" : "22px 24px", cursor: "pointer", ...tilt3DStyle }}>
           <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: "0 0 18px 0" }}>Revenue Trend</h3>
           {revenueTrend.every(r => r.revenue === 0) ? (
             <div style={{ height: 220, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, borderRadius: 18, border: "0.5px dashed rgba(0,85,255,.2)", background: "rgba(0,85,255,.03)" }}>
@@ -1000,13 +1016,14 @@ export default function Dashboard() {
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 12 : 14, marginBottom: isMobile ? 16 : 20, perspective: "1200px" }}>
 
         {/* Critical Alerts */}
-        <div {...tilt3D} style={{ background: "#fff", borderRadius: isMobile ? 20 : 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: isMobile ? "18px 18px" : "22px 24px", ...tilt3DStyle }}>
+        <div {...tilt3D} onClick={() => navigate("/risks")} role="button" tabIndex={0} style={{ background: "#fff", borderRadius: isMobile ? 20 : 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: isMobile ? "18px 18px" : "22px 24px", cursor: "pointer", ...tilt3DStyle }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
             <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: 0 }}>Critical Alerts</h3>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <select
                 value={selectedAlertBranch}
                 onChange={(e) => setSelectedAlertBranch(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
                 style={{ fontSize: 11, fontWeight: 700, color: T3, background: "#fff", border: "0.5px solid rgba(0,85,255,.14)", borderRadius: 10, padding: "6px 10px", outline: "none", cursor: "pointer", fontFamily: "inherit", boxShadow: SHADOW_SM }}
               >
                 <option value="all">All Branches</option>
@@ -1015,7 +1032,7 @@ export default function Dashboard() {
                 ))}
               </select>
               <button
-                onClick={() => navigate("/risks")}
+                onClick={(e) => { e.stopPropagation(); navigate("/risks"); }}
                 style={{ fontSize: 11, fontWeight: 700, color: B1, background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.06em", textTransform: "uppercase" }}
               >
                 View All →
@@ -1042,7 +1059,9 @@ export default function Dashboard() {
                 return (
                   <div
                     key={alert.id}
-                    onClick={() => navigate("/risks")}
+                    onClick={(e) => { e.stopPropagation(); navigate(`/risks/${alert.id}`); }}
+                    role="button"
+                    tabIndex={0}
                     style={{ position: "relative", display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 14, background: bg, border: `0.5px solid ${iconBorder}`, cursor: "pointer", overflow: "hidden", transition: "transform .15s" }}
                   >
                     <div style={{ position: "absolute", left: 0, top: 6, bottom: 6, width: 4, borderRadius: "0 3px 3px 0", background: accent }} />
@@ -1113,7 +1132,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Improvement Timeline ─────────────────────────── */}
-      <div {...tilt3D} style={{ background: "#fff", borderRadius: isMobile ? 20 : 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: isMobile ? "18px 18px" : "22px 24px", marginBottom: isMobile ? 16 : 20, perspective: "1200px", ...tilt3DStyle }}>
+      <div {...tilt3D} onClick={() => navigate("/academics")} role="button" tabIndex={0} style={{ background: "#fff", borderRadius: isMobile ? 20 : 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: isMobile ? "18px 18px" : "22px 24px", marginBottom: isMobile ? 16 : 20, perspective: "1200px", cursor: "pointer", ...tilt3DStyle }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
           <div>
             <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: 0 }}>School Improvement Timeline</h3>

@@ -536,10 +536,13 @@ export default function StudentsIntelligence() {
           {/* ── Dark Hero Banner ───────────────────────── */}
           <div
             {...tilt3D}
+            onClick={()=>navigate("/students")}
+            role="button" tabIndex={0}
             style={{
               background:GRAD_HERO, borderRadius: isMobile ? 18 : 24, padding: isMobile ? "18px 18px" : "24px 28px", color:"#fff",
               marginBottom: isMobile ? 16 : 24, position:"relative", overflow:"hidden",
               boxShadow:"0 14px 40px rgba(0,8,60,.32), 0 0 0 .5px rgba(255,255,255,.12)",
+              cursor:"pointer",
               ...tilt3DStyle,
             }}
           >
@@ -563,11 +566,16 @@ export default function StudentsIntelligence() {
               </div>
               <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : "repeat(3, minmax(120px,1fr))", gap: isMobile ? 8 : 10, width: isMobile ? "100%" : "auto" }}>
                 {[
-                  { label:"Avg Attendance", value:avgAttendance > 0 ? `${avgAttendance}%` : "—" },
-                  { label:"At Risk",        value:atRisk.toString() },
-                  { label:"High Performers",value:highPerformers.toString() },
+                  { label:"Avg Attendance", value:avgAttendance > 0 ? `${avgAttendance}%` : "—", route:"/students" },
+                  { label:"At Risk",        value:atRisk.toString(), route:"/risks" },
+                  { label:"High Performers",value:highPerformers.toString(), route:"/students" },
                 ].map(s=>(
-                  <div key={s.label} style={{ background:"rgba(255,255,255,.10)", borderRadius: isMobile ? 12 : 14, padding: isMobile ? "10px 10px" : "12px 14px", border:"0.5px solid rgba(255,255,255,.14)" }}>
+                  <div
+                    key={s.label}
+                    onClick={(e)=>{ e.stopPropagation(); navigate(s.route); }}
+                    role="button" tabIndex={0}
+                    style={{ background:"rgba(255,255,255,.10)", borderRadius: isMobile ? 12 : 14, padding: isMobile ? "10px 10px" : "12px 14px", border:"0.5px solid rgba(255,255,255,.14)", cursor:"pointer" }}
+                  >
                     <p style={{ fontSize: isMobile ? 8 : 9, fontWeight:700, color:"rgba(255,255,255,.65)", letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 6px 0" }}>{s.label}</p>
                     <p style={{ fontSize: isMobile ? 16 : 20, fontWeight:800, color:"#fff", margin:0, letterSpacing:"-0.4px" }}>{s.value}</p>
                   </div>
@@ -623,9 +631,12 @@ export default function StudentsIntelligence() {
             {/* Grade Distribution */}
             <div
               {...tilt3D}
+              onClick={()=>navigate("/students")}
+              role="button" tabIndex={0}
               style={{
                 background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px 14px" : "22px 22px 18px",
                 boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
+                cursor:"pointer",
                 ...tilt3DStyle,
               }}
             >
@@ -663,9 +674,12 @@ export default function StudentsIntelligence() {
             {/* Enrollment Trend */}
             <div
               {...tilt3D}
+              onClick={()=>navigate("/students")}
+              role="button" tabIndex={0}
               style={{
                 background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px 14px" : "22px 22px 18px",
                 boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
+                cursor:"pointer",
                 ...tilt3DStyle,
               }}
             >
@@ -701,9 +715,12 @@ export default function StudentsIntelligence() {
             {/* Performance by Branch */}
             <div
               {...tilt3D}
+              onClick={()=>navigate("/branches")}
+              role="button" tabIndex={0}
               style={{
                 background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px 14px" : "22px 22px 18px",
                 boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
+                cursor:"pointer",
                 ...tilt3DStyle,
               }}
             >
@@ -744,10 +761,13 @@ export default function StudentsIntelligence() {
           {/* ── Attendance Heatmap ───────────────────── */}
           <div
             {...tilt3D}
+            onClick={()=>navigate("/students")}
+            role="button" tabIndex={0}
             style={{
               background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px" : "22px 24px",
               boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
               marginBottom: isMobile ? 16 : 24, perspective:"1200px",
+              cursor:"pointer",
               ...tilt3DStyle,
             }}
           >
@@ -765,6 +785,7 @@ export default function StudentsIntelligence() {
                 <select
                   value={heatBranch}
                   onChange={e=>setHeatBranch(e.target.value)}
+                  onClick={e=>e.stopPropagation()}
                   style={{
                     padding:"7px 12px", borderRadius:10, border:"0.5px solid rgba(0,85,255,.18)",
                     background:"#F5F9FF", fontSize:11, fontWeight:700, color:T3,
@@ -888,7 +909,8 @@ export default function StudentsIntelligence() {
                       const isSelected = selected?._eid===s._eid;
                       return (
                         <div key={s._eid}
-                          onClick={()=>setSelected(isSelected ? null : s)}
+                          onClick={()=>navigate(`/students/${encodeURIComponent(s.id)}`)}
+                          role="button" tabIndex={0}
                           style={{
                             borderRadius:14, padding:"12px 12px", marginBottom:8,
                             background: isSelected ? "rgba(0,85,255,.06)" : "#F8FBFF",
@@ -978,6 +1000,7 @@ export default function StudentsIntelligence() {
                         return (
                           <tr key={s._eid}
                             className="stu-row"
+                            onClick={()=>navigate(`/students/${encodeURIComponent(s.id)}`)}
                             style={{
                               borderBottom:"0.5px solid rgba(0,85,255,.04)",
                               background: isSelected ? "rgba(0,85,255,.06)" : "transparent",
@@ -1015,7 +1038,7 @@ export default function StudentsIntelligence() {
                             </td>
                             <td style={{ padding:"12px 18px" }}>
                               <button
-                                onClick={()=>setSelected(isSelected ? null : s)}
+                                onClick={(e)=>{e.stopPropagation();setSelected(isSelected ? null : s);}}
                                 className="stu-btn"
                                 style={{
                                   padding:"7px 14px", borderRadius:10,
@@ -1094,11 +1117,14 @@ export default function StudentsIntelligence() {
             return (
               <div
                 {...tilt3D}
+                onClick={()=>navigate(`/students/${encodeURIComponent(selected.id)}`)}
+                role="button" tabIndex={0}
                 style={{
                   background:"#fff", borderRadius: isMobile ? 16 : 22,
                   boxShadow:SHADOW_LG, border:"0.5px solid rgba(0,85,255,.10)",
                   overflow:"hidden", marginBottom: isMobile ? 16 : 24,
                   animation:"slide-in-from-bottom .3s ease", perspective:"1200px",
+                  cursor:"pointer",
                   ...tilt3DStyle,
                 }}
               >
@@ -1126,6 +1152,7 @@ export default function StudentsIntelligence() {
                       boxShadow:"0 4px 10px rgba(0,85,255,.18)",
                     }}>{risk.label} Risk</span>
                     <button
+                      onClick={(e)=>e.stopPropagation()}
                       className="stu-btn"
                       style={{
                         display:"inline-flex", alignItems:"center", justifyContent:"center", gap:6,
@@ -1138,7 +1165,7 @@ export default function StudentsIntelligence() {
                     >
                       <Mail size={13}/> Contact Parent
                     </button>
-                    <button onClick={()=>setSelected(null)}
+                    <button onClick={(e)=>{e.stopPropagation();setSelected(null);}}
                       className="stu-btn"
                       style={{
                         width: isMobile ? 34 : 36, height: isMobile ? 34 : 36, borderRadius:11, border:"0.5px solid rgba(0,85,255,.12)",
@@ -1167,16 +1194,19 @@ export default function StudentsIntelligence() {
                     return (
                       <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: isMobile ? 10 : 14, marginBottom: isMobile ? 16 : 22 }}>
                         {[
-                          { label:"Attendance (30d)", value:attDisplay, sub:attSubText, subColor:attColor, icon:Percent, grad:GRAD_GREEN },
-                          { label:"Academic Score", value:scoreDisplay, sub:scoreSubText, subColor:scoreColor, icon:Award, grad:GRAD_BLUE },
-                          { label:"Behavior Incidents", value:selected.incidents.toString(), sub:"This term", subColor:T4, icon:AlertTriangle, grad:selected.incidents>0?GRAD_RED:GRAD_VIOLET },
+                          { label:"Attendance (30d)", value:attDisplay, sub:attSubText, subColor:attColor, icon:Percent, grad:GRAD_GREEN, route:`/students/${encodeURIComponent(selected.id)}` },
+                          { label:"Academic Score", value:scoreDisplay, sub:scoreSubText, subColor:scoreColor, icon:Award, grad:GRAD_BLUE, route:`/students/${encodeURIComponent(selected.id)}` },
+                          { label:"Behavior Incidents", value:selected.incidents.toString(), sub:"This term", subColor:T4, icon:AlertTriangle, grad:selected.incidents>0?GRAD_RED:GRAD_VIOLET, route: selected.incidents>0 ? "/risks" : `/students/${encodeURIComponent(selected.id)}` },
                         ].map(c=>{
                           const Icon = c.icon;
                           return (
                             <div key={c.label} {...tilt3D}
+                              onClick={(e)=>{e.stopPropagation();navigate(c.route);}}
+                              role="button" tabIndex={0}
                               style={{
                                 background:"#F5F9FF", borderRadius: isMobile ? 14 : 16, padding: isMobile ? "14px 14px" : "16px 18px",
                                 border:"0.5px solid rgba(0,85,255,.1)",
+                                cursor:"pointer",
                                 ...tilt3DStyle,
                               }}
                             >
@@ -1230,10 +1260,13 @@ export default function StudentsIntelligence() {
           {/* ── AI Intelligence Card ─────────────────── */}
           <div
             {...tilt3D}
+            onClick={()=>navigate("/ai-predictor")}
+            role="button" tabIndex={0}
             style={{
               background:GRAD_HERO, borderRadius: isMobile ? 16 : 22, padding: isMobile ? "18px 16px" : "24px 26px", color:"#fff",
               position:"relative", overflow:"hidden",
               boxShadow:"0 14px 40px rgba(0,8,60,.32), 0 0 0 .5px rgba(255,255,255,.12)",
+              cursor:"pointer",
               ...tilt3DStyle,
             }}
           >

@@ -82,21 +82,99 @@ const StudentProfile = () => {
     const run = async () => {
       setLoading(true);
       try {
-        const snap = await getDoc(doc(db, "students", studentId));
-        if (!snap.exists()) { setLoading(false); return; }
-        const sd = { id: snap.id, ...snap.data() } as any;
+        const decoded = decodeURIComponent(studentId);
+        let sd: any = null;
+        let resolvedSid = decoded;
+        let resolvedEmail = "";
+
+        // Try 1: students/{decoded}
+        try {
+          const snap = await getDoc(doc(db, "students", decoded));
+          if (snap.exists()) {
+            sd = { id: snap.id, ...snap.data() };
+            resolvedSid = snap.id;
+            resolvedEmail = (sd.email || sd.studentEmail || "").toLowerCase();
+          }
+        } catch {}
+
+        // Try 2: enrollments where studentId == decoded OR studentEmail == decoded
+        if (!sd) {
+          const isEmail = decoded.includes("@");
+          const [byIdSnap, byEmailSnap] = await Promise.all([
+            getDocs(query(
+              collection(db, "enrollments"),
+              where("schoolId", "==", schoolId),
+              where("studentId", "==", decoded),
+            )).catch(() => null),
+            isEmail ? getDocs(query(
+              collection(db, "enrollments"),
+              where("schoolId", "==", schoolId),
+              where("studentEmail", "==", decoded.toLowerCase()),
+            )).catch(() => null) : Promise.resolve(null),
+          ]);
+          const enrDoc = byIdSnap?.docs[0] || byEmailSnap?.docs[0];
+          if (enrDoc) {
+            const e = enrDoc.data() as any;
+            resolvedSid = e.studentId || decoded;
+            resolvedEmail = (e.studentEmail || (isEmail ? decoded.toLowerCase() : "")).toLowerCase();
+            sd = {
+              id: resolvedSid,
+              name: e.studentName || e.name || "Student",
+              studentName: e.studentName || e.name,
+              email: resolvedEmail,
+              studentEmail: resolvedEmail,
+              classId: e.classId,
+              className: e.className || e.class || e.grade,
+              class: e.class || e.grade,
+              rollNo: e.rollNo || e.roll,
+              roll: e.roll,
+              grade: e.grade || e.class,
+              branchId: e.branchId,
+              schoolName: e.schoolName,
+            };
+          }
+        }
+
+        // Try 3: enrollment doc id (last resort)
+        if (!sd) {
+          try {
+            const enrSnap = await getDoc(doc(db, "enrollments", decoded));
+            if (enrSnap.exists()) {
+              const e = enrSnap.data() as any;
+              resolvedSid = e.studentId || decoded;
+              resolvedEmail = (e.studentEmail || "").toLowerCase();
+              sd = {
+                id: resolvedSid,
+                name: e.studentName || e.name || "Student",
+                studentName: e.studentName || e.name,
+                email: resolvedEmail,
+                studentEmail: resolvedEmail,
+                classId: e.classId,
+                className: e.className || e.class || e.grade,
+                class: e.class || e.grade,
+                rollNo: e.rollNo || e.roll,
+                roll: e.roll,
+                grade: e.grade || e.class,
+                branchId: e.branchId,
+                schoolName: e.schoolName,
+              };
+            }
+          } catch {}
+        }
+
+        if (!sd) { setLoading(false); return; }
         setStudent(sd);
-        const email = (sd.email || sd.studentEmail || "").toLowerCase();
+
         const byId = (col: string) => getDocs(query(
           collection(db, col),
           where("schoolId", "==", schoolId),
-          where("studentId", "==", studentId),
-        ));
-        const byEmail = (col: string) => email ? getDocs(query(
+          where("studentId", "==", resolvedSid),
+        )).catch(() => null);
+        const byEmail = (col: string) => resolvedEmail ? getDocs(query(
           collection(db, col),
           where("schoolId", "==", schoolId),
-          where("studentEmail", "==", email),
-        )) : Promise.resolve(null as any);
+          where("studentEmail", "==", resolvedEmail),
+        )).catch(() => null) : Promise.resolve(null as any);
         const merge = (a: any, b: any) => { const l: any[] = []; if (a) a.docs.forEach((d: any) => l.push({ id: d.id, ...d.data() })); if (b) b.docs.forEach((d: any) => { if (!l.find(x => x.id === d.id)) l.push({ id: d.id, ...d.data() }); }); return l; };
 
         const [aI, aE, sI, sE, rI, rE, subI, subE, inc, pn, iv] = await Promise.all([
@@ -109,9 +187,9 @@ const StudentProfile = () => {
         setAttendance(merge(aI, aE));
         setTestScores([...merge(sI, sE), ...merge(rI, rE)]);
         setSubmissions(merge(subI, subE));
-        setIncidents(inc.docs.map((d: any) => ({ id: d.id, ...d.data() })));
-        setParentNotes(pn.docs.map((d: any) => ({ id: d.id, ...d.data() })));
-        setInterventions(iv.docs.map((d: any) => ({ id: d.id, ...d.data() })));
+        setIncidents(inc?.docs.map((d: any) => ({ id: d.id, ...d.data() })) || []);
+        setParentNotes(pn?.docs.map((d: any) => ({ id: d.id, ...d.data() })) || []);
+        setInterventions(iv?.docs.map((d: any) => ({ id: d.id, ...d.data() })) || []);
 
         const classId = sd.classId || merge(await byId("enrollments"), await byEmail("enrollments"))[0]?.classId;
         if (classId) {
@@ -119,8 +197,8 @@ const StudentProfile = () => {
             collection(db, "assignments"),
             where("schoolId", "==", schoolId),
             where("classId", "==", classId),
-          ));
-          setAssignments(asSnap.docs.map((d: any) => ({ id: d.id, ...d.data() })));
+          )).catch(() => null);
+          if (asSnap) setAssignments(asSnap.docs.map((d: any) => ({ id: d.id, ...d.data() })));
         }
       } catch (e) { console.error("StudentProfile fetch error:", e); }
       finally { setLoading(false); }
