@@ -23,6 +23,7 @@ import DEOManagement from "@/pages/DEOManagement";
 import AuditLogPage from "@/pages/AuditLogPage";
 import AIPredictorPage from "@/pages/AIPredictorPage";
 import TeacherLeaderboard from "@/pages/TeacherLeaderboard";
+import OwnerDashboard from "@/pages/owner/OwnerDashboard";
 import ParentPortal from "@/pages/ParentPortal";
 import NotFound from "@/pages/NotFound";
 import LoginPage from "@/pages/LoginPage";
@@ -135,6 +136,7 @@ const App = () => {
                       <Route path="/audit"                 element={<AuditLogPage />} />
                       <Route path="/ai-predictor"          element={<AIPredictorPage />} />
                       <Route path="/teacher-leaderboard"   element={<TeacherLeaderboard />} />
+                      <Route path="/branch-leaderboard"    element={<OwnerDashboard />} />
                       <Route path="/settings"              element={<SettingsPage />} />
                       <Route path="*"                      element={<NotFound />} />
                     </Routes>

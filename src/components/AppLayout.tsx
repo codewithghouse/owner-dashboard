@@ -5,7 +5,7 @@ import {
   DollarSign, AlertTriangle, GitBranch, FileText, Settings,
   Menu, X, UserCog, LogOut, ShieldCheck, Bell,
   Clock, ShieldAlert, CheckCircle2, DollarSign as FeeIcon,
-  Search, Activity, Brain, ClipboardList, FileSpreadsheet, Trophy,
+  Search, Activity, Brain, ClipboardList, FileSpreadsheet, Trophy, Award,
 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import {
@@ -43,6 +43,7 @@ const navItems = [
   { to: "/audit",        label: "Activity Log",          icon: Activity },
   { to: "/ai-predictor", label: "AI Risk Predictor",    icon: Brain },
   { to: "/teacher-leaderboard", label: "Teacher Leaderboard", icon: Trophy },
+  { to: "/branch-leaderboard",  label: "Branch Leaderboard",  icon: Award },
   { to: "/settings",     label: "Settings",              icon: Settings },
 ];
 
