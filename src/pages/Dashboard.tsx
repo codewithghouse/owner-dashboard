@@ -331,24 +331,51 @@ export default function Dashboard() {
       });
     }, 5 * 60 * 1000);
 
-    /* 7. Live alerts — try `risks`, fallback to `discipline` */
-    try {
-      alertsUnsub = onSnapshot(
-        query(collection(db, "risks"), orderBy("createdAt","desc"), limit(5)),
-        snap => {
-          setAlerts(snap.docs.map(d => ({ id: d.id, ...d.data() as any })));
-          setActiveAlerts(snap.size);
-        }
-      );
-    } catch {
-      alertsUnsub = onSnapshot(
-        query(collection(db, "discipline"), orderBy("createdAt","desc"), limit(5)),
-        snap => {
-          setAlerts(snap.docs.map(d => ({ id: d.id, ...d.data() as any })));
-          setActiveAlerts(snap.size);
-        }
-      );
-    }
+    /* 7. Live alerts — merge `risks` + student `incidents`, scoped by schoolId */
+    let risksAlerts: any[] = [];
+    let incidentAlerts: any[] = [];
+    const mergeAndSet = () => {
+      const combined = [...risksAlerts, ...incidentAlerts]
+        .sort((a, b) => {
+          const ta = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0;
+          const tb = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0;
+          return tb - ta;
+        })
+        .slice(0, 10);
+      setAlerts(combined);
+      setActiveAlerts(combined.filter(a => (a.severity || "").toLowerCase() === "critical").length || combined.length);
+    };
+
+    const risksUnsub = onSnapshot(
+      query(collection(db, "risks"), where("schoolId", "==", uid), orderBy("createdAt", "desc"), limit(10)),
+      snap => { risksAlerts = snap.docs.map(d => ({ id: d.id, ...d.data() as any })); mergeAndSet(); },
+      () => {
+        onSnapshot(
+          query(collection(db, "discipline"), where("schoolId", "==", uid), orderBy("createdAt", "desc"), limit(10)),
+          s => { risksAlerts = s.docs.map(d => ({ id: d.id, ...d.data() as any })); mergeAndSet(); },
+        );
+      },
+    );
+
+    const incidentsUnsub = onSnapshot(
+      query(collection(db, "incidents"), where("schoolId", "==", uid), orderBy("createdAt", "desc"), limit(10)),
+      snap => {
+        incidentAlerts = snap.docs
+          .map(d => ({ id: d.id, ...d.data() as any }))
+          .filter(d => (d.type || "INCIDENT").toUpperCase() !== "POSITIVE")
+          .map(d => ({
+            ...d,
+            message: d.studentName
+              ? `${d.studentName}${d.className ? ` · ${d.className}` : ""} — ${d.description || d.content || (d.type || "Incident")}`
+              : (d.description || d.content || d.type || "Student incident"),
+            severity: (d.type === "INCIDENT") ? "critical" : "warning",
+          }));
+        mergeAndSet();
+      },
+      err => console.warn("[Dashboard/incidents]", err.code),
+    );
+
+    alertsUnsub = () => { risksUnsub(); incidentsUnsub(); };
 
     return () => {
       alertsUnsub();
