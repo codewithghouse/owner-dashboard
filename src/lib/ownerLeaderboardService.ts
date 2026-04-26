@@ -11,14 +11,14 @@
  * from the same metrics so the dashboard surfaces real patterns.
  */
 import { auth, db } from "./firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import {
   loadCoreSnapshot, calculateAHI, calculatePassRate, avg,
 } from "./analyticsService";
 import type {
   OwnerLeaderboardData, OwnerBranchRanking, OwnerBranchInsight,
   OwnerBranchStyle, BranchWhyTopItem, BranchWhyHereItem, BranchSolution,
-  OwnerNetworkSummary,
+  OwnerNetworkSummary, BranchAISource,
 } from "./ownerTypes";
 
 // ── Style tokens per rank — pure data from the locked UI design ─────────────
@@ -58,7 +58,7 @@ const STYLE_BY_RANK: Record<number, OwnerBranchStyle> = {
   },
 };
 
-function getStyleTokens(rank: number): OwnerBranchStyle {
+export function getStyleTokens(rank: number): OwnerBranchStyle {
   return STYLE_BY_RANK[rank] || STYLE_BY_RANK[5];
 }
 
@@ -297,13 +297,133 @@ function getSolutionLabel(rank: number, isDeclining: boolean): string {
   return "Recovery plan";
 }
 
-// ── AI extension point ──────────────────────────────────────────────────────
-// To swap rule-based insights for OpenAI, implement a callable that takes the
-// BranchMetrics + top-branch context and returns the same { whyTop|whyHere,
-// pills|solutions, solutionLabel } shape. Wire it from fetchOwnerLeaderboard
-// below, falling back to the rule-based generators on error or quota miss.
-// Suggested transport: POST to /api/owner-insights (Vercel serverless),
-// gated by Firebase ID token via the same pattern as /api/send-email.
+// ── AI enhancement (Vercel serverless + Firestore cache) ────────────────────
+// Cache shape: schools/{uid}/branch_insights/{branchId}_{monthKey}
+//   { isTop, whyTop[], pills[], whyHere[], solutions[], solutionLabel,
+//     model, generatedAt: Timestamp }
+// TTL: 7 days. After that we re-fetch from OpenAI on next page load.
+
+const AI_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+interface CachedInsight {
+  isTop: boolean;
+  whyTop?: BranchWhyTopItem[]; pills?: string[];
+  whyHere?: BranchWhyHereItem[]; solutions?: BranchSolution[];
+  solutionLabel?: string;
+  model?: string;
+  generatedAt?: { toMillis: () => number } | number;
+}
+
+function cachedAtMs(c: CachedInsight): number {
+  if (!c.generatedAt) return 0;
+  if (typeof c.generatedAt === "number") return c.generatedAt;
+  if (typeof c.generatedAt.toMillis === "function") return c.generatedAt.toMillis();
+  return 0;
+}
+
+async function readCachedInsight(
+  uid: string, branchId: string, monthKey: string,
+): Promise<CachedInsight | null> {
+  try {
+    const ref = doc(db, "schools", uid, "branch_insights", `${branchId}_${monthKey}`);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return null;
+    const data = snap.data() as CachedInsight;
+    if (Date.now() - cachedAtMs(data) > AI_CACHE_TTL_MS) return null;
+    return data;
+  } catch (err) {
+    console.warn("[ownerLeaderboard] cache read failed:", err);
+    return null;
+  }
+}
+
+async function writeCachedInsight(
+  uid: string, branchId: string, monthKey: string, payload: CachedInsight,
+): Promise<void> {
+  try {
+    const ref = doc(db, "schools", uid, "branch_insights", `${branchId}_${monthKey}`);
+    await setDoc(ref, { ...payload, generatedAt: serverTimestamp() });
+  } catch (err) {
+    console.warn("[ownerLeaderboard] cache write failed:", err);
+  }
+}
+
+async function callAIRoute(
+  rank: number, branch: BranchAISource, top: BranchAISource | null,
+  network: OwnerNetworkSummary,
+): Promise<CachedInsight | null> {
+  try {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) return null;
+    const res = await fetch("/api/owner-insights", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ rank, branch, top, network }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const insight = data?.insight || {};
+    return {
+      isTop: rank === 1,
+      whyTop: insight.whyTop, pills: insight.pills,
+      whyHere: insight.whyHere, solutions: insight.solutions,
+      solutionLabel: insight.solutionLabel,
+      model: data?.model,
+      generatedAt: data?.generatedAt,
+    };
+  } catch (err) {
+    console.warn("[ownerLeaderboard] AI route failed:", err);
+    return null;
+  }
+}
+
+/**
+ * Fetch (or compute) the AI insight for a single branch and merge it onto the
+ * rule-based fallback. Returns the resulting OwnerBranchInsight.
+ *
+ * Flow: Firestore cache (7d) → OpenAI route → cache write. Any failure simply
+ * returns the rule-based fallback unchanged so the UI never blanks.
+ */
+export async function fetchAIInsightForBranch(
+  branchId: string, monthKey: string,
+  ranking: OwnerBranchRanking, top: BranchAISource | null,
+  branchSource: BranchAISource, network: OwnerNetworkSummary,
+  fallback: OwnerBranchInsight,
+): Promise<{ insight: OwnerBranchInsight; source: "ai" | "cache" | "fallback" }> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return { insight: fallback, source: "fallback" };
+
+  const cached = await readCachedInsight(uid, branchId, monthKey);
+  if (cached) {
+    return {
+      insight: mergeInsight(fallback, cached),
+      source: "cache",
+    };
+  }
+
+  const ai = await callAIRoute(ranking.rank, branchSource, top, network);
+  if (!ai) return { insight: fallback, source: "fallback" };
+
+  // Persist for next visit (don't await — UI doesn't depend on it)
+  void writeCachedInsight(uid, branchId, monthKey, ai);
+  return { insight: mergeInsight(fallback, ai), source: "ai" };
+}
+
+function mergeInsight(fallback: OwnerBranchInsight, ai: CachedInsight): OwnerBranchInsight {
+  if (fallback.isTop) {
+    return {
+      ...fallback,
+      whyTop: ai.whyTop?.length ? ai.whyTop : fallback.whyTop,
+      pills:  ai.pills?.length  ? ai.pills  : fallback.pills,
+    };
+  }
+  return {
+    ...fallback,
+    whyHere:       ai.whyHere?.length   ? ai.whyHere   : fallback.whyHere,
+    solutions:     ai.solutions?.length ? ai.solutions : fallback.solutions,
+    solutionLabel: ai.solutionLabel     || fallback.solutionLabel,
+  };
+}
 
 // ── Public: fetch the full leaderboard view ─────────────────────────────────
 export async function fetchOwnerLeaderboard(): Promise<OwnerLeaderboardData> {
@@ -315,15 +435,20 @@ export async function fetchOwnerLeaderboard(): Promise<OwnerLeaderboardData> {
     getDoc(doc(db, "schools", uid)),
   ]);
 
+  const lastMonth = snap.months[snap.months.length - 1];
+  const monthKey  = lastMonth?.key   || "";
+  const monthLabel = lastMonth?.label || "";
+
   if (snap.branches.length === 0) {
     return {
       network: {
         name: schoolDoc.data()?.schoolName || "Network",
-        monthLabel: snap.months[snap.months.length - 1]?.label || "",
+        monthLabel, monthKey,
         totalBranches: 0, totalStudents: 0, totalTeachers: 0,
         networkAvg: 0, topScore: 0, totalAtRisk: 0,
       },
       branches: [], insights: {},
+      aiSources: {}, trendByBranch: {}, trendMonths: snap.months.map(m => m.label),
     };
   }
 
@@ -342,7 +467,7 @@ export async function fetchOwnerLeaderboard(): Promise<OwnerLeaderboardData> {
 
   const network: OwnerNetworkSummary = {
     name: schoolDoc.data()?.schoolName || "Network",
-    monthLabel: snap.months[snap.months.length - 1]?.label || "",
+    monthLabel, monthKey,
     totalBranches: metrics.length,
     totalStudents, totalTeachers, totalAtRisk,
     networkAvg, topScore,
@@ -351,6 +476,8 @@ export async function fetchOwnerLeaderboard(): Promise<OwnerLeaderboardData> {
   // 3. Build ranking rows + insights
   const branches: OwnerBranchRanking[] = [];
   const insights: Record<string, OwnerBranchInsight> = {};
+  const aiSources: Record<string, BranchAISource> = {};
+  const trendByBranch: Record<string, number[]> = {};
 
   metrics.forEach((m, i) => {
     const rank = i + 1;
@@ -362,6 +489,15 @@ export async function fetchOwnerLeaderboard(): Promise<OwnerLeaderboardData> {
       composite: m.ahi, weekChange: m.weekChange, trend: m.trend,
       contextLine: ctx.line, contextColor: ctx.color,
     });
+    aiSources[m.id] = {
+      rank,
+      ahi: m.ahi, attendance: m.attendance, passRate: m.passRate,
+      feeCollection: m.feeCollection, studentCount: m.studentCount,
+      teacherCount: m.teacherCount, activeAlerts: m.activeAlerts,
+      weekChange: m.weekChange, name: m.name, city: m.city,
+      monthlyAttendance: m.monthlyAttendance,
+    };
+    trendByBranch[m.id] = m.monthlyAttendance;
 
     const style = getStyleTokens(rank);
     if (rank === 1) {
@@ -384,5 +520,8 @@ export async function fetchOwnerLeaderboard(): Promise<OwnerLeaderboardData> {
     }
   });
 
-  return { network, branches, insights };
+  return {
+    network, branches, insights, aiSources, trendByBranch,
+    trendMonths: snap.months.map(m => m.label),
+  };
 }

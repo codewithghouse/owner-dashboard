@@ -57,6 +57,7 @@ export interface OwnerBranchInsight {
 export interface OwnerNetworkSummary {
   name: string;          // school name
   monthLabel: string;    // current month label e.g. "April"
+  monthKey: string;      // YYYY-MM, used for insight cache keys
   totalBranches: number;
   totalStudents: number;
   totalTeachers: number;
@@ -65,8 +66,31 @@ export interface OwnerNetworkSummary {
   totalAtRisk: number;
 }
 
+// ── For the AI enhancement step ─────────────────────────────────────────────
+export interface BranchAISource {
+  rank: number;
+  ahi: number;
+  attendance: number;
+  passRate: number;
+  feeCollection: number;
+  studentCount: number;
+  teacherCount: number;
+  activeAlerts: number;
+  weekChange: number;
+  name: string;
+  city: string;
+  monthlyAttendance: number[];
+}
+
 export interface OwnerLeaderboardData {
   network: OwnerNetworkSummary;
   branches: OwnerBranchRanking[];
   insights: Record<string, OwnerBranchInsight>;
+  /** Per-branch metrics used by the AI route — kept alongside the public
+   *  ranking so the hook can enhance insights without re-loading. */
+  aiSources: Record<string, BranchAISource>;
+  /** Per-branch 6-month attendance % for the desktop trend chart. */
+  trendByBranch: Record<string, number[]>;
+  /** Month labels (oldest → newest, length 6). */
+  trendMonths: string[];
 }

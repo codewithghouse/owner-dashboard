@@ -3,6 +3,7 @@ import { db, auth } from "@/lib/firebase";
 import { collection, getDocs, query, where, orderBy, limit, onSnapshot, doc, getDoc, setDoc } from "firebase/firestore";
 import { calculateAHI, invalidateCache } from "@/lib/analyticsService";
 import { loadDashboardStats, invalidateDashboardCache } from "@/lib/cloudAggregation";
+import { fetchFeeHistory, invalidateFeeHistoryCache, type FeeHistoryPoint } from "@/lib/feeHistoryService";
 import {
   Activity, Users, Percent, Bell, Download, Mail, Calendar, Settings,
   AlertCircle, Loader2, TrendingUp, ArrowUpRight, ArrowDownRight, Minus,
@@ -63,7 +64,7 @@ export default function Dashboard() {
     { name: "Moderate", value: 0, color: "#f59e0b" },
     { name: "Critical", value: 0, color: "#ef4444" },
   ]);
-  const [revenueTrend,       setRevenueTrend]       = useState<any[]>([]);
+  const [revenueTrend,       setRevenueTrend]       = useState<FeeHistoryPoint[]>([]);
   const [improvementTimeline, setImprovementTimeline] = useState<any[]>([]);
   const [alerts,              setAlerts]              = useState<any[]>([]);
   const [selectedAlertBranch, setSelectedAlertBranch] = useState<string>("all");
@@ -215,27 +216,15 @@ export default function Dashboard() {
         const paidFee  = feesSnap.docs.filter(d => (d.data().status||"").toLowerCase()==="paid").length;
         setFeeRate(totalFee > 0 ? Math.round((paidFee / totalFee)*1000)/10 : 0);
 
-        /* 6. Revenue trend (last 6 months) */
-        const monthMap: Record<string,number> = {};
-        feesSnap.docs
-          .filter(d => (d.data().status||"").toLowerCase()==="paid")
-          .forEach(d => {
-            const data  = d.data();
-            const date  = data.paidAt?.toDate?.() || data.createdAt?.toDate?.() || null;
-            if (date) {
-              const key = MONTH_NAMES[date.getMonth()];
-              monthMap[key] = (monthMap[key]||0) + (parseFloat(data.amount ?? data.totalAmount ?? "0")||0);
-            }
-          });
-        const now  = new Date();
-        const last6 = Array.from({length:6},(_,i)=>{
-          const d = new Date(now.getFullYear(), now.getMonth()-5+i, 1);
-          return MONTH_NAMES[d.getMonth()];
-        });
-        setRevenueTrend(last6.map(m => ({
-          month:   m,
-          revenue: Math.round((monthMap[m]||0) / 1000), // K units
-        })));
+        /* 6. Revenue trend (last 6 months) — same source as Finance & Fees.
+              Buckets by month + year (cross-year safe), splits collected vs pending. */
+        try {
+          const feeHistory = await fetchFeeHistory(uid);
+          setRevenueTrend(feeHistory);
+        } catch (err) {
+          console.warn("[Dashboard] fee history failed:", err);
+          setRevenueTrend([]);
+        }
 
         /* 7. Improvement Timeline — AHI + Attendance + Fee rate per month (last 6) */
         const allAttSnap    = await getDocs(query(collection(db, "attendance"),  where("schoolId","==",uid)));
@@ -321,6 +310,7 @@ export default function Dashboard() {
         }));
         invalidateCache(`core:${uid}`);
         invalidateDashboardCache();
+        invalidateFeeHistoryCache(uid);
         fetchAll(docs);
       },
       () => {
@@ -336,6 +326,7 @@ export default function Dashboard() {
       getDocs(collection(db, "schools", uid, "branches")).then(s => {
         invalidateCache(`core:${uid}`);
         invalidateDashboardCache();
+        invalidateFeeHistoryCache(uid);
         fetchAll(s.docs.map(d => ({ id: d.data().branchId || d.id, ...d.data() as any })));
       });
     }, 5 * 60 * 1000);
@@ -405,6 +396,7 @@ export default function Dashboard() {
   const SEP = "rgba(0,85,255,0.07)";
   const GREEN = "#00C853";
   const RED = "#FF3355";
+  const GOLD = "#FFAA00";
 
   const GRAD_PRIMARY = `linear-gradient(135deg, ${B1}, ${B2})`;
   const GRAD_HERO = "linear-gradient(135deg,#001040 0%,#001888 35%,#0033CC 70%,#0055FF 100%)";
@@ -977,10 +969,31 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Revenue Trend */}
+        {/* Revenue Trend — sourced from /api Finance & Fees data (collected + pending) */}
         <div {...tilt3D} onClick={() => navigate("/finance")} role="button" tabIndex={0} style={{ gridColumn: isMobile ? "span 1" : isTablet ? "span 2" : "span 4", background: "#fff", borderRadius: isMobile ? 20 : 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: isMobile ? "18px 18px" : "22px 24px", cursor: "pointer", ...tilt3DStyle }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: "0 0 18px 0" }}>Revenue Trend</h3>
-          {revenueTrend.every(r => r.revenue === 0) ? (
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 8, margin: "0 0 14px 0" }}>
+            <div>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: 0 }}>Revenue Trend</h3>
+              <p style={{ fontSize: 11, fontWeight: 600, color: T4, margin: "2px 0 0" }}>Last 6 months · ₹ in thousands · from Finance &amp; Fees</p>
+            </div>
+            {revenueTrend.length > 0 && (() => {
+              const totalCollected = revenueTrend.reduce((s, r) => s + r.collected, 0);
+              const totalPending   = revenueTrend.reduce((s, r) => s + r.pending, 0);
+              return (
+                <div style={{ display: "flex", gap: 14 }}>
+                  <div style={{ textAlign: "right" }}>
+                    <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: "1px", color: T4, margin: 0, textTransform: "uppercase" }}>6-mo collected</p>
+                    <p style={{ fontSize: 16, fontWeight: 800, color: GREEN, margin: "1px 0 0" }}>₹{totalCollected.toLocaleString()}K</p>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: "1px", color: T4, margin: 0, textTransform: "uppercase" }}>6-mo pending</p>
+                    <p style={{ fontSize: 16, fontWeight: 800, color: GOLD, margin: "1px 0 0" }}>₹{totalPending.toLocaleString()}K</p>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+          {revenueTrend.length === 0 || revenueTrend.every(r => r.collected === 0 && r.pending === 0) ? (
             <div style={{ height: 220, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, borderRadius: 18, border: "0.5px dashed rgba(0,85,255,.2)", background: "rgba(0,85,255,.03)" }}>
               <div style={{ width: 48, height: 48, borderRadius: 16, background: "rgba(0,85,255,.10)", border: "0.5px solid rgba(0,85,255,.22)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <Download size={24} color={B1} strokeWidth={2.2} />
@@ -991,20 +1004,34 @@ export default function Dashboard() {
               </div>
             </div>
           ) : (
-            <div style={{ height: isMobile ? 180 : 220, width: "100%" }}>
+            <div style={{ height: isMobile ? 200 : 240, width: "100%" }}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={revenueTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={B1} stopOpacity={0.18} />
-                      <stop offset="95%" stopColor={B1} stopOpacity={0} />
+                      <stop offset="5%" stopColor={GREEN} stopOpacity={0.22} />
+                      <stop offset="95%" stopColor={GREEN} stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="penGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={GOLD} stopOpacity={0.18} />
+                      <stop offset="95%" stopColor={GOLD} stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,85,255,.08)" />
                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: T4, fontSize: 11, fontWeight: 700 }} dy={10} />
                   <YAxis axisLine={false} tickLine={false} tick={{ fill: T4, fontSize: 11, fontWeight: 700 }} />
-                  <Tooltip formatter={(v: any) => [`${v}K`, "Revenue"]} contentStyle={{ borderRadius: 14, border: "none", boxShadow: "0 10px 25px rgba(0,0,0,.10)", padding: "10px 14px" }} itemStyle={{ fontWeight: 700, fontSize: 12 }} />
-                  <Area type="monotone" dataKey="revenue" stroke={B1} strokeWidth={3} fillOpacity={1} fill="url(#revGrad)" dot={{ r: 4, fill: B1, strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 6, strokeWidth: 0 }} />
+                  <Tooltip
+                    formatter={(v: number, name: string) => [`₹${v.toLocaleString()}K`, name === "collected" ? "Collected" : "Pending"]}
+                    contentStyle={{ borderRadius: 14, border: "none", boxShadow: "0 10px 25px rgba(0,0,0,.10)", padding: "10px 14px" }}
+                    itemStyle={{ fontWeight: 700, fontSize: 12 }}
+                  />
+                  <Legend
+                    wrapperStyle={{ fontSize: 11, fontWeight: 700, paddingTop: 4 }}
+                    iconType="circle"
+                    formatter={(value: string) => value === "collected" ? "Collected" : "Pending"}
+                  />
+                  <Area type="monotone" dataKey="pending"   stroke={GOLD}  strokeWidth={2.5} fillOpacity={1} fill="url(#penGrad)" dot={{ r: 3, fill: GOLD,  strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 5, strokeWidth: 0 }} />
+                  <Area type="monotone" dataKey="collected" stroke={GREEN} strokeWidth={3}   fillOpacity={1} fill="url(#revGrad)" dot={{ r: 4, fill: GREEN, strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 6, strokeWidth: 0 }} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
