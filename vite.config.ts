@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
+import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -20,6 +21,82 @@ export default defineConfig(({ mode }) => {
     clearScreen: false,
     plugins: [
       react(),
+      VitePWA({
+        registerType: "prompt",
+        includeAssets: ["favicon.ico", "robots.txt", "icons/icon.svg", "icons/icon-maskable.svg"],
+        manifest: {
+          name: "Edullent — Owner Dashboard",
+          short_name: "Edullent",
+          description: "Multi-branch school analytics, finance, academics and operations.",
+          theme_color: "#1e3a8a",
+          background_color: "#EEF4FF",
+          display: "standalone",
+          orientation: "portrait",
+          start_url: "/",
+          scope: "/",
+          lang: "en",
+          categories: ["education", "productivity", "business"],
+          icons: [
+            { src: "icons/icon.svg",          sizes: "192x192", type: "image/svg+xml", purpose: "any" },
+            { src: "icons/icon.svg",          sizes: "512x512", type: "image/svg+xml", purpose: "any" },
+            { src: "icons/icon.svg",          sizes: "any",     type: "image/svg+xml", purpose: "any" },
+            { src: "icons/icon-maskable.svg", sizes: "512x512", type: "image/svg+xml", purpose: "maskable" },
+          ],
+        },
+        workbox: {
+          globPatterns: ["**/*.{js,css,html,svg,png,ico,webp,woff2}"],
+          navigateFallback: "/index.html",
+          navigateFallbackDenylist: [/^\/api\//, /^\/parent-portal/],
+          cleanupOutdatedCaches: true,
+          maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+          runtimeCaching: [
+            {
+              urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+              handler: "StaleWhileRevalidate",
+              options: { cacheName: "google-fonts-css", expiration: { maxAgeSeconds: 60 * 60 * 24 * 30 } },
+            },
+            {
+              urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+              handler: "CacheFirst",
+              options: {
+                cacheName: "google-fonts-webfonts",
+                expiration: { maxAgeSeconds: 60 * 60 * 24 * 365, maxEntries: 30 },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
+            {
+              urlPattern: /^https:\/\/firestore\.googleapis\.com\/.*/i,
+              handler: "NetworkFirst",
+              options: {
+                cacheName: "firestore-cache",
+                networkTimeoutSeconds: 5,
+                expiration: { maxAgeSeconds: 60 * 5, maxEntries: 80 },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
+            {
+              urlPattern: /^https:\/\/identitytoolkit\.googleapis\.com\/.*/i,
+              handler: "NetworkOnly",
+            },
+            {
+              urlPattern: /^https:\/\/securetoken\.googleapis\.com\/.*/i,
+              handler: "NetworkOnly",
+            },
+            {
+              urlPattern: ({ request }) => request.destination === "image",
+              handler: "StaleWhileRevalidate",
+              options: {
+                cacheName: "images",
+                expiration: { maxAgeSeconds: 60 * 60 * 24 * 30, maxEntries: 60 },
+              },
+            },
+          ],
+        },
+        devOptions: {
+          enabled: false,
+          type: "module",
+        },
+      }),
       {
         name: 'local-email-middleware',
         configureServer: (server: any) => {

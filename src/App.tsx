@@ -5,6 +5,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import AppLayout from "@/components/AppLayout";
 import OnboardingModal from "@/components/OnboardingModal";
+import OfflineBanner from "@/components/OfflineBanner";
+import PWAUpdateToast from "@/components/PWAUpdateToast";
+import InstallPrompt from "@/components/InstallPrompt";
 import LoginPage from "@/pages/LoginPage";
 import { lazy, Suspense, useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
@@ -107,6 +110,9 @@ const App = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        <OfflineBanner />
+        <PWAUpdateToast />
+        <InstallPrompt />
         <BrowserRouter>
           <Routes>
             {/* ── Public routes (no auth needed) ────────────────────── */}
