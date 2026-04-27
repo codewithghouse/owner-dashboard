@@ -94,9 +94,61 @@
     @apply border-border;
   }
 
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+    text-rendering: optimizeLegibility;
+  }
+
+  button, a, [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  input, textarea, select {
+    font-size: 16px;
+  }
+  @media (min-width: 640px) {
+    input, textarea, select { font-size: inherit; }
+  }
+}
+
+@layer utilities {
+  .safe-top    { padding-top:    env(safe-area-inset-top); }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+  .safe-left   { padding-left:   env(safe-area-inset-left); }
+  .safe-right  { padding-right:  env(safe-area-inset-right); }
+  .safe-x      { padding-left:   env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+  .safe-y      { padding-top:    env(safe-area-inset-top);  padding-bottom: env(safe-area-inset-bottom); }
+
+  .mt-safe    { margin-top:    env(safe-area-inset-top); }
+  .mb-safe    { margin-bottom: env(safe-area-inset-bottom); }
+
+  .h-svh { height: 100svh; }
+  .min-h-svh { min-height: 100svh; }
+  .h-dvh { height: 100dvh; }
+  .min-h-dvh { min-height: 100dvh; }
+
+  .touch-target { min-height: 44px; min-width: 44px; }
+
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+
+  .scroll-snap-x { scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
+  .snap-start    { scroll-snap-align: start; }
+
+  .edge-fade-x {
+    mask-image: linear-gradient(to right, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 16px, #000 calc(100% - 16px), transparent);
   }
 }
 
@@ -117,30 +169,32 @@ div[class*="shadow-sm"][class*="rounded-"]:not(.dash3d):not(.dash-tile):not(.das
   position: relative;
 }
 
-.bg-white[class*="rounded-"]:not(.dash3d):not(.dash-tile):not(.dash-card):hover,
-.bg-card[class*="rounded-"]:not(.dash3d):not(.dash-tile):not(.dash-card):hover,
-[class*="bg-white"][class*="border"][class*="rounded-"]:not(.dash3d):not(.dash-tile):not(.dash-card):hover,
-div[class*="shadow-sm"][class*="rounded-"]:not(.dash3d):not(.dash-tile):not(.dash-card):hover,
-.stat-card:hover {
-  transform: translateY(-4px) scale(1.008) !important;
-  box-shadow: 0 20px 40px rgba(30, 58, 138, 0.08),
-              0 8px 16px rgba(0, 0, 0, 0.04),
-              0 0 0 1px rgba(59, 91, 219, 0.1) !important;
-  border-color: rgba(59, 91, 219, 0.2) !important;
-}
+@media (hover: hover) and (pointer: fine) {
+  .bg-white[class*="rounded-"]:not(.dash3d):not(.dash-tile):not(.dash-card):hover,
+  .bg-card[class*="rounded-"]:not(.dash3d):not(.dash-tile):not(.dash-card):hover,
+  [class*="bg-white"][class*="border"][class*="rounded-"]:not(.dash3d):not(.dash-tile):not(.dash-card):hover,
+  div[class*="shadow-sm"][class*="rounded-"]:not(.dash3d):not(.dash-tile):not(.dash-card):hover,
+  .stat-card:hover {
+    transform: translateY(-4px) scale(1.008) !important;
+    box-shadow: 0 20px 40px rgba(30, 58, 138, 0.08),
+                0 8px 16px rgba(0, 0, 0, 0.04),
+                0 0 0 1px rgba(59, 91, 219, 0.1) !important;
+    border-color: rgba(59, 91, 219, 0.2) !important;
+  }
 
-/* Radial glow shine on hover */
-.bg-white[class*="rounded-"]:not(.dash3d):not(.dash-tile):not(.dash-card):hover::after,
-.bg-card[class*="rounded-"]:not(.dash3d):not(.dash-tile):not(.dash-card):hover::after,
-div[class*="shadow-sm"][class*="rounded-"]:not(.dash3d):not(.dash-tile):not(.dash-card):hover::after,
-.stat-card:hover::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: radial-gradient(circle at 30% 20%, rgba(59, 91, 219, 0.05) 0%, transparent 60%);
-  z-index: 0;
+  /* Radial glow shine on hover */
+  .bg-white[class*="rounded-"]:not(.dash3d):not(.dash-tile):not(.dash-card):hover::after,
+  .bg-card[class*="rounded-"]:not(.dash3d):not(.dash-tile):not(.dash-card):hover::after,
+  div[class*="shadow-sm"][class*="rounded-"]:not(.dash3d):not(.dash-tile):not(.dash-card):hover::after,
+  .stat-card:hover::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: radial-gradient(circle at 30% 20%, rgba(59, 91, 219, 0.05) 0%, transparent 60%);
+    z-index: 0;
+  }
 }
 
 /* Keep children above the ::after glow */
@@ -171,21 +225,23 @@ button[class*="bg-[#1e3a8a]"],
 a[class*="bg-primary"] {
   transition: transform 0.15s ease, box-shadow 0.2s ease !important;
 }
-button[class*="bg-primary"]:hover,
-button[class*="bg-blue"]:hover,
-button[class*="bg-[#1e3a8a]"]:hover,
-a[class*="bg-primary"]:hover {
-  transform: translateY(-2px) !important;
-  box-shadow: 0 6px 20px rgba(30, 58, 138, 0.25) !important;
+@media (hover: hover) and (pointer: fine) {
+  button[class*="bg-primary"]:hover,
+  button[class*="bg-blue"]:hover,
+  button[class*="bg-[#1e3a8a]"]:hover,
+  a[class*="bg-primary"]:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(30, 58, 138, 0.25) !important;
+  }
+
+  /* ── Table row hover ──────────────────────────────────────────── */
+  tr[class*="hover"]:hover,
+  tbody tr:hover {
+    background: rgba(59, 91, 219, 0.03) !important;
+    transition: background 0.15s ease !important;
+  }
 }
 button:active, a:active { transform: scale(0.97) !important; }
-
-/* ── Table row hover ──────────────────────────────────────────── */
-tr[class*="hover"]:hover,
-tbody tr:hover {
-  background: rgba(59, 91, 219, 0.03) !important;
-  transition: background 0.15s ease !important;
-}
 
 /* ── Page fade-in ─────────────────────────────────────────────── */
 @keyframes ownerFadeSlideIn {
@@ -198,9 +254,11 @@ main > div,
 }
 
 /* ── Stat number scale on card hover ──────────────────────────── */
-.stat-card:hover [class*="text-2xl"],
-.stat-card:hover [class*="text-3xl"],
-.stat-card:hover [class*="text-4xl"] {
-  transform: scale(1.05);
-  transition: transform 0.25s ease;
+@media (hover: hover) and (pointer: fine) {
+  .stat-card:hover [class*="text-2xl"],
+  .stat-card:hover [class*="text-3xl"],
+  .stat-card:hover [class*="text-4xl"] {
+    transform: scale(1.05);
+    transition: transform 0.25s ease;
+  }
 }
