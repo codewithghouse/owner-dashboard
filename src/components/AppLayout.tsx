@@ -438,7 +438,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* ── Body: Sidebar + Page Content ─────────────────────────────────── */}
-      <div className="flex flex-1 overflow-hidden min-h-0">
+      <div className="flex flex-1 overflow-hidden min-h-0 min-w-0">
 
       {/* Sidebar */}
       <aside className={`
@@ -510,8 +510,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main */}
-      <main className="flex-1 overflow-auto bg-[#EEF4FF]">
-        <div className="p-4 lg:px-8 lg:pt-6 lg:pb-8 mb-[calc(5rem+env(safe-area-inset-bottom))] lg:mb-0">
+      <main className="flex-1 overflow-y-auto overflow-x-hidden bg-[#EEF4FF] min-w-0">
+        <div className="p-4 lg:px-8 lg:pt-6 lg:pb-8 mb-[calc(5rem+env(safe-area-inset-bottom))] lg:mb-0 max-w-full">
           {children}
         </div>
       </main>

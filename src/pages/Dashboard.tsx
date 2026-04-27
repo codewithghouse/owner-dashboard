@@ -442,6 +442,9 @@ export default function Dashboard() {
         minHeight: "100vh",
         margin: isMobile ? "-16px -16px 0" : "-40px -40px 0",
         padding: isMobile ? "16px 16px 32px" : "24px 32px 40px",
+        maxWidth: "100vw",
+        overflowX: "hidden",
+        boxSizing: "border-box",
       }}
     >
       {/* ── Page Head ─────────────────────────────────────── */}
