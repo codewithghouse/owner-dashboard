@@ -4,36 +4,44 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import AppLayout from "@/components/AppLayout";
-import Dashboard from "@/pages/Dashboard";
-import StudentsIntelligence from "@/pages/StudentsIntelligence";
-import StudentProfile from "@/pages/StudentProfile";
-import TeacherPerformance from "@/pages/TeacherPerformance";
-import TeacherProfile from "@/pages/TeacherProfile";
-import TeachersDirectory from "@/pages/TeachersDirectory";
-import FeeStructureOverview from "@/pages/FeeStructureOverview";
-import AcademicsOverview from "@/pages/AcademicsOverview";
-import FinanceFees from "@/pages/FinanceFees";
-import RisksAlerts from "@/pages/RisksAlerts";
-import AlertDetail from "@/pages/AlertDetail";
-import BranchesComparison from "@/pages/BranchesComparison";
-import ReportsCenter from "@/pages/ReportsCenter";
-import SettingsPage from "@/pages/SettingsPage";
-import PrincipalManagement from "@/pages/PrincipalManagement";
-import DEOManagement from "@/pages/DEOManagement";
-import AuditLogPage from "@/pages/AuditLogPage";
-import AIPredictorPage from "@/pages/AIPredictorPage";
-import TeacherLeaderboard from "@/pages/TeacherLeaderboard";
-import OwnerDashboard from "@/pages/owner/OwnerDashboard";
-import ParentPortal from "@/pages/ParentPortal";
-import NotFound from "@/pages/NotFound";
-import LoginPage from "@/pages/LoginPage";
 import OnboardingModal from "@/components/OnboardingModal";
-import { useState, useEffect } from "react";
+import LoginPage from "@/pages/LoginPage";
+import { lazy, Suspense, useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs, limit, query, setDoc } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { syncClaimsAndRefreshToken } from "@/lib/syncClaims";
 import { Loader2 } from "lucide-react";
+
+// ── Route-level code splitting (PWA pre-req: shrink initial bundle) ──────────
+const Dashboard            = lazy(() => import("@/pages/Dashboard"));
+const StudentsIntelligence = lazy(() => import("@/pages/StudentsIntelligence"));
+const StudentProfile       = lazy(() => import("@/pages/StudentProfile"));
+const TeacherPerformance   = lazy(() => import("@/pages/TeacherPerformance"));
+const TeacherProfile       = lazy(() => import("@/pages/TeacherProfile"));
+const TeachersDirectory    = lazy(() => import("@/pages/TeachersDirectory"));
+const FeeStructureOverview = lazy(() => import("@/pages/FeeStructureOverview"));
+const AcademicsOverview    = lazy(() => import("@/pages/AcademicsOverview"));
+const FinanceFees          = lazy(() => import("@/pages/FinanceFees"));
+const RisksAlerts          = lazy(() => import("@/pages/RisksAlerts"));
+const AlertDetail          = lazy(() => import("@/pages/AlertDetail"));
+const BranchesComparison   = lazy(() => import("@/pages/BranchesComparison"));
+const ReportsCenter        = lazy(() => import("@/pages/ReportsCenter"));
+const SettingsPage         = lazy(() => import("@/pages/SettingsPage"));
+const PrincipalManagement  = lazy(() => import("@/pages/PrincipalManagement"));
+const DEOManagement        = lazy(() => import("@/pages/DEOManagement"));
+const AuditLogPage         = lazy(() => import("@/pages/AuditLogPage"));
+const AIPredictorPage      = lazy(() => import("@/pages/AIPredictorPage"));
+const TeacherLeaderboard   = lazy(() => import("@/pages/TeacherLeaderboard"));
+const OwnerDashboard       = lazy(() => import("@/pages/owner/OwnerDashboard"));
+const ParentPortal         = lazy(() => import("@/pages/ParentPortal"));
+const NotFound             = lazy(() => import("@/pages/NotFound"));
+
+const RouteFallback = () => (
+  <div className="flex items-center justify-center py-20">
+    <Loader2 className="w-6 h-6 animate-spin text-[#1e3a8a]" />
+  </div>
+);
 
 const queryClient = new QueryClient();
 
@@ -102,7 +110,7 @@ const App = () => {
         <BrowserRouter>
           <Routes>
             {/* ── Public routes (no auth needed) ────────────────────── */}
-            <Route path="/parent-portal" element={<ParentPortal />} />
+            <Route path="/parent-portal" element={<Suspense fallback={<RouteFallback />}><ParentPortal /></Suspense>} />
 
             {/* ── Auth-gated routes ──────────────────────────────────── */}
             {!user ? (
@@ -114,32 +122,34 @@ const App = () => {
                     <OnboardingModal onComplete={() => setShowOnboarding(false)} />
                   )}
                   <AppLayout>
-                    <Routes>
-                      <Route path="/"                      element={<Dashboard />} />
-                      <Route path="/students"              element={<StudentsIntelligence />} />
-                      <Route path="/students/:id"          element={<StudentProfile />} />
-                      <Route path="/teachers"              element={<TeacherPerformance />} />
-                      <Route path="/teachers/:id"          element={<TeacherPerformance />} />
-                      <Route path="/teachers/profile/:id"  element={<TeacherProfile />} />
-                      <Route path="/teachers-directory"    element={<TeachersDirectory />} />
-                      <Route path="/academics"             element={<AcademicsOverview />} />
-                      <Route path="/academics/:id"         element={<AcademicsOverview />} />
-                      <Route path="/finance"               element={<FinanceFees />} />
-                      <Route path="/fee-structure"         element={<FeeStructureOverview />} />
-                      <Route path="/risks"                 element={<RisksAlerts />} />
-                      <Route path="/risks/:id"             element={<AlertDetail />} />
-                      <Route path="/branches"              element={<BranchesComparison />} />
-                      <Route path="/branches/:id"          element={<BranchesComparison />} />
-                      <Route path="/reports"               element={<ReportsCenter />} />
-                      <Route path="/principals"            element={<PrincipalManagement />} />
-                      <Route path="/deo"                   element={<DEOManagement />} />
-                      <Route path="/audit"                 element={<AuditLogPage />} />
-                      <Route path="/ai-predictor"          element={<AIPredictorPage />} />
-                      <Route path="/teacher-leaderboard"   element={<TeacherLeaderboard />} />
-                      <Route path="/branch-leaderboard"    element={<OwnerDashboard />} />
-                      <Route path="/settings"              element={<SettingsPage />} />
-                      <Route path="*"                      element={<NotFound />} />
-                    </Routes>
+                    <Suspense fallback={<RouteFallback />}>
+                      <Routes>
+                        <Route path="/"                      element={<Dashboard />} />
+                        <Route path="/students"              element={<StudentsIntelligence />} />
+                        <Route path="/students/:id"          element={<StudentProfile />} />
+                        <Route path="/teachers"              element={<TeacherPerformance />} />
+                        <Route path="/teachers/:id"          element={<TeacherPerformance />} />
+                        <Route path="/teachers/profile/:id"  element={<TeacherProfile />} />
+                        <Route path="/teachers-directory"    element={<TeachersDirectory />} />
+                        <Route path="/academics"             element={<AcademicsOverview />} />
+                        <Route path="/academics/:id"         element={<AcademicsOverview />} />
+                        <Route path="/finance"               element={<FinanceFees />} />
+                        <Route path="/fee-structure"         element={<FeeStructureOverview />} />
+                        <Route path="/risks"                 element={<RisksAlerts />} />
+                        <Route path="/risks/:id"             element={<AlertDetail />} />
+                        <Route path="/branches"              element={<BranchesComparison />} />
+                        <Route path="/branches/:id"          element={<BranchesComparison />} />
+                        <Route path="/reports"               element={<ReportsCenter />} />
+                        <Route path="/principals"            element={<PrincipalManagement />} />
+                        <Route path="/deo"                   element={<DEOManagement />} />
+                        <Route path="/audit"                 element={<AuditLogPage />} />
+                        <Route path="/ai-predictor"          element={<AIPredictorPage />} />
+                        <Route path="/teacher-leaderboard"   element={<TeacherLeaderboard />} />
+                        <Route path="/branch-leaderboard"    element={<OwnerDashboard />} />
+                        <Route path="/settings"              element={<SettingsPage />} />
+                        <Route path="*"                      element={<NotFound />} />
+                      </Routes>
+                    </Suspense>
                   </AppLayout>
                 </>
               } />
