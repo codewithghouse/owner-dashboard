@@ -27,11 +27,11 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile";
 
 // ── Risk visual config ────────────────────────────────────────────────────────
-const RISK_TIER: Record<RiskLevel, { label: string; grad: string; color: string; bg: string }> = {
-  Critical: { label: "Critical Risk", grad: GRAD_RED,    color: RED,    bg: "rgba(255,51,85,.10)" },
-  High:     { label: "High Risk",     grad: GRAD_ORANGE, color: ORANGE, bg: "rgba(255,136,0,.10)" },
-  Watch:    { label: "Watch",         grad: GRAD_GOLD,   color: GOLD,   bg: "rgba(255,170,0,.10)" },
-  Safe:     { label: "Safe",          grad: GRAD_GREEN,  color: GREEN,  bg: "rgba(0,200,83,.10)" },
+const RISK_TIER: Record<RiskLevel, { label: string; grad: string; solidGrad: string; color: string; bg: string }> = {
+  Critical: { label: "Critical Risk", grad: GRAD_RED,    solidGrad: "linear-gradient(135deg,#FF3355 0%,#DC2626 100%)", color: RED,    bg: "rgba(255,51,85,.10)" },
+  High:     { label: "High Risk",     grad: GRAD_ORANGE, solidGrad: "linear-gradient(135deg,#FF8800 0%,#EA580C 100%)", color: ORANGE, bg: "rgba(255,136,0,.10)" },
+  Watch:    { label: "Watch",         grad: GRAD_GOLD,   solidGrad: "linear-gradient(135deg,#F59E0B 0%,#D97706 100%)", color: GOLD,   bg: "rgba(255,170,0,.10)" },
+  Safe:     { label: "Safe",          grad: GRAD_GREEN,  solidGrad: "linear-gradient(135deg,#10B981 0%,#059669 100%)", color: GREEN,  bg: "rgba(0,200,83,.10)" },
 };
 
 const RISK_ICON: Record<RiskLevel, React.ElementType> = {
@@ -274,7 +274,7 @@ export default function AIPredictorPage() {
                     position:"relative",
                   }}
                 >
-                  <div style={{ position:"absolute", left:0, top:0, bottom:0, width: isMobile ? 3 : 4, background:tier.grad }}/>
+                  <div style={{ position:"absolute", left:0, top:0, bottom:0, width: isMobile ? 3 : 4, background:tier.solidGrad }}/>
 
                   {isMobile ? (
                     /* Mobile: two-row layout — header + compact stats strip */
@@ -282,7 +282,7 @@ export default function AIPredictorPage() {
                       {/* Row 1: avatar + name/meta + actions */}
                       <div style={{ display:"flex", alignItems:"center", gap:11 }}>
                         <div style={{
-                          width:38, height:38, borderRadius:11, background:tier.grad,
+                          width:38, height:38, borderRadius:11, background:tier.solidGrad,
                           display:"flex", alignItems:"center", justifyContent:"center",
                           color:"#fff", fontSize:11, fontWeight:800, flexShrink:0,
                           boxShadow:`0 6px 14px ${tier.color}33`,
@@ -344,7 +344,7 @@ export default function AIPredictorPage() {
                           <span style={{ fontSize:12, fontWeight:800, color:tier.color }}>{p.failProbability}%</span>
                         </div>
                         <div style={{ height:6, background:"#F5F9FF", borderRadius:999, overflow:"hidden" }}>
-                          <div style={{ height:"100%", width:`${p.failProbability}%`, background:tier.grad, borderRadius:999 }}/>
+                          <div style={{ height:"100%", width:`${p.failProbability}%`, background:tier.solidGrad, borderRadius:999 }}/>
                         </div>
                       </div>
 
@@ -374,7 +374,7 @@ export default function AIPredictorPage() {
                   ) : (
                   <div style={{ display:"flex", alignItems:"center", gap:14, padding:"14px 18px 14px 22px" }}>
                     <div style={{
-                      width:40, height:40, borderRadius:12, background:tier.grad,
+                      width:40, height:40, borderRadius:12, background:tier.solidGrad,
                       display:"flex", alignItems:"center", justifyContent:"center",
                       color:"#fff", fontSize:11, fontWeight:800, flexShrink:0,
                       boxShadow:`0 6px 14px ${tier.color}33`,
@@ -406,7 +406,7 @@ export default function AIPredictorPage() {
                         <span style={{ fontSize:13, fontWeight:800, color:tier.color }}>{p.failProbability}%</span>
                       </div>
                       <div style={{ height:6, background:"#F5F9FF", borderRadius:999, overflow:"hidden" }}>
-                        <div style={{ height:"100%", width:`${p.failProbability}%`, background:tier.grad, borderRadius:999 }}/>
+                        <div style={{ height:"100%", width:`${p.failProbability}%`, background:tier.solidGrad, borderRadius:999 }}/>
                       </div>
                     </div>
 

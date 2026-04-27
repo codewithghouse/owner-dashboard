@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { tilt3D, tilt3DStyle } from "@/lib/use3DTilt";
+import { GRAD_ACCENTS } from "@/lib/dashboardTokens";
 
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const GRADE_COLORS = ["#1e3a8a","#2563eb","#3b82f6","#60a5fa","#93c5fd","#bfdbfe"];
@@ -461,11 +462,11 @@ export default function StudentsIntelligence() {
   const GREEN = "#00C853", RED = "#FF3355", GOLD = "#FFAA00", VIOLET = "#7B3FF4";
   const GRAD_PRIMARY = `linear-gradient(135deg, ${B1}, ${B2})`;
   const GRAD_HERO = "linear-gradient(135deg,#001040 0%,#001888 35%,#0033CC 70%,#0055FF 100%)";
-  const GRAD_BLUE = "linear-gradient(140deg,#F0F5FF 0%,#DCE7FF 55%,#C8D8FF 100%)";
-  const GRAD_GREEN = "linear-gradient(140deg,#EAFBF1 0%,#CFEEDA 55%,#B4E2C2 100%)";
-  const GRAD_VIOLET = "linear-gradient(140deg,#F6EEFF 0%,#E7D6FF 55%,#D6BEFF 100%)";
-  const GRAD_GOLD = "linear-gradient(140deg,#FFFAE0 0%,#FFEEB0 55%,#FFE082 100%)";
-  const GRAD_RED = "linear-gradient(140deg,#FFECEE 0%,#FFCAD2 55%,#FFA8B4 100%)";
+  const GRAD_BLUE   = "linear-gradient(135deg,#F7FAFF 0%,#EEF3FF 100%)";
+  const GRAD_GREEN  = "linear-gradient(135deg,#F5FCF8 0%,#E9F8EF 100%)";
+  const GRAD_VIOLET = "linear-gradient(135deg,#FAF7FF 0%,#F2EBFF 100%)";
+  const GRAD_GOLD   = "linear-gradient(135deg,#FFFCF0 0%,#FEF5DC 100%)";
+  const GRAD_RED    = "linear-gradient(135deg,#FEF8F9 0%,#FCEAEE 100%)";
   const SHADOW_SM = "0 0 0 .5px rgba(0,85,255,.08), 0 2px 8px rgba(0,85,255,.08), 0 10px 26px rgba(0,85,255,.10)";
   const SHADOW_LG = "0 0 0 .5px rgba(0,85,255,.10), 0 4px 16px rgba(0,85,255,.11), 0 18px 44px rgba(0,85,255,.13)";
   const SHADOW_BTN = "0 6px 22px rgba(0,85,255,.40), 0 2px 5px rgba(0,85,255,.20)";
@@ -489,10 +490,10 @@ export default function StudentsIntelligence() {
       `}</style>
       <div
         style={{
-          fontFamily: "'DM Sans', -apple-system, sans-serif",
+          fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
           background: "#EEF4FF",
           minHeight: "100vh",
-          margin: isMobile ? "-12px -12px 0" : "-16px -24px 0",
+          margin: isMobile ? "-12px -12px 0" : "-40px -40px 0",
           padding: isMobile ? "16px 14px 28px" : "24px 32px 40px",
         }}
       >
@@ -503,10 +504,10 @@ export default function StudentsIntelligence() {
             <GraduationCap size={isMobile ? 20 : 24} color="#fff" strokeWidth={2.2}/>
           </div>
           <div style={{ minWidth:0 }}>
-            <h1 style={{ fontSize: isMobile ? 20 : 32, fontWeight:700, color:T1, letterSpacing: isMobile ? "-0.4px" : "-0.8px", margin:0, lineHeight:1.1 }}>
+            <h1 style={{ fontSize: isMobile ? 20 : 28, fontWeight:700, color:T1, letterSpacing: isMobile ? "-0.4px" : "-0.6px", margin:0, lineHeight:1.15 }}>
               Students Intelligence
             </h1>
-            <p style={{ fontSize: isMobile ? 10 : 12, color:T3, fontWeight:500, margin:"5px 0 0 0", letterSpacing:"0.10em", textTransform:"uppercase" }}>
+            <p style={{ fontSize: isMobile ? 12 : 14, color:T3, fontWeight:500, margin:"4px 0 0 0", letterSpacing:0 }}>
               Enrollment, performance &amp; behavior analytics
             </p>
           </div>
@@ -593,6 +594,7 @@ export default function StudentsIntelligence() {
               { label:"High Performers", value:highPerformers.toString(), sub:`${totalEnrollment>0?((highPerformers/totalEnrollment)*100).toFixed(1):0}% of total`, grad:GRAD_VIOLET, icon:Award, delta:"up", route:"/students" },
             ].map(s=>{
               const Icon = s.icon;
+              const accent = GRAD_ACCENTS[s.grad] || "#4F46E5";
               return (
                 <div
                   key={s.label}
@@ -601,25 +603,28 @@ export default function StudentsIntelligence() {
                   tabIndex={0}
                   {...tilt3D}
                   style={{
-                    background:s.grad, borderRadius: isMobile ? 16 : 22, padding: isMobile ? "14px 14px" : "20px 22px", color:T1,
+                    background:s.grad, borderRadius: isMobile ? 16 : 22, padding: isMobile ? "14px 14px" : "20px 22px",
                     cursor:"pointer", position:"relative", overflow:"hidden",
-                    boxShadow:"0 0 0 .5px rgba(0,16,64,.06), 0 10px 28px rgba(0,85,255,.12), 0 4px 12px rgba(0,85,255,.08)",
+                    boxShadow:"0 4px 8px rgba(0,85,255,.12), 0 12px 24px rgba(0,85,255,.16), 0 28px 56px rgba(0,85,255,.18)",
                     ...tilt3DStyle,
                   }}
                 >
-                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: isMobile ? 10 : 14, position:"relative", zIndex:1 }}>
-                    <div style={{ width: isMobile ? 32 : 38, height: isMobile ? 32 : 38, borderRadius: isMobile ? 10 : 12, background:"rgba(255,255,255,.65)", border:"0.5px solid rgba(0,16,64,.08)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                      <Icon size={isMobile ? 16 : 19} color={T1} strokeWidth={2.4}/>
-                    </div>
-                    {s.delta && (
-                      <div style={{ display:"inline-flex", alignItems:"center", gap:3, padding:"4px 8px", borderRadius:8, background:"rgba(255,255,255,.55)", fontSize:10, fontWeight:800, color:T1 }}>
-                        {s.delta === "up" ? <ArrowUpRight size={11}/> : <ArrowDownRight size={11}/>}
-                      </div>
-                    )}
+                  {/* Decorative faded icon — bottom-right */}
+                  <div style={{ position:"absolute", bottom: isMobile ? 8 : 12, right: isMobile ? 10 : 16, color: accent, opacity: 0.22, pointerEvents:"none", lineHeight: 0 }}>
+                    <Icon size={isMobile ? 48 : 64} strokeWidth={2}/>
                   </div>
-                  <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:800, color:T3, letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 4px 0", position:"relative", zIndex:1 }}>{s.label}</p>
-                  <p style={{ fontSize: isMobile ? 22 : 30, fontWeight:800, color:T1, letterSpacing:"-0.6px", margin:0, lineHeight:1.1, position:"relative", zIndex:1 }}>{s.value}</p>
-                  <p style={{ fontSize: isMobile ? 10 : 11, fontWeight:600, color:T3, margin:"6px 0 0 0", position:"relative", zIndex:1 }}>{s.sub}</p>
+                  {/* Solid icon badge — top-left */}
+                  <div style={{ width: isMobile ? 36 : 44, height: isMobile ? 36 : 44, borderRadius: isMobile ? 10 : 12, display:"flex", alignItems:"center", justifyContent:"center", background: accent, marginBottom: isMobile ? 10 : 14, boxShadow: `0 4px 12px ${accent}33`, position:"relative", zIndex:1 }}>
+                    <Icon size={isMobile ? 18 : 20} color="#FFFFFF" strokeWidth={2.5}/>
+                  </div>
+                  {s.delta && (
+                    <div style={{ position:"absolute", top: isMobile ? 14 : 20, right: isMobile ? 14 : 20, display:"inline-flex", alignItems:"center", gap:3, padding:"4px 8px", borderRadius:8, background: `${accent}1A`, fontSize:10, fontWeight:800, color: accent, zIndex:1 }}>
+                      {s.delta === "up" ? <ArrowUpRight size={11}/> : <ArrowDownRight size={11}/>}
+                    </div>
+                  )}
+                  <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:700, color:"#94A3B8", letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 6px 0", position:"relative", zIndex:1 }}>{s.label}</p>
+                  <p style={{ fontSize: isMobile ? 22 : 30, fontWeight:800, color:"#0F172A", letterSpacing:"-0.6px", margin:0, lineHeight:1.1, position:"relative", zIndex:1 }}>{s.value}</p>
+                  <p style={{ fontSize: isMobile ? 10 : 11, fontWeight:600, color:"#64748B", margin:"6px 0 0 0", position:"relative", zIndex:1 }}>{s.sub}</p>
                 </div>
               );
             })}
@@ -905,7 +910,7 @@ export default function StudentsIntelligence() {
                       const risk = getRisk(s.score);
                       const riskBg = s.score>=75 ? "rgba(0,200,83,.1)" : s.score>=50 ? "rgba(255,170,0,.1)" : "rgba(255,51,85,.1)";
                       const riskColor = s.score>=75 ? GREEN : s.score>=50 ? GOLD : RED;
-                      const avatarBg = s.score>=75 ? GRAD_GREEN : s.score>=50 ? GRAD_GOLD : GRAD_RED;
+                      const avatarBg = s.score>=75 ? "linear-gradient(135deg,#10B981 0%,#059669 100%)" : s.score>=50 ? "linear-gradient(135deg,#F59E0B 0%,#D97706 100%)" : "linear-gradient(135deg,#FF3355 0%,#DC2626 100%)";
                       const isSelected = selected?._eid===s._eid;
                       return (
                         <div key={s._eid}
@@ -995,7 +1000,7 @@ export default function StudentsIntelligence() {
                         const risk = getRisk(s.score);
                         const riskBg = s.score>=75 ? "rgba(0,200,83,.1)" : s.score>=50 ? "rgba(255,170,0,.1)" : "rgba(255,51,85,.1)";
                         const riskColor = s.score>=75 ? GREEN : s.score>=50 ? GOLD : RED;
-                        const avatarBg = s.score>=75 ? GRAD_GREEN : s.score>=50 ? GRAD_GOLD : GRAD_RED;
+                        const avatarBg = s.score>=75 ? "linear-gradient(135deg,#10B981 0%,#059669 100%)" : s.score>=50 ? "linear-gradient(135deg,#F59E0B 0%,#D97706 100%)" : "linear-gradient(135deg,#FF3355 0%,#DC2626 100%)";
                         const isSelected = selected?._eid===s._eid;
                         return (
                           <tr key={s._eid}
@@ -1113,7 +1118,7 @@ export default function StudentsIntelligence() {
           {selected && (()=>{
             const risk = getRisk(selected.score);
             const isCritical = selected.score > 0 && selected.score < 50;
-            const headerGrad = selected.score>=75 ? GRAD_GREEN : selected.score>=50 ? GRAD_GOLD : GRAD_RED;
+            const headerGrad = selected.score>=75 ? "linear-gradient(135deg,#10B981 0%,#059669 100%)" : selected.score>=50 ? "linear-gradient(135deg,#F59E0B 0%,#D97706 100%)" : "linear-gradient(135deg,#FF3355 0%,#DC2626 100%)";
             return (
               <div
                 {...tilt3D}
@@ -1194,9 +1199,9 @@ export default function StudentsIntelligence() {
                     return (
                       <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: isMobile ? 10 : 14, marginBottom: isMobile ? 16 : 22 }}>
                         {[
-                          { label:"Attendance (30d)", value:attDisplay, sub:attSubText, subColor:attColor, icon:Percent, grad:GRAD_GREEN, route:`/students/${encodeURIComponent(selected.id)}` },
-                          { label:"Academic Score", value:scoreDisplay, sub:scoreSubText, subColor:scoreColor, icon:Award, grad:GRAD_BLUE, route:`/students/${encodeURIComponent(selected.id)}` },
-                          { label:"Behavior Incidents", value:selected.incidents.toString(), sub:"This term", subColor:T4, icon:AlertTriangle, grad:selected.incidents>0?GRAD_RED:GRAD_VIOLET, route: selected.incidents>0 ? "/risks" : `/students/${encodeURIComponent(selected.id)}` },
+                          { label:"Attendance (30d)", value:attDisplay, sub:attSubText, subColor:attColor, icon:Percent, grad:"linear-gradient(135deg,#10B981 0%,#059669 100%)", route:`/students/${encodeURIComponent(selected.id)}` },
+                          { label:"Academic Score", value:scoreDisplay, sub:scoreSubText, subColor:scoreColor, icon:Award, grad:"linear-gradient(135deg,#0055FF 0%,#1166FF 100%)", route:`/students/${encodeURIComponent(selected.id)}` },
+                          { label:"Behavior Incidents", value:selected.incidents.toString(), sub:"This term", subColor:T4, icon:AlertTriangle, grad: selected.incidents>0 ? "linear-gradient(135deg,#FF3355 0%,#DC2626 100%)" : "linear-gradient(135deg,#7B3FF4 0%,#9333EA 100%)", route: selected.incidents>0 ? "/risks" : `/students/${encodeURIComponent(selected.id)}` },
                         ].map(c=>{
                           const Icon = c.icon;
                           return (

@@ -254,7 +254,7 @@ export default function AcademicsOverview() {
           {subject.weakAreas.length > 0 && (
             <div style={{ marginBottom: isMobile ? 16 : 24 }}>
               <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 12, marginBottom: isMobile ? 10 : 14 }}>
-                <div style={{ width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius:11, background:GRAD_RED, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(255,51,85,.28)", flexShrink:0 }}>
+                <div style={{ width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius:11, background:"linear-gradient(135deg,#FF3355 0%,#DC2626 100%)", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(255,51,85,.28)", flexShrink:0 }}>
                   <AlertTriangle size={isMobile ? 16 : 18} color="#fff" strokeWidth={2.3}/>
                 </div>
                 <div style={{ minWidth:0 }}>

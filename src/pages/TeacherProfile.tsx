@@ -7,7 +7,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 // ── Tokens ───────────────────────────────────────────────────────────────────
 const T = {
-  bg:"#f8fafc",white:"#fff",ink:"#0f172a",ink2:"#475569",ink3:"#94a3b8",
+  bg:"#EEF4FF",white:"#fff",ink:"#0f172a",ink2:"#475569",ink3:"#94a3b8",
   bdr:"#e2e8f0",s1:"#f1f5f9",s2:"#e2e8f0",
   blue:"#3B5BDB",blBg:"#EDF2FF",grn:"#16a34a",glBg:"#f0fdf4",
   red:"#dc2626",rlBg:"#fef2f2",amb:"#d97706",alBg:"#fffbeb",
@@ -21,12 +21,12 @@ const Card=({children,title,action,style:st}:{children:React.ReactNode;title?:st
   return(
     <div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
       style={{position:"relative",background:T.white,border:`1px solid ${hov?"rgba(59,91,219,0.25)":T.bdr}`,borderRadius:16,overflow:"hidden",
-        transform: hov ? "translate3d(0,-5px,0) scale(1.02)" : "translate3d(0,0,0) scale(1)",
+        transform: hov ? "translate3d(0,-7px,0) scale(1.02)" : "translate3d(0,0,0) scale(1)",
         transition:"transform 0.22s cubic-bezier(0.2,0.8,0.2,1), box-shadow 0.22s ease, border-color 0.3s",
         willChange:"transform", backfaceVisibility:"hidden",
         boxShadow: hov
-          ? "0 0 0 0.5px rgba(59,91,219,0.14), 0 8px 24px rgba(59,91,219,0.16), 0 20px 46px rgba(59,91,219,0.18)"
-          : "0 1px 3px rgba(0,0,0,0.04)",
+          ? "0 8px 16px rgba(0,85,255,0.20), 0 24px 40px rgba(0,85,255,0.24), 0 40px 80px rgba(0,85,255,0.26)"
+          : "0 4px 8px rgba(0,85,255,0.12), 0 12px 24px rgba(0,85,255,0.16), 0 28px 56px rgba(0,85,255,0.18)",
         ...st}}>
       {title&&<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 20px",borderBottom:`1px solid ${T.s2}`,position:"relative",zIndex:2}}><span style={{fontSize:14,fontWeight:600,color:T.ink}}>{title}</span>{action||null}</div>}
       <div style={{padding:"16px 20px",position:"relative",zIndex:2}}>{children}</div>

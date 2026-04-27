@@ -597,9 +597,9 @@ export default function ReportsCenter() {
   const favorites = stats?.favorites ?? 0;
 
   const categoryBlocks = [
-    { key:"student",   title:"Student Reports",  icon:GraduationCap,  grad:GRAD_BLUE,    bg:"rgba(0,85,255,.08)",    items: REPORT_CATEGORIES.student },
-    { key:"teacher",   title:"Teacher Reports",  icon:Presentation,   grad:GRAD_GREEN,   bg:"rgba(0,200,83,.10)",    items: REPORT_CATEGORIES.teacher },
-    { key:"financial", title:"Financial Reports",icon:DollarSign,     grad:GRAD_GOLD,    bg:"rgba(255,170,0,.12)",   items: REPORT_CATEGORIES.financial },
+    { key:"student",   title:"Student Reports",  icon:GraduationCap,  grad:GRAD_BLUE,    iconGrad:"linear-gradient(135deg,#0055FF 0%,#1166FF 100%)", iconShadow:"rgba(0,85,255,.28)",   bg:"rgba(0,85,255,.08)",    items: REPORT_CATEGORIES.student },
+    { key:"teacher",   title:"Teacher Reports",  icon:Presentation,   grad:GRAD_GREEN,   iconGrad:"linear-gradient(135deg,#10B981 0%,#059669 100%)", iconShadow:"rgba(16,185,129,.28)", bg:"rgba(0,200,83,.10)",    items: REPORT_CATEGORIES.teacher },
+    { key:"financial", title:"Financial Reports",icon:DollarSign,     grad:GRAD_GOLD,    iconGrad:"linear-gradient(135deg,#F59E0B 0%,#D97706 100%)", iconShadow:"rgba(245,158,11,.28)", bg:"rgba(255,170,0,.12)",   items: REPORT_CATEGORIES.financial },
   ];
 
   return (
@@ -663,15 +663,15 @@ export default function ReportsCenter() {
             >
               <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 12, marginBottom: isMobile ? 12 : 16, paddingBottom: isMobile ? 10 : 14, borderBottom:"0.5px solid rgba(0,85,255,.08)" }}>
                 <div style={{
-                  width: isMobile ? 36 : 42, height: isMobile ? 36 : 42, borderRadius: isMobile ? 11 : 13, background:cat.grad,
+                  width: isMobile ? 36 : 42, height: isMobile ? 36 : 42, borderRadius: isMobile ? 11 : 13, background:cat.iconGrad,
                   display:"flex", alignItems:"center", justifyContent:"center",
-                  boxShadow:"0 6px 14px rgba(0,85,255,.18)", flexShrink:0,
+                  boxShadow:`0 6px 14px ${cat.iconShadow}`, flexShrink:0,
                 }}>
                   <Icon size={isMobile ? 17 : 20} color="#fff" strokeWidth={2.3}/>
                 </div>
                 <div style={{ minWidth: 0 }}>
                   <h3 style={{ fontSize: isMobile ? 13 : 15, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.3px" }}>{cat.title}</h3>
-                  <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:700, color:T4, margin:"2px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>{cat.items.length} templates</p>
+                  <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:700, color:"#5A6E96", margin:"2px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>{cat.items.length} templates</p>
                 </div>
               </div>
               <div style={{ display:"flex", flexDirection:"column", gap:4 }}>

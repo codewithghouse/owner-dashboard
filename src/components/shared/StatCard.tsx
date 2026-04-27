@@ -39,9 +39,9 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, subtitle }: PageHeaderProps) {
   return (
-    <div className="mb-6 lg:mb-10">
-      <h1 className="text-2xl lg:text-4xl font-black text-[#1e293b] tracking-tight">{title}</h1>
-      <p className="text-slate-400 font-medium text-xs lg:text-base mt-1">{subtitle}</p>
+    <div className="mb-5 lg:mb-7">
+      <h1 className="text-2xl lg:text-3xl font-black text-[#1e293b] tracking-tight">{title}</h1>
+      <p className="text-slate-400 font-medium text-xs lg:text-sm mt-1">{subtitle}</p>
     </div>
   );
 }

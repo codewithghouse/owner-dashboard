@@ -15,23 +15,24 @@ export const VIOLET = "#7B3FF4";
 
 export const GRAD_PRIMARY = `linear-gradient(135deg, ${B1}, ${B2})`;
 export const GRAD_HERO = "linear-gradient(135deg,#001040 0%,#001888 35%,#0033CC 70%,#0055FF 100%)";
-// Mild pastel 3-stop gradients — paired with dark ink text for readability.
-export const GRAD_BLUE = "linear-gradient(140deg,#F0F5FF 0%,#DCE7FF 55%,#C8D8FF 100%)";
-export const GRAD_GREEN = "linear-gradient(140deg,#EAFBF1 0%,#CFEEDA 55%,#B4E2C2 100%)";
-export const GRAD_VIOLET = "linear-gradient(140deg,#F6EEFF 0%,#E7D6FF 55%,#D6BEFF 100%)";
-export const GRAD_GOLD = "linear-gradient(140deg,#FFFAE0 0%,#FFEEB0 55%,#FFE082 100%)";
-export const GRAD_RED = "linear-gradient(140deg,#FFECEE 0%,#FFCAD2 55%,#FFA8B4 100%)";
-export const GRAD_ORANGE = "linear-gradient(140deg,#FFF3E0 0%,#FFDBB5 55%,#FFC388 100%)";
+// Premium soft pastel 2-stop gradients — almost-white with a subtle tint.
+// Designed to pair with saturated solid icon badges for an aesthetic premium feel.
+export const GRAD_BLUE   = "linear-gradient(135deg,#F7FAFF 0%,#EEF3FF 100%)";
+export const GRAD_GREEN  = "linear-gradient(135deg,#F5FCF8 0%,#E9F8EF 100%)";
+export const GRAD_VIOLET = "linear-gradient(135deg,#FAF7FF 0%,#F2EBFF 100%)";
+export const GRAD_GOLD   = "linear-gradient(135deg,#FFFCF0 0%,#FEF5DC 100%)";
+export const GRAD_RED    = "linear-gradient(135deg,#FEF8F9 0%,#FCEAEE 100%)";
+export const GRAD_ORANGE = "linear-gradient(135deg,#FFF9F0 0%,#FDECD3 100%)";
 
-export const SHADOW_SM = "0 0 0 .5px rgba(0,85,255,.08), 0 2px 8px rgba(0,85,255,.08), 0 10px 26px rgba(0,85,255,.10)";
-export const SHADOW_LG = "0 0 0 .5px rgba(0,85,255,.10), 0 4px 16px rgba(0,85,255,.11), 0 18px 44px rgba(0,85,255,.13)";
+export const SHADOW_SM = "0 2px 4px rgba(0,85,255,.10), 0 6px 14px rgba(0,85,255,.14), 0 16px 32px rgba(0,85,255,.14)";
+export const SHADOW_LG = "0 4px 8px rgba(0,85,255,.12), 0 12px 24px rgba(0,85,255,.16), 0 28px 56px rgba(0,85,255,.18)";
 export const SHADOW_BTN = "0 6px 22px rgba(0,85,255,.40), 0 2px 5px rgba(0,85,255,.20)";
 
 export const pageShellStyle: React.CSSProperties = {
-  fontFamily: "'DM Sans', -apple-system, sans-serif",
+  fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   background: "#EEF4FF",
   minHeight: "100vh",
-  margin: "-16px -24px 0",
+  margin: "-40px -40px 0",
   padding: "24px 32px 40px",
 };
 
@@ -39,10 +40,10 @@ export const pageShellStyle: React.CSSProperties = {
 export function usePageShellStyle(): React.CSSProperties {
   const isMobile = useIsMobile();
   return {
-    fontFamily: "'DM Sans', -apple-system, sans-serif",
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     background: "#EEF4FF",
     minHeight: "100vh",
-    margin: isMobile ? "-12px -12px 0" : "-16px -24px 0",
+    margin: isMobile ? "-12px -12px 0" : "-40px -40px 0",
     padding: isMobile ? "16px 14px 28px" : "24px 32px 40px",
   };
 }
@@ -58,8 +59,8 @@ export function DashGlobalStyles() {
         will-change: transform;
       }
       .dash3d:hover {
-        transform: translate3d(0,-5px,0) scale(1.02);
-        box-shadow: 0 0 0 .5px rgba(0,85,255,.14), 0 8px 24px rgba(0,85,255,.16), 0 20px 46px rgba(0,85,255,.18) !important;
+        transform: translate3d(0,-7px,0);
+        box-shadow: 0 8px 16px rgba(0,85,255,.20), 0 24px 40px rgba(0,85,255,.24), 0 40px 80px rgba(0,85,255,.26) !important;
       }
       .dash-tile {
         transition: transform .22s cubic-bezier(0.2,0.8,0.2,1), box-shadow .22s ease;
@@ -68,8 +69,8 @@ export function DashGlobalStyles() {
         cursor: pointer;
       }
       .dash-tile:hover {
-        transform: translate3d(0,-5px,0) scale(1.02);
-        box-shadow: 0 0 0 .5px rgba(0,85,255,.14), 0 8px 24px rgba(0,85,255,.16), 0 20px 46px rgba(0,85,255,.18) !important;
+        transform: translate3d(0,-7px,0);
+        box-shadow: 0 8px 16px rgba(0,85,255,.20), 0 24px 40px rgba(0,85,255,.24), 0 40px 80px rgba(0,85,255,.26) !important;
       }
       .dash-card {
         transition: transform .22s cubic-bezier(0.2,0.8,0.2,1), box-shadow .22s ease;
@@ -77,8 +78,8 @@ export function DashGlobalStyles() {
         -webkit-backface-visibility: hidden;
       }
       .dash-card:hover {
-        transform: translate3d(0,-5px,0) scale(1.02);
-        box-shadow: 0 0 0 .5px rgba(0,85,255,.14), 0 8px 24px rgba(0,85,255,.16), 0 20px 46px rgba(0,85,255,.18) !important;
+        transform: translate3d(0,-7px,0);
+        box-shadow: 0 8px 16px rgba(0,85,255,.20), 0 24px 40px rgba(0,85,255,.24), 0 40px 80px rgba(0,85,255,.26) !important;
       }
       .dash-row {
         transition: transform .3s ease, background .2s ease;
@@ -121,8 +122,8 @@ export function PageHead({
           <Icon size={isMobile ? 20 : 24} color="#fff" strokeWidth={2.2}/>
         </div>
         <div style={{ minWidth:0 }}>
-          <h1 style={{ fontSize: isMobile ? 20 : 32, fontWeight:700, color:T1, letterSpacing: isMobile ? "-0.4px" : "-0.8px", margin:0, lineHeight:1.1 }}>{title}</h1>
-          <p style={{ fontSize: isMobile ? 10 : 12, color:T3, fontWeight:500, margin:"5px 0 0 0", letterSpacing:"0.10em", textTransform:"uppercase" }}>
+          <h1 style={{ fontSize: isMobile ? 20 : 28, fontWeight:700, color:T1, letterSpacing: isMobile ? "-0.4px" : "-0.6px", margin:0, lineHeight:1.15 }}>{title}</h1>
+          <p style={{ fontSize: isMobile ? 12 : 14, color:T3, fontWeight:500, margin:"4px 0 0 0", letterSpacing:0 }}>
             {subtitle}
           </p>
         </div>
@@ -132,7 +133,18 @@ export function PageHead({
   );
 }
 
-/* Bright stat tile (clickable) */
+/* Map known gradient constants → solid accent color for the badge / decoration */
+export const GRAD_ACCENTS: Record<string, string> = {
+  [GRAD_BLUE]:   "#4F46E5",
+  [GRAD_GREEN]:  "#10B981",
+  [GRAD_VIOLET]: "#7C3AED",
+  [GRAD_GOLD]:   "#F59E0B",
+  [GRAD_RED]:    "#DC2626",
+  [GRAD_ORANGE]: "#F97316",
+};
+
+/* Bright stat tile (clickable) — premium aesthetic style: mild pastel bg,
+   solid colored badge top-left, faded decorative icon bottom-right. */
 export function StatTile({
   label,
   value,
@@ -151,6 +163,7 @@ export function StatTile({
   delta?: "up" | "down" | null;
 }) {
   const isMobile = useIsMobile();
+  const accent = GRAD_ACCENTS[grad] || "#4F46E5";
   return (
     <div
       onClick={onClick}
@@ -160,23 +173,26 @@ export function StatTile({
       style={{
         background:grad, borderRadius: isMobile ? 16 : 22, padding: isMobile ? "14px 14px" : "20px 22px", color:T1,
         position:"relative", overflow:"hidden",
-        boxShadow:"0 0 0 .5px rgba(0,16,64,.06), 0 10px 28px rgba(0,85,255,.12), 0 4px 12px rgba(0,85,255,.08)",
+        boxShadow:"0 4px 8px rgba(0,85,255,.12), 0 12px 24px rgba(0,85,255,.16), 0 28px 56px rgba(0,85,255,.18)",
       }}
     >
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: isMobile ? 10 : 14, position:"relative", zIndex:1 }}>
-        <div style={{ width: isMobile ? 32 : 38, height: isMobile ? 32 : 38, borderRadius: isMobile ? 10 : 12, background:"rgba(255,255,255,.65)", border:"0.5px solid rgba(0,16,64,.08)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-          <Icon size={isMobile ? 16 : 19} color={T1} strokeWidth={2.4}/>
-        </div>
-        {delta && (
-          <div style={{ display:"inline-flex", alignItems:"center", gap:3, padding:"4px 8px", borderRadius:8, background:"rgba(255,255,255,.55)", fontSize:10, fontWeight:800, color:T1 }}>
-            {delta === "up" ? "▲" : "▼"}
-          </div>
-        )}
+      {/* Decorative faded icon — bottom-right */}
+      <div style={{ position:"absolute", bottom: isMobile ? 8 : 12, right: isMobile ? 10 : 16, color: accent, opacity: 0.22, pointerEvents:"none", lineHeight: 0 }}>
+        <Icon size={isMobile ? 48 : 64} strokeWidth={2}/>
       </div>
-      <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:800, color:T3, letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 4px 0", position:"relative", zIndex:1 }}>{label}</p>
-      <p style={{ fontSize: isMobile ? 22 : 30, fontWeight:800, color:T1, letterSpacing:"-0.6px", margin:0, lineHeight:1.1, position:"relative", zIndex:1 }}>{value}</p>
+      {/* Solid icon badge — top-left */}
+      <div style={{ width: isMobile ? 36 : 44, height: isMobile ? 36 : 44, borderRadius: isMobile ? 10 : 12, display:"flex", alignItems:"center", justifyContent:"center", background: accent, marginBottom: isMobile ? 10 : 14, boxShadow: `0 4px 12px ${accent}33`, position:"relative", zIndex:1 }}>
+        <Icon size={isMobile ? 18 : 20} color="#FFFFFF" strokeWidth={2.5}/>
+      </div>
+      {delta && (
+        <div style={{ position:"absolute", top: isMobile ? 14 : 20, right: isMobile ? 14 : 20, display:"inline-flex", alignItems:"center", gap:3, padding:"4px 8px", borderRadius:8, background: `${accent}1A`, fontSize:10, fontWeight:800, color: accent, zIndex:1 }}>
+          {delta === "up" ? "▲" : "▼"}
+        </div>
+      )}
+      <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:700, color:"#94A3B8", letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 6px 0", position:"relative", zIndex:1 }}>{label}</p>
+      <p style={{ fontSize: isMobile ? 22 : 30, fontWeight:800, color:"#0F172A", letterSpacing:"-0.6px", margin:0, lineHeight:1.1, position:"relative", zIndex:1 }}>{value}</p>
       {sub && (
-        <p style={{ fontSize: isMobile ? 10 : 11, fontWeight:600, color:T3, margin:"6px 0 0 0", position:"relative", zIndex:1 }}>{sub}</p>
+        <p style={{ fontSize: isMobile ? 10 : 11, fontWeight:600, color:"#64748B", margin:"6px 0 0 0", position:"relative", zIndex:1 }}>{sub}</p>
       )}
     </div>
   );

@@ -7,7 +7,7 @@ import { db, auth } from "@/lib/firebase";
 
 // ── Tokens ───────────────────────────────────────────────────────────────────
 const T = {
-  bg: "#f8fafc", white: "#ffffff", ink: "#0f172a", ink2: "#475569", ink3: "#94a3b8",
+  bg: "#EEF4FF", white: "#ffffff", ink: "#0f172a", ink2: "#475569", ink3: "#94a3b8",
   bdr: "#e2e8f0", s1: "#f1f5f9", s2: "#e2e8f0",
   blue: "#3B5BDB", blBg: "#EDF2FF", blBdr: "#BAC8FF",
   grn: "#16a34a", glBg: "#f0fdf4", red: "#dc2626", rlBg: "#fef2f2",
@@ -31,11 +31,11 @@ const Card = ({ children, title, action, style }: { children: React.ReactNode; t
         border: `1px solid ${hovered ? "rgba(59,91,219,0.25)" : T.bdr}`,
         borderRadius: 16,
         overflow: "hidden",
-        transform: hovered ? "translate3d(0,-5px,0) scale(1.02)" : "translate3d(0,0,0) scale(1)",
+        transform: hovered ? "translate3d(0,-7px,0) scale(1.02)" : "translate3d(0,0,0) scale(1)",
         transition: "transform 0.22s cubic-bezier(0.2,0.8,0.2,1), box-shadow 0.22s ease, border-color 0.3s",
         boxShadow: hovered
-          ? "0 0 0 0.5px rgba(59,91,219,0.14), 0 8px 24px rgba(59,91,219,0.16), 0 20px 46px rgba(59,91,219,0.18)"
-          : "0 1px 3px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.02)",
+          ? "0 8px 16px rgba(0,85,255,0.20), 0 24px 40px rgba(0,85,255,0.24), 0 40px 80px rgba(0,85,255,0.26)"
+          : "0 4px 8px rgba(0,85,255,0.12), 0 12px 24px rgba(0,85,255,0.16), 0 28px 56px rgba(0,85,255,0.18)",
         willChange: "transform",
         backfaceVisibility: "hidden",
         position: "relative",

@@ -434,24 +434,13 @@ export default function Dashboard() {
   const ahiDelta = deltas.ahi;
   const feeDelta = deltas.fee;
 
-  const ahiTier =
-    ahi >= 85
-      ? { label: "Excellent", bg: "rgba(0,200,83,.22)", border: "rgba(0,200,83,.4)", color: "#66FFAA" }
-      : ahi >= 70
-      ? { label: "Healthy", bg: "rgba(0,85,255,.22)", border: "rgba(0,85,255,.4)", color: "#AACCFF" }
-      : ahi >= 55
-      ? { label: "Average", bg: "rgba(255,170,0,.22)", border: "rgba(255,170,0,.4)", color: "#FFDD44" }
-      : ahi > 0
-      ? { label: "Needs Focus", bg: "rgba(255,51,85,.22)", border: "rgba(255,51,85,.4)", color: "#FF99AA" }
-      : { label: "No Data", bg: "rgba(153,170,204,.18)", border: "rgba(153,170,204,.32)", color: "#CCDDEE" };
-
   return (
     <div
       style={{
-        fontFamily: "'DM Sans', -apple-system, sans-serif",
+        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         background: "#EEF4FF",
         minHeight: "100vh",
-        margin: isMobile ? "-16px -16px 0" : "-16px -24px 0",
+        margin: isMobile ? "-16px -16px 0" : "-40px -40px 0",
         padding: isMobile ? "16px 16px 32px" : "24px 32px 40px",
       }}
     >
@@ -474,44 +463,14 @@ export default function Dashboard() {
             <Activity size={isMobile ? 20 : 24} color="#fff" strokeWidth={2.2} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <h1 style={{ fontSize: isMobile ? 22 : 32, fontWeight: 700, color: T1, letterSpacing: "-0.8px", margin: 0, lineHeight: 1.1 }}>
-              Executive Dashboard
+            <h1 style={{ fontSize: isMobile ? 20 : 28, fontWeight: 700, color: T1, letterSpacing: "-0.6px", margin: 0, lineHeight: 1.15 }}>
+              Owner Dashboard
             </h1>
-            <p style={{ fontSize: isMobile ? 10 : 12, color: T3, fontWeight: 500, margin: "5px 0 0 0", letterSpacing: "0.10em", textTransform: "uppercase" }}>
-              Real-time overview of all school operations
+            <p style={{ fontSize: isMobile ? 12 : 14, color: T3, fontWeight: 500, margin: "4px 0 0 0", letterSpacing: 0 }}>
+              Real-time school intelligence overview
             </p>
           </div>
         </div>
-        {lastRefreshed && (
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 7,
-              padding: "8px 14px",
-              borderRadius: 14,
-              background: "#fff",
-              border: "0.5px solid rgba(0,85,255,.12)",
-              boxShadow: SHADOW_SM,
-              fontSize: 11,
-              fontWeight: 700,
-              color: T3,
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-            }}
-          >
-            <div
-              style={{
-                width: 7,
-                height: 7,
-                borderRadius: "50%",
-                background: GREEN,
-                boxShadow: "0 0 0 3px rgba(0,200,83,.15), 0 0 10px rgba(0,200,83,.5)",
-              }}
-            />
-            Updated {timeAgo(lastRefreshed)}
-          </div>
-        )}
       </div>
 
       {/* ── Fresh School Onboarding Banner ───────────────── */}
@@ -748,25 +707,6 @@ export default function Dashboard() {
 
             <div
               style={{
-                display: "inline-flex",
-                alignSelf: isMobile ? "flex-start" : "center",
-                alignItems: "center",
-                gap: 6,
-                padding: isMobile ? "6px 14px" : "8px 18px",
-                borderRadius: 100,
-                background: ahiTier.bg,
-                border: `0.5px solid ${ahiTier.border}`,
-                fontSize: isMobile ? 11 : 13,
-                fontWeight: 700,
-                color: ahiTier.color,
-              }}
-            >
-              <TrendingUp size={isMobile ? 12 : 14} strokeWidth={2.5} />
-              {ahiTier.label} tier
-            </div>
-
-            <div
-              style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(3, 1fr)",
                 gap: 1,
@@ -810,12 +750,14 @@ export default function Dashboard() {
             value: loading ? "—" : ahi.toString(),
             sub: ahiDelta != null ? `${ahiDelta >= 0 ? "+" : ""}${ahiDelta} vs last month` : "No prior data",
             up: ahiDelta == null ? true : ahiDelta >= 0,
-            bg: "linear-gradient(140deg,#F0F5FF 0%,#DCE7FF 55%,#C8D8FF 100%)",
-            border: "0.5px solid rgba(0,85,255,.22)",
-            lblColor: "#002080",
-            valColor: "#001055",
-            subColor: "#002080",
-            icon: <Activity size={18} color="#001055" strokeWidth={2.5} />,
+            bg: "linear-gradient(135deg,#F7FAFF 0%,#EEF3FF 100%)",
+            border: "0.5px solid rgba(79,70,229,.08)",
+            lblColor: "#94A3B8",
+            valColor: "#0F172A",
+            subColor: "#64748B",
+            accent: "#4F46E5",
+            icon: <Activity size={20} color="#FFFFFF" strokeWidth={2.5} />,
+            decoIcon: TrendingUp,
             href: "/academics",
           },
           {
@@ -823,12 +765,14 @@ export default function Dashboard() {
             value: loading ? "—" : totalStudents.toLocaleString(),
             sub: branches.length > 0 ? `Across ${branches.length} branch${branches.length !== 1 ? "es" : ""}` : "No branches yet",
             up: true,
-            bg: "linear-gradient(140deg,#F6EEFF 0%,#E7D6FF 55%,#D6BEFF 100%)",
-            border: "0.5px solid rgba(123,63,244,.22)",
-            lblColor: "#3A1580",
-            valColor: "#280C5C",
-            subColor: "#3A1580",
-            icon: <Users size={18} color="#3A1580" strokeWidth={2.5} />,
+            bg: "linear-gradient(135deg,#FAF7FF 0%,#F2EBFF 100%)",
+            border: "0.5px solid rgba(124,58,237,.08)",
+            lblColor: "#94A3B8",
+            valColor: "#0F172A",
+            subColor: "#64748B",
+            accent: "#7C3AED",
+            icon: <Users size={20} color="#FFFFFF" strokeWidth={2.5} />,
+            decoIcon: Users,
             href: "/students",
           },
           {
@@ -836,12 +780,14 @@ export default function Dashboard() {
             value: loading ? "—" : `${feeRate}%`,
             sub: feeDelta != null ? `${feeDelta >= 0 ? "+" : ""}${feeDelta}% vs last month` : "No prior data",
             up: feeDelta == null ? true : feeDelta >= 0,
-            bg: "linear-gradient(140deg,#EAFBF1 0%,#CFEEDA 55%,#B4E2C2 100%)",
-            border: "0.5px solid rgba(0,200,83,.22)",
-            lblColor: "#005A20",
-            valColor: "#004018",
-            subColor: "#005A20",
-            icon: <Percent size={18} color="#005A20" strokeWidth={2.5} />,
+            bg: "linear-gradient(135deg,#F5FCF8 0%,#E9F8EF 100%)",
+            border: "0.5px solid rgba(16,185,129,.08)",
+            lblColor: "#94A3B8",
+            valColor: "#0F172A",
+            subColor: "#64748B",
+            accent: "#10B981",
+            icon: <Percent size={20} color="#FFFFFF" strokeWidth={2.5} />,
+            decoIcon: TrendingUp,
             href: "/finance",
           },
           {
@@ -849,15 +795,19 @@ export default function Dashboard() {
             value: loading ? "—" : displayAlertsCount.toString(),
             sub: criticalAlerts > 0 ? `${criticalAlerts} critical` : "No critical issues",
             up: criticalAlerts === 0,
-            bg: criticalAlerts > 0 ? "linear-gradient(140deg,#FFECEE 0%,#FFCAD2 55%,#FFA8B4 100%)" : "linear-gradient(140deg,#FFFAE0 0%,#FFEEB0 55%,#FFE082 100%)",
-            border: criticalAlerts > 0 ? "0.5px solid rgba(255,51,85,.22)" : "0.5px solid rgba(255,170,0,.22)",
-            lblColor: criticalAlerts > 0 ? "#8A0A22" : "#664400",
-            valColor: criticalAlerts > 0 ? "#60081A" : "#472A00",
-            subColor: criticalAlerts > 0 ? "#8A0A22" : "#664400",
-            icon: <Bell size={18} color={criticalAlerts > 0 ? "#8A0A22" : "#664400"} strokeWidth={2.5} />,
+            bg: criticalAlerts > 0 ? "linear-gradient(135deg,#FEF8F9 0%,#FCEAEE 100%)" : "linear-gradient(135deg,#FFFCF0 0%,#FEF5DC 100%)",
+            border: criticalAlerts > 0 ? "0.5px solid rgba(220,38,38,.08)" : "0.5px solid rgba(245,158,11,.08)",
+            lblColor: "#94A3B8",
+            valColor: "#0F172A",
+            subColor: "#64748B",
+            accent: criticalAlerts > 0 ? "#DC2626" : "#F59E0B",
+            icon: <Bell size={20} color="#FFFFFF" strokeWidth={2.5} />,
+            decoIcon: AlertCircle,
             href: "/risks",
           },
-        ].map((s) => (
+        ].map((s) => {
+          const DecoIcon = s.decoIcon;
+          return (
           <div
             key={s.title}
             onClick={() => navigate(s.href)}
@@ -876,10 +826,15 @@ export default function Dashboard() {
               ...tilt3DStyle,
             }}
           >
-            <div style={{ position: "absolute", top: isMobile ? 12 : 16, right: isMobile ? 12 : 16, width: isMobile ? 32 : 38, height: isMobile ? 32 : 38, borderRadius: isMobile ? 10 : 12, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,.75)", border: "0.5px solid rgba(255,255,255,.95)", boxShadow: "0 2px 6px rgba(0,0,0,.05)" }}>
+            {/* Decorative faded icon — bottom-right */}
+            <div style={{ position: "absolute", bottom: isMobile ? 8 : 12, right: isMobile ? 10 : 16, color: s.accent, opacity: 0.22, pointerEvents: "none", lineHeight: 0 }}>
+              <DecoIcon size={isMobile ? 48 : 64} strokeWidth={2} />
+            </div>
+            {/* Solid icon badge — top-left */}
+            <div style={{ width: isMobile ? 36 : 44, height: isMobile ? 36 : 44, borderRadius: isMobile ? 10 : 12, display: "flex", alignItems: "center", justifyContent: "center", background: s.accent, marginBottom: isMobile ? 10 : 14, boxShadow: `0 4px 12px ${s.accent}33`, position: "relative", zIndex: 1 }}>
               {s.icon}
             </div>
-            <div style={{ fontSize: isMobile ? 9 : 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: s.lblColor, marginBottom: isMobile ? 8 : 12, position: "relative", zIndex: 1, paddingRight: isMobile ? 40 : 0 }}>
+            <div style={{ fontSize: isMobile ? 9 : 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: s.lblColor, marginBottom: isMobile ? 6 : 8, position: "relative", zIndex: 1 }}>
               {s.title}
             </div>
             {loading ? (
@@ -896,7 +851,8 @@ export default function Dashboard() {
               </>
             )}
           </div>
-        ))}
+          );
+        })}
         <style>{`@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
       </div>
 

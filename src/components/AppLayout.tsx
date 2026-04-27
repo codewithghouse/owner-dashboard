@@ -5,7 +5,7 @@ import {
   DollarSign, AlertTriangle, GitBranch, FileText, Settings,
   Menu, X, UserCog, LogOut, ShieldCheck, Bell,
   Clock, ShieldAlert, CheckCircle2, DollarSign as FeeIcon,
-  Search, Activity, Brain, ClipboardList, FileSpreadsheet, Trophy, Award,
+  Activity, Brain, ClipboardList, FileSpreadsheet, Trophy, Award,
 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import {
@@ -26,26 +26,57 @@ interface Notification {
   ts: number;
 }
 
-// ── Nav items ─────────────────────────────────────────────────────────────────
-const navItems = [
-  { to: "/",          label: "Dashboard",             icon: LayoutDashboard },
-  { to: "/students",  label: "Students Intelligence", icon: Users },
-  { to: "/teachers",  label: "Teacher Performance",   icon: GraduationCap },
-  { to: "/teachers-directory", label: "Teachers Directory", icon: ClipboardList },
-  { to: "/academics", label: "Academics Overview",    icon: BookOpen },
-  { to: "/finance",   label: "Finance & Fees",        icon: DollarSign },
-  { to: "/fee-structure", label: "Fee Structure",     icon: FileSpreadsheet },
-  { to: "/risks",     label: "Risks & Alerts",        icon: AlertTriangle },
-  { to: "/branches",  label: "Branches Comparison",   icon: GitBranch },
-  { to: "/reports",   label: "Reports Center",        icon: FileText },
-  { to: "/principals",label: "Principal Management",  icon: UserCog },
-  { to: "/deo",       label: "DEO Management",        icon: ShieldCheck },
-  { to: "/audit",        label: "Activity Log",          icon: Activity },
-  { to: "/ai-predictor", label: "AI Risk Predictor",    icon: Brain },
-  { to: "/teacher-leaderboard", label: "Teacher Leaderboard", icon: Trophy },
-  { to: "/branch-leaderboard",  label: "Branch Leaderboard",  icon: Award },
-  { to: "/settings",     label: "Settings",              icon: Settings },
+// ── Nav items grouped by section ─────────────────────────────────────────────
+const navSections: { heading: string; items: { to: string; label: string; icon: any }[] }[] = [
+  {
+    heading: "Overview",
+    items: [
+      { to: "/",          label: "Dashboard",             icon: LayoutDashboard },
+    ],
+  },
+  {
+    heading: "Students",
+    items: [
+      { to: "/students",     label: "Students Intelligence", icon: Users },
+      { to: "/ai-predictor", label: "AI Risk Predictor",     icon: Brain },
+    ],
+  },
+  {
+    heading: "Academics",
+    items: [
+      { to: "/academics",     label: "Academics Overview", icon: BookOpen },
+      { to: "/fee-structure", label: "Fee Structure",      icon: FileSpreadsheet },
+    ],
+  },
+  {
+    heading: "Staff",
+    items: [
+      { to: "/teachers-directory",  label: "Teachers Directory",   icon: ClipboardList },
+      { to: "/teachers",            label: "Teacher Performance",  icon: GraduationCap },
+      { to: "/teacher-leaderboard", label: "Teacher Leaderboard",  icon: Trophy },
+      { to: "/principals",          label: "Principal Management", icon: UserCog },
+      { to: "/deo",                 label: "DEO Management",       icon: ShieldCheck },
+    ],
+  },
+  {
+    heading: "Operations",
+    items: [
+      { to: "/branches",           label: "Branches Comparison", icon: GitBranch },
+      { to: "/branch-leaderboard", label: "Branch Leaderboard",  icon: Award },
+      { to: "/finance",            label: "Finance & Fees",      icon: DollarSign },
+      { to: "/risks",              label: "Risks & Alerts",      icon: AlertTriangle },
+    ],
+  },
+  {
+    heading: "Reports",
+    items: [
+      { to: "/reports", label: "Reports Center", icon: FileText },
+      { to: "/audit",   label: "Activity Log",   icon: Activity },
+    ],
+  },
 ];
+
+const settingsItem = { to: "/settings", label: "Settings", icon: Settings };
 
 // ── Notification icon helper ──────────────────────────────────────────────────
 function NotifIcon({ type }: { type: Notification["type"] }) {
@@ -53,6 +84,25 @@ function NotifIcon({ type }: { type: Notification["type"] }) {
   if (type === "risk_alert")   return <AlertTriangle className="w-4 h-4 text-rose-500" />;
   if (type === "fee_alert")    return <FeeIcon className="w-4 h-4 text-orange-500" />;
   return <Bell className="w-4 h-4 text-[#1e3a8a]" />;
+}
+
+function getInitials(name?: string | null): string {
+  if (!name) return "SC";
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "SC";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function getSchoolCode(name?: string | null): string {
+  if (!name) return "EDLT";
+  const trimmed = name.trim();
+  if (!trimmed) return "EDLT";
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) {
+    return parts[0].length <= 8 ? parts[0].toUpperCase() : parts[0].slice(0, 4).toUpperCase();
+  }
+  return parts.map(p => p[0]).join("").slice(0, 5).toUpperCase();
 }
 
 function timeAgo(ts: number): string {
@@ -72,15 +122,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [bellOpen, setBellOpen]           = useState(false);
   const [searchOpen, setSearchOpen]       = useState(false);
-  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const bellRef                           = useRef<HTMLDivElement>(null);
-  const avatarRef                         = useRef<HTMLDivElement>(null);
   const location   = useLocation();
   const navigate   = useNavigate();
-
-  const currentPage = navItems.find(
-    (item) => item.to === "/" ? location.pathname === "/" : location.pathname.startsWith(item.to)
-  );
 
   // ── Cmd+K / Ctrl+K global search shortcut ─────────────────────────────
   useEffect(() => {
@@ -188,12 +232,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // ── Close bell + avatar menu on outside click ────────────────────────────
+  // ── Close bell on outside click ─────────────────────────────────────────
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       const t = e.target as Node;
       if (bellRef.current && !bellRef.current.contains(t)) setBellOpen(false);
-      if (avatarRef.current && !avatarRef.current.contains(t)) setAvatarMenuOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -203,7 +246,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setIsSidebarOpen(false);
     setBellOpen(false);
-    setAvatarMenuOpen(false);
   }, [location.pathname]);
 
   // ── Mark all as read ────────────────────────────────────────────────────
@@ -235,7 +277,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const handleLogout = () => signOut(auth);
 
   return (
-    <div className="flex h-screen overflow-hidden font-sans bg-[#f8fafc]">
+    <div className="flex flex-col h-screen overflow-hidden font-sans bg-[#EEF4FF]">
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div
@@ -244,257 +286,234 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         />
       )}
 
+      {/* ── Top Header (full width) ─────────────────────────────────────── */}
+      <header className="h-14 lg:h-16 bg-white flex items-center justify-between px-4 lg:px-6 shrink-0 z-30 gap-4 border-b border-slate-100">
+        {/* Mobile menu button + School identifier */}
+        <div className="flex items-center gap-3 min-w-0">
+          <button
+            className="p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-xl lg:hidden transition-colors shrink-0"
+            onClick={() => setIsSidebarOpen(true)}
+            aria-label="Open sidebar"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          <div className="w-8 h-8 bg-[#1e3a8a] rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/10 shrink-0">
+            <GraduationCap className="w-4 h-4 text-white" />
+          </div>
+          <div
+            title={schoolData?.schoolName || "EDULLENT"}
+            className="min-w-0 flex flex-col leading-tight"
+          >
+            <span className="text-[14px] font-bold text-[#1e294b] tracking-tight uppercase truncate">
+              {getSchoolCode(schoolData?.schoolName)}
+            </span>
+            <span className="text-[10px] font-bold text-slate-400 tracking-widest uppercase truncate mt-0.5">
+              {schoolData?.schoolName || "EDULLENT"}
+            </span>
+          </div>
+        </div>
+
+        {/* Right cluster: bell, name+role, avatar, logout */}
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          {/* ── Bell ── */}
+          <div ref={bellRef} className="relative flex items-center">
+            <button
+              onClick={() => setBellOpen(v => !v)}
+              className="relative w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center hover:bg-slate-100 transition-all"
+            >
+              <Bell className="w-4 h-4 text-slate-500" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white" />
+              )}
+            </button>
+
+            {/* ── Notification panel ── */}
+            {bellOpen && (
+              <div className="absolute right-0 top-12 w-80 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in slide-in-from-top-2 duration-200 z-50">
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-50">
+                  <div>
+                    <h3 className="text-sm font-black text-[#1e293b]">Notifications</h3>
+                    {unreadCount > 0 && (
+                      <p className="text-[10px] text-slate-400 font-medium">{unreadCount} unread</p>
+                    )}
+                  </div>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={markAllRead}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-50 text-[10px] font-black text-slate-500 hover:bg-blue-50 hover:text-[#1e3a8a] transition-all uppercase tracking-wide"
+                    >
+                      <CheckCircle2 className="w-3 h-3" /> Mark all read
+                    </button>
+                  )}
+                </div>
+
+                {/* Items */}
+                <div className="max-h-[360px] overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 gap-3">
+                      <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center">
+                        <Bell className="w-6 h-6 text-slate-200" />
+                      </div>
+                      <p className="text-xs font-bold text-slate-300">No notifications yet</p>
+                    </div>
+                  ) : (
+                    notifications.map(n => (
+                      <button
+                        key={n.id}
+                        onClick={() => handleNotifClick(n)}
+                        className={`w-full flex items-start gap-3 px-5 py-4 text-left border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors ${!n.read ? "bg-blue-50/40" : ""}`}
+                      >
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                          n.type === "deo_request" ? "bg-amber-50" :
+                          n.type === "risk_alert"  ? "bg-rose-50"  :
+                          "bg-blue-50"
+                        }`}>
+                          <NotifIcon type={n.type} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-black text-[#1e293b] truncate">{n.title}</p>
+                            {!n.read && (
+                              <span className="w-2 h-2 rounded-full bg-[#1e3a8a] shrink-0" />
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-400 font-medium mt-0.5 leading-relaxed line-clamp-2">{n.body}</p>
+                          <p className="text-[10px] text-slate-300 font-bold mt-1 flex items-center gap-1">
+                            <Clock className="w-2.5 h-2.5" /> {timeAgo(n.ts)}
+                          </p>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+
+                {/* Footer */}
+                {notifications.length > 0 && (
+                  <div className="px-5 py-3 border-t border-slate-50">
+                    <button
+                      onClick={() => { setBellOpen(false); navigate("/risks"); }}
+                      className="w-full text-center text-[11px] font-black text-[#1e3a8a] hover:text-blue-700 transition-colors uppercase tracking-widest"
+                    >
+                      View all alerts →
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div className="hidden md:block w-px h-7 bg-slate-200" />
+
+          {/* Name + role */}
+          <div className="hidden md:flex flex-col leading-tight max-w-[200px]">
+            <p className="text-sm font-bold text-slate-800 truncate">
+              {schoolData?.ownerName || "School Chairman"}
+            </p>
+            <p className="text-[10px] font-bold text-slate-400 tracking-widest uppercase truncate">
+              {schoolData?.role || "Owner"}
+            </p>
+          </div>
+
+          {/* Circular avatar */}
+          <button
+            onClick={() => navigate("/settings")}
+            className="w-9 h-9 rounded-full bg-[#1e294b] text-white flex items-center justify-center text-[11px] font-bold shadow-lg shadow-slate-900/10 hover:scale-105 active:scale-95 transition-all cursor-pointer uppercase"
+            title="Account settings"
+          >
+            {getInitials(schoolData?.ownerName)}
+          </button>
+
+          {/* Logout */}
+          <button
+            onClick={handleLogout}
+            title="Sign out"
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-rose-500 hover:bg-rose-50 transition-all"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
+        </div>
+      </header>
+
+      {/* ── Body: Sidebar + Page Content ─────────────────────────────────── */}
+      <div className="flex flex-1 overflow-hidden min-h-0">
+
       {/* Sidebar */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-[280px] bg-white border-r border-slate-100 flex flex-col shrink-0
-        transition-all duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-auto
+        fixed inset-y-0 left-0 z-50 w-[280px] bg-white border border-slate-100 flex flex-col shrink-0
+        rounded-r-3xl shadow-[0_4px_24px_rgba(0,16,64,.06)]
+        transition-all duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-auto lg:my-3 lg:ml-3 lg:rounded-3xl
         ${isSidebarOpen ? "translate-x-0 shadow-xl" : "-translate-x-full"}
       `}>
-        <div className="flex items-center gap-3 px-5 lg:px-6 py-6 lg:py-8 border-b border-slate-50">
-          <div className="w-9 h-9 bg-[#1e3a8a] rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/10 shrink-0">
-            <GraduationCap className="w-5 h-5 text-white" />
-          </div>
-          <span
-            title={schoolData?.schoolName || "EDULLENT"}
-            className="flex-1 min-w-0 block text-[15px] lg:text-base font-bold text-[#1e294b] tracking-tight uppercase truncate leading-tight"
-          >
-            {schoolData?.schoolName || "EDULLENT"}
-          </span>
+        <div className="flex items-center justify-end px-3 py-3 lg:hidden">
           <button
-            className="p-2 -mr-2 text-slate-400 hover:text-[#1e3a8a] lg:hidden transition-colors shrink-0"
+            className="p-2 text-slate-400 hover:text-[#1e3a8a] transition-colors"
             onClick={() => setIsSidebarOpen(false)}
             aria-label="Close sidebar"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
-        <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto">
-          {navItems.map((item) => {
-            const isActive = item.to === "/"
-              ? location.pathname === "/"
-              : location.pathname.startsWith(item.to);
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) => `
-                  flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200
-                  ${isActive
-                    ? "bg-[#1e3a8a] text-white shadow-lg shadow-blue-900/15"
-                    : "text-slate-500 hover:bg-slate-50 hover:text-[#1e3a8a]"
-                  }
-                `}
-              >
-                <item.icon className={`w-5 h-5 ${isActive ? "text-white" : "text-slate-400"}`} />
-                {item.label}
-              </NavLink>
-            );
-          })}
-        </nav>
-        <div className="p-4 border-t border-slate-50 space-y-2">
-          <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">System v1.0.5</p>
-            <div className="h-1 w-full bg-slate-200 rounded-full overflow-hidden">
-              <div className="h-full bg-blue-500 w-3/4"></div>
+        <nav className="flex-1 px-3 py-4 overflow-y-auto">
+          {navSections.map((section, idx) => (
+            <div key={section.heading} className={idx === 0 ? "" : "mt-5"}>
+              <p className="px-4 mb-2 text-[10px] font-bold text-slate-400 tracking-widest uppercase">
+                {section.heading}
+              </p>
+              <div className="space-y-1">
+                {section.items.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.to === "/"}
+                    className={({ isActive }) => `
+                      flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200
+                      ${isActive
+                        ? "bg-[#EEF4FF] text-[#1e3a8a] font-bold"
+                        : "text-slate-500 hover:bg-slate-50 hover:text-[#1e3a8a]"
+                      }
+                    `}
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <item.icon className={`w-[18px] h-[18px] ${isActive ? "text-[#1e3a8a]" : "text-slate-400"}`} />
+                        {item.label}
+                      </>
+                    )}
+                  </NavLink>
+                ))}
+              </div>
             </div>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-rose-500 hover:bg-rose-50 transition-all"
+          ))}
+        </nav>
+        <div className="px-3 py-3 border-t border-slate-100">
+          <NavLink
+            to={settingsItem.to}
+            className={({ isActive }) => `
+              flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200
+              ${isActive
+                ? "bg-[#EEF4FF] text-[#1e3a8a] font-bold"
+                : "text-slate-500 hover:bg-slate-50 hover:text-[#1e3a8a]"
+              }
+            `}
           >
-            <LogOut className="w-5 h-5" /> Logout
-          </button>
+            {({ isActive }) => (
+              <>
+                <settingsItem.icon className={`w-[18px] h-[18px] ${isActive ? "text-[#1e3a8a]" : "text-slate-400"}`} />
+                {settingsItem.label}
+              </>
+            )}
+          </NavLink>
         </div>
       </aside>
 
       {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top bar */}
-        <header className="h-16 lg:h-20 bg-white/80 backdrop-blur-md flex items-center justify-between px-4 lg:px-8 shrink-0 border-b border-slate-100/60 sticky top-0 z-30">
-          <div className="flex items-center gap-4">
-            <button
-              className="p-2 -ml-2 text-slate-500 hover:bg-slate-50 rounded-xl lg:hidden transition-colors"
-              onClick={() => setIsSidebarOpen(true)}
-            >
-              <Menu className="w-6 h-6" />
-            </button>
-
-            <div className="flex items-center gap-2 text-sm font-semibold overflow-hidden">
-              {location.pathname.includes("/students") && location.pathname !== "/students" ? (
-                <div className="flex items-center gap-2 whitespace-nowrap">
-                  <span className="text-slate-400 hidden sm:inline text-xs">Students /</span>
-                  <span className="text-[#1e3a8a]">Details</span>
-                </div>
-              ) : location.pathname.includes("/teachers") && location.pathname !== "/teachers" ? (
-                <div className="flex items-center gap-2 whitespace-nowrap">
-                  <span className="text-slate-400 hidden sm:inline text-xs">Teachers /</span>
-                  <span className="text-[#1e3a8a]">Faculty Profile</span>
-                </div>
-              ) : location.pathname.includes("/academics") && location.pathname !== "/academics" ? (
-                <div className="flex items-center gap-2 whitespace-nowrap">
-                  <span className="text-slate-400 hidden sm:inline text-xs">Academics /</span>
-                  <span className="text-[#1e3a8a]">Subject Analysis</span>
-                </div>
-              ) : location.pathname.includes("/branches") && location.pathname !== "/branches" ? (
-                <div className="flex items-center gap-2 whitespace-nowrap">
-                  <span className="text-slate-400 hidden sm:inline text-xs">Branches /</span>
-                  <span className="text-[#1e3a8a]">Detail View</span>
-                </div>
-              ) : (
-                <h2 className="text-sm font-bold text-slate-800 tracking-tight truncate">
-                  {currentPage?.label || "Dashboard"}
-                </h2>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="hidden sm:flex flex-col text-right">
-              <p className="text-xs font-bold text-slate-800 leading-tight">
-                {schoolData?.ownerName || "School Chairman"}
-              </p>
-              <p className="text-[10px] font-medium text-slate-400">
-                {auth.currentUser?.email || "admin@edu.com"}
-              </p>
-            </div>
-
-            {/* ── Bell ── */}
-            <div ref={bellRef} className="relative">
-              {/* ── Search button ── */}
-              <button
-                onClick={() => setSearchOpen(true)}
-                title="Search (Ctrl+K)"
-                className="hidden sm:flex items-center gap-2 h-9 lg:h-10 px-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100 transition-all text-slate-400 text-xs font-bold"
-              >
-                <Search className="w-3.5 h-3.5" />
-                <span className="hidden lg:inline">Search</span>
-                <kbd className="hidden lg:flex items-center px-1.5 py-0.5 text-[9px] font-black bg-white border border-slate-200 rounded-md text-slate-400">⌘K</kbd>
-              </button>
-
-              <button
-                onClick={() => setBellOpen(v => !v)}
-                className="relative w-9 h-9 lg:w-10 lg:h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center hover:bg-slate-100 transition-all"
-              >
-                <Bell className="w-4 h-4 text-slate-500" />
-                {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center px-1 leading-none animate-in zoom-in duration-200">
-                    {unreadCount > 9 ? "9+" : unreadCount}
-                  </span>
-                )}
-              </button>
-
-              {/* ── Notification panel ── */}
-              {bellOpen && (
-                <div className="absolute right-0 top-12 w-80 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in slide-in-from-top-2 duration-200 z-50">
-                  {/* Header */}
-                  <div className="flex items-center justify-between px-5 py-4 border-b border-slate-50">
-                    <div>
-                      <h3 className="text-sm font-black text-[#1e293b]">Notifications</h3>
-                      {unreadCount > 0 && (
-                        <p className="text-[10px] text-slate-400 font-medium">{unreadCount} unread</p>
-                      )}
-                    </div>
-                    {unreadCount > 0 && (
-                      <button
-                        onClick={markAllRead}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-50 text-[10px] font-black text-slate-500 hover:bg-blue-50 hover:text-[#1e3a8a] transition-all uppercase tracking-wide"
-                      >
-                        <CheckCircle2 className="w-3 h-3" /> Mark all read
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Items */}
-                  <div className="max-h-[360px] overflow-y-auto">
-                    {notifications.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 gap-3">
-                        <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center">
-                          <Bell className="w-6 h-6 text-slate-200" />
-                        </div>
-                        <p className="text-xs font-bold text-slate-300">No notifications yet</p>
-                      </div>
-                    ) : (
-                      notifications.map(n => (
-                        <button
-                          key={n.id}
-                          onClick={() => handleNotifClick(n)}
-                          className={`w-full flex items-start gap-3 px-5 py-4 text-left border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors ${!n.read ? "bg-blue-50/40" : ""}`}
-                        >
-                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
-                            n.type === "deo_request" ? "bg-amber-50" :
-                            n.type === "risk_alert"  ? "bg-rose-50"  :
-                            "bg-blue-50"
-                          }`}>
-                            <NotifIcon type={n.type} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-xs font-black text-[#1e293b] truncate">{n.title}</p>
-                              {!n.read && (
-                                <span className="w-2 h-2 rounded-full bg-[#1e3a8a] shrink-0" />
-                              )}
-                            </div>
-                            <p className="text-[11px] text-slate-400 font-medium mt-0.5 leading-relaxed line-clamp-2">{n.body}</p>
-                            <p className="text-[10px] text-slate-300 font-bold mt-1 flex items-center gap-1">
-                              <Clock className="w-2.5 h-2.5" /> {timeAgo(n.ts)}
-                            </p>
-                          </div>
-                        </button>
-                      ))
-                    )}
-                  </div>
-
-                  {/* Footer */}
-                  {notifications.length > 0 && (
-                    <div className="px-5 py-3 border-t border-slate-50">
-                      <button
-                        onClick={() => { setBellOpen(false); navigate("/risks"); }}
-                        className="w-full text-center text-[11px] font-black text-[#1e3a8a] hover:text-blue-700 transition-colors uppercase tracking-widest"
-                      >
-                        View all alerts →
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Avatar + dropdown menu (Settings / Sign out) */}
-            <div ref={avatarRef} className="relative">
-              <button
-                onClick={() => setAvatarMenuOpen(v => !v)}
-                className="w-9 h-9 lg:w-10 lg:h-10 rounded-xl bg-[#1e294b] text-white flex items-center justify-center text-xs font-bold shadow-lg shadow-slate-900/10 hover:scale-105 active:scale-95 transition-all cursor-pointer uppercase"
-                title="Account"
-              >
-                {schoolData?.ownerName?.substring(0, 2) || "SC"}
-              </button>
-              {avatarMenuOpen && (
-                <div className="absolute right-0 top-12 w-44 bg-white rounded-xl shadow-xl border border-slate-100 py-1 z-50 animate-in slide-in-from-top-2 duration-150">
-                  <button
-                    onClick={() => { setAvatarMenuOpen(false); navigate("/settings"); }}
-                    className="w-full text-left px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
-                  >
-                    Settings
-                  </button>
-                  <div className="my-1 border-t border-slate-100" />
-                  <button
-                    onClick={() => { setAvatarMenuOpen(false); handleLogout(); }}
-                    className="w-full text-left px-4 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors"
-                  >
-                    Sign out
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </header>
-
-        {/* Page content */}
-        <main className="flex-1 overflow-auto bg-[#f8fafc]">
-          <div className="p-4 lg:p-10 mb-20 lg:mb-0">
-            {children}
-          </div>
-        </main>
+      <main className="flex-1 overflow-auto bg-[#EEF4FF]">
+        <div className="p-4 lg:px-8 lg:pt-6 lg:pb-8 mb-20 lg:mb-0">
+          {children}
+        </div>
+      </main>
       </div>
 
       {/* ── Global Search Modal ─────────────────────────────────────────────── */}

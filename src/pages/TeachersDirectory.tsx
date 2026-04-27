@@ -660,19 +660,19 @@ export default function TeachersDirectory() {
                     display:"inline-flex", alignItems:"center", gap: isMobile ? 6 : 8,
                     padding: isMobile ? "8px 12px" : "10px 16px", borderRadius:12,
                     background: active ? GRAD_PRIMARY : "transparent",
-                    color: active ? "#fff" : T3,
+                    color: active ? "#fff" : "#33457A",
                     fontSize: isMobile ? 10 : 11, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
                     border:"none", cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap",
                     boxShadow: active ? SHADOW_BTN : "none",
                     flexShrink:0,
                   }}
                 >
-                  <t.icon size={isMobile ? 12 : 14} strokeWidth={2.4}/>
+                  <t.icon size={isMobile ? 12 : 14} strokeWidth={2.4} color={active ? "#fff" : "#33457A"}/>
                   <span>{t.label}</span>
                   <span style={{
                     fontSize:10, fontWeight:800, padding:"2px 7px", borderRadius:999,
-                    background: active ? "rgba(255,255,255,.3)" : "rgba(0,85,255,.08)",
-                    color: active ? "#fff" : B1,
+                    background: active ? "rgba(255,255,255,.3)" : "rgba(0,85,255,.10)",
+                    color: active ? "#fff" : "#0044CC",
                   }}>
                     {t.count}
                   </span>
@@ -713,7 +713,7 @@ export default function TeachersDirectory() {
                             </div>
                             <div style={{ textAlign:"left", minWidth:0 }}>
                               <h3 style={{ fontSize: isMobile ? 13 : 14, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.2px", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{branchName}</h3>
-                              <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:700, color:T4, margin:"2px 0 0 0", letterSpacing:"0.10em", textTransform:"uppercase" }}>
+                              <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:700, color:"#5A6E96", margin:"2px 0 0 0", letterSpacing:"0.10em", textTransform:"uppercase" }}>
                                 {list.length} teacher{list.length !== 1 ? "s" : ""}
                               </p>
                             </div>
@@ -770,12 +770,12 @@ export default function TeachersDirectory() {
                           }}
                         >
                           <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 12, minWidth:0, flex:1 }}>
-                            <div style={{ width: isMobile ? 36 : 42, height: isMobile ? 36 : 42, borderRadius: isMobile ? 11 : 13, background:GRAD_VIOLET, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(123,63,244,.22)", flexShrink:0 }}>
+                            <div style={{ width: isMobile ? 36 : 42, height: isMobile ? 36 : 42, borderRadius: isMobile ? 11 : 13, background:"linear-gradient(135deg,#7B3FF4 0%,#9333EA 100%)", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 6px 14px rgba(123,63,244,.28)", flexShrink:0 }}>
                               <BookOpen size={isMobile ? 17 : 20} color="#fff" strokeWidth={2.3}/>
                             </div>
                             <div style={{ textAlign:"left", minWidth:0 }}>
                               <h3 style={{ fontSize: isMobile ? 13 : 14, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.2px", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{className}</h3>
-                              <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:700, color:T4, margin:"2px 0 0 0", letterSpacing:"0.10em", textTransform:"uppercase", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                              <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:700, color:"#5A6E96", margin:"2px 0 0 0", letterSpacing:"0.10em", textTransform:"uppercase", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                                 {list.length} teacher{list.length !== 1 ? "s" : ""}{classInfo?.subject ? ` · ${classInfo.subject}` : ""}
                               </p>
                             </div>
@@ -802,16 +802,16 @@ export default function TeachersDirectory() {
                   className="dash3d"
                   style={{
                     background:GRAD_GREEN, borderRadius: isMobile ? 14 : 18, padding: isMobile ? "14px 16px" : "18px 22px",
-                    color:"#fff", display:"flex", gap: isMobile ? 12 : 14, alignItems:"flex-start",
-                    boxShadow:"0 14px 38px rgba(0,200,83,.26)",
+                    display:"flex", gap: isMobile ? 12 : 14, alignItems:"flex-start",
+                    boxShadow:"0 8px 24px rgba(6,95,70,.14)", border:"0.5px solid rgba(6,95,70,.10)",
                   }}
                 >
-                  <div style={{ width: isMobile ? 38 : 44, height: isMobile ? 38 : 44, borderRadius: isMobile ? 11 : 13, background:"rgba(255,255,255,.22)", border:"0.5px solid rgba(255,255,255,.28)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                    <Trophy size={isMobile ? 18 : 22} color="#fff" strokeWidth={2.2}/>
+                  <div style={{ width: isMobile ? 38 : 44, height: isMobile ? 38 : 44, borderRadius: isMobile ? 11 : 13, background:"rgba(6,95,70,.12)", border:"0.5px solid rgba(6,95,70,.18)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                    <Trophy size={isMobile ? 18 : 22} color="#065F46" strokeWidth={2.2}/>
                   </div>
                   <div style={{ minWidth:0 }}>
-                    <h3 style={{ fontSize: isMobile ? 14 : 16, fontWeight:800, color:"#fff", margin:0, letterSpacing:"-0.3px" }}>Top Performing Teachers</h3>
-                    <p style={{ fontSize: isMobile ? 11 : 12, fontWeight:500, color:"rgba(255,255,255,.85)", margin:"6px 0 0 0", lineHeight:1.5 }}>
+                    <h3 style={{ fontSize: isMobile ? 14 : 16, fontWeight:800, color:"#065F46", margin:0, letterSpacing:"-0.3px" }}>Top Performing Teachers</h3>
+                    <p style={{ fontSize: isMobile ? 11 : 12, fontWeight:500, color:"#047857", margin:"6px 0 0 0", lineHeight:1.5 }}>
                       Teachers with overall activity score ≥ <b>{TOP_SCORE_THRESHOLD}%</b>.
                       Scoring blends test results, attendance discipline, assignments, lesson plans &amp; parent communication.
                     </p>
@@ -835,16 +835,16 @@ export default function TeachersDirectory() {
                   className="dash3d"
                   style={{
                     background:GRAD_RED, borderRadius: isMobile ? 14 : 18, padding: isMobile ? "14px 16px" : "18px 22px",
-                    color:"#fff", display:"flex", gap: isMobile ? 12 : 14, alignItems:"flex-start",
-                    boxShadow:"0 14px 38px rgba(255,51,85,.26)",
+                    display:"flex", gap: isMobile ? 12 : 14, alignItems:"flex-start",
+                    boxShadow:"0 8px 24px rgba(153,27,27,.14)", border:"0.5px solid rgba(153,27,27,.10)",
                   }}
                 >
-                  <div style={{ width: isMobile ? 38 : 44, height: isMobile ? 38 : 44, borderRadius: isMobile ? 11 : 13, background:"rgba(255,255,255,.22)", border:"0.5px solid rgba(255,255,255,.28)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                    <AlertTriangle size={isMobile ? 18 : 22} color="#fff" strokeWidth={2.2}/>
+                  <div style={{ width: isMobile ? 38 : 44, height: isMobile ? 38 : 44, borderRadius: isMobile ? 11 : 13, background:"rgba(153,27,27,.12)", border:"0.5px solid rgba(153,27,27,.18)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                    <AlertTriangle size={isMobile ? 18 : 22} color="#991B1B" strokeWidth={2.2}/>
                   </div>
                   <div style={{ minWidth:0 }}>
-                    <h3 style={{ fontSize: isMobile ? 14 : 16, fontWeight:800, color:"#fff", margin:0, letterSpacing:"-0.3px" }}>Teachers Needing Attention</h3>
-                    <p style={{ fontSize: isMobile ? 11 : 12, fontWeight:500, color:"rgba(255,255,255,.85)", margin:"6px 0 0 0", lineHeight:1.5 }}>
+                    <h3 style={{ fontSize: isMobile ? 14 : 16, fontWeight:800, color:"#991B1B", margin:0, letterSpacing:"-0.3px" }}>Teachers Needing Attention</h3>
+                    <p style={{ fontSize: isMobile ? 11 : 12, fontWeight:500, color:"#B91C1C", margin:"6px 0 0 0", lineHeight:1.5 }}>
                       Teachers with overall activity score below <b>{LOW_SCORE_THRESHOLD}%</b>.
                       Look at the reason tags to decide whether they need mentoring, training or a review.
                     </p>
@@ -926,12 +926,12 @@ function EmptyState({ message, icon: Icon = GraduationCap }: { message: string; 
   );
 }
 
-function tierFromScore(score: number): { label: string; grad: string; color: string; bg: string } {
-  if (score >= 75) return { label:"Excellent", grad:GRAD_GREEN, color:GREEN, bg:"rgba(0,200,83,.10)" };
-  if (score >= 60) return { label:"Good", grad:GRAD_BLUE, color:B1, bg:"rgba(0,85,255,.08)" };
-  if (score >= 45) return { label:"Average", grad:GRAD_GOLD, color:GOLD, bg:"rgba(255,170,0,.10)" };
-  if (score > 0)   return { label:"Needs Work", grad:GRAD_RED, color:RED, bg:"rgba(255,51,85,.10)" };
-  return             { label:"No Activity", grad:"linear-gradient(135deg,#99AACC,#5070B0)", color:T4, bg:"rgba(153,170,204,.10)" };
+function tierFromScore(score: number): { label: string; grad: string; solidGrad: string; color: string; bg: string } {
+  if (score >= 75) return { label:"Excellent", grad:GRAD_GREEN, solidGrad:"linear-gradient(135deg,#10B981 0%,#059669 100%)", color:GREEN, bg:"rgba(0,200,83,.10)" };
+  if (score >= 60) return { label:"Good", grad:GRAD_BLUE, solidGrad:"linear-gradient(135deg,#0055FF 0%,#1166FF 100%)", color:B1, bg:"rgba(0,85,255,.08)" };
+  if (score >= 45) return { label:"Average", grad:GRAD_GOLD, solidGrad:"linear-gradient(135deg,#F59E0B 0%,#D97706 100%)", color:GOLD, bg:"rgba(255,170,0,.10)" };
+  if (score > 0)   return { label:"Needs Work", grad:GRAD_RED, solidGrad:"linear-gradient(135deg,#FF3355 0%,#DC2626 100%)", color:RED, bg:"rgba(255,51,85,.10)" };
+  return             { label:"No Activity", grad:"linear-gradient(135deg,#99AACC,#5070B0)", solidGrad:"linear-gradient(135deg,#99AACC,#5070B0)", color:T4, bg:"rgba(153,170,204,.10)" };
 }
 
 function ActivityChip({ icon: Icon, count, label, color }: { icon: any; count: number; label: string; color: string }) {
@@ -956,10 +956,10 @@ function TeacherCard({ teacher, onClick, isMobile = false }: { teacher: any; onC
     >
       <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 12, marginBottom: isMobile ? 10 : 12 }}>
         <div style={{
-          width: isMobile ? 36 : 40, height: isMobile ? 36 : 40, borderRadius: isMobile ? 11 : 12, background:tr.grad,
+          width: isMobile ? 36 : 40, height: isMobile ? 36 : 40, borderRadius: isMobile ? 11 : 12, background:tr.solidGrad,
           display:"flex", alignItems:"center", justifyContent:"center",
           color:"#fff", fontSize:11, fontWeight:800,
-          boxShadow:"0 6px 14px rgba(0,85,255,.18)", flexShrink:0,
+          boxShadow:`0 6px 14px ${tr.color}33`, flexShrink:0,
         }}>
           {initials(teacher.name)}
         </div>
@@ -1020,10 +1020,10 @@ function TopCard({ teacher, rank, onClick, isMobile = false }: { teacher: any; r
       <div style={{ position:"relative", zIndex:1 }}>
         <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 12, marginBottom: isMobile ? 12 : 14 }}>
           <div style={{
-            width: isMobile ? 38 : 44, height: isMobile ? 38 : 44, borderRadius: isMobile ? 11 : 13, background:GRAD_GREEN,
+            width: isMobile ? 38 : 44, height: isMobile ? 38 : 44, borderRadius: isMobile ? 11 : 13, background:"linear-gradient(135deg,#10B981 0%,#059669 100%)",
             display:"flex", alignItems:"center", justifyContent:"center",
             color:"#fff", fontSize:12, fontWeight:800,
-            boxShadow:"0 6px 14px rgba(0,200,83,.22)", flexShrink:0,
+            boxShadow:"0 6px 14px rgba(16,185,129,.28)", flexShrink:0,
           }}>
             {initials(teacher.name)}
           </div>
@@ -1092,10 +1092,10 @@ function DefaulterCard({ teacher, onClick, isMobile = false }: { teacher: any; o
       <div style={{ position:"relative", zIndex:1 }}>
         <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 12, marginBottom: isMobile ? 12 : 14 }}>
           <div style={{
-            width: isMobile ? 38 : 44, height: isMobile ? 38 : 44, borderRadius: isMobile ? 11 : 13, background:GRAD_RED,
+            width: isMobile ? 38 : 44, height: isMobile ? 38 : 44, borderRadius: isMobile ? 11 : 13, background:"linear-gradient(135deg,#FF3355 0%,#DC2626 100%)",
             display:"flex", alignItems:"center", justifyContent:"center",
             color:"#fff", fontSize:12, fontWeight:800,
-            boxShadow:"0 6px 14px rgba(255,51,85,.22)", flexShrink:0,
+            boxShadow:"0 6px 14px rgba(255,51,85,.28)", flexShrink:0,
           }}>
             {initials(teacher.name)}
           </div>
@@ -1104,9 +1104,9 @@ function DefaulterCard({ teacher, onClick, isMobile = false }: { teacher: any; o
             <p style={{ fontSize:10, fontWeight:700, color:T4, margin:"2px 0 0 0", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{teacher.subject || "—"} · {teacher.branchName}</p>
           </div>
           <div style={{
-            width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: isMobile ? 10 : 11, background:GRAD_RED,
+            width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: isMobile ? 10 : 11, background:"linear-gradient(135deg,#FF3355 0%,#DC2626 100%)",
             display:"flex", alignItems:"center", justifyContent:"center",
-            boxShadow:"0 6px 14px rgba(255,51,85,.26)", flexShrink:0,
+            boxShadow:"0 6px 14px rgba(255,51,85,.28)", flexShrink:0,
           }}>
             <AlertTriangle size={isMobile ? 14 : 16} color="#fff" strokeWidth={2.3}/>
           </div>

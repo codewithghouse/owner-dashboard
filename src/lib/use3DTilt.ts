@@ -17,9 +17,9 @@ type TiltEl = HTMLElement;
 const ORIGINAL_SHADOW = new WeakMap<HTMLElement, string>();
 
 const HOVER_SHADOW =
-  "0 0 0 0.5px rgba(0,85,255,0.14)," +
-  " 0 8px 24px rgba(0,85,255,0.16)," +
-  " 0 20px 46px rgba(0,85,255,0.18)";
+  "0 8px 16px rgba(0,85,255,0.20)," +
+  " 0 24px 40px rgba(0,85,255,0.24)," +
+  " 0 40px 80px rgba(0,85,255,0.26)";
 
 export const tilt3D = {
   onMouseEnter: (e: React.MouseEvent<TiltEl>) => {
@@ -31,7 +31,7 @@ export const tilt3D = {
     (el.style as any).webkitBackfaceVisibility = "hidden";
     el.style.transition =
       "transform 0.22s cubic-bezier(0.2,0.8,0.2,1), box-shadow 0.22s ease";
-    el.style.transform = "translate3d(0,-5px,0) scale(1.02)";
+    el.style.transform = "translate3d(0,-7px,0)";
     el.style.boxShadow = HOVER_SHADOW;
   },
   onMouseMove: (_e: React.MouseEvent<TiltEl>) => {},
@@ -39,7 +39,7 @@ export const tilt3D = {
     const el = e.currentTarget as HTMLElement;
     el.style.transition =
       "transform 0.28s cubic-bezier(0.2,0.8,0.2,1), box-shadow 0.28s ease";
-    el.style.transform = "translate3d(0,0,0) scale(1)";
+    el.style.transform = "translate3d(0,0,0)";
     const orig = ORIGINAL_SHADOW.get(el);
     if (orig !== undefined) el.style.boxShadow = orig;
   },
@@ -55,7 +55,7 @@ export const tilt3DProfile = {
     (el.style as any).webkitBackfaceVisibility = "hidden";
     el.style.transition =
       "transform 0.22s cubic-bezier(0.2,0.8,0.2,1), box-shadow 0.22s ease";
-    el.style.transform = "translate3d(0,-7px,0) scale(1.025)";
+    el.style.transform = "translate3d(0,-7px,0)";
     el.style.boxShadow = HOVER_SHADOW;
   },
   onMouseMove: (_e: React.MouseEvent<TiltEl>) => {},
@@ -63,7 +63,7 @@ export const tilt3DProfile = {
     const el = e.currentTarget as HTMLElement;
     el.style.transition =
       "transform 0.28s cubic-bezier(0.2,0.8,0.2,1), box-shadow 0.28s ease";
-    el.style.transform = "translate3d(0,0,0) scale(1)";
+    el.style.transform = "translate3d(0,0,0)";
     const orig = ORIGINAL_SHADOW.get(el);
     if (orig !== undefined) el.style.boxShadow = orig;
   },

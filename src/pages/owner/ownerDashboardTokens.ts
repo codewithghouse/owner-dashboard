@@ -12,9 +12,9 @@ export const T = {
   ORANGE: "#FF8800", ORANGE_DEEP: "#C26A00",
   VIOLET: "#7B3FF4",
   GOLD: "#FFD700", GOLD_DEEP: "#FFAA00",
-  SH:    "0 0 0 0.5px rgba(0,85,255,0.08), 0 2px 8px rgba(0,85,255,0.10)",
-  SH_LG: "0 0 0 0.5px rgba(0,85,255,0.10), 0 4px 16px rgba(0,85,255,0.12), 0 20px 48px rgba(0,85,255,0.14)",
-  SH_HERO: "0 0 0 0.5px rgba(0,85,255,0.10), 0 8px 24px rgba(0,85,255,0.18), 0 24px 60px rgba(0,85,255,0.22)",
+  SH:    "0 2px 4px rgba(0,85,255,0.10), 0 6px 14px rgba(0,85,255,0.14), 0 16px 32px rgba(0,85,255,0.14)",
+  SH_LG: "0 4px 8px rgba(0,85,255,0.12), 0 12px 24px rgba(0,85,255,0.16), 0 28px 56px rgba(0,85,255,0.18)",
+  SH_HERO: "0 6px 12px rgba(0,85,255,0.16), 0 18px 32px rgba(0,85,255,0.20), 0 36px 72px rgba(0,85,255,0.24)",
   BORDER: "0.5px solid rgba(0,85,255,0.10)",
   BORDER_SOFT: "0.5px solid rgba(0,85,255,0.06)",
 } as const;

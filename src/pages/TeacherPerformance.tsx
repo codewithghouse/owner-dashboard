@@ -14,6 +14,7 @@ import {
 import { useParams, useNavigate } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { tilt3D, tilt3DStyle } from "@/lib/use3DTilt";
+import { GRAD_ACCENTS } from "@/lib/dashboardTokens";
 
 /* ── constants ────────────────────────────────────────── */
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -403,22 +404,22 @@ export default function TeacherPerformance() {
   const GREEN = "#00C853", RED = "#FF3355", GOLD = "#FFAA00", VIOLET = "#7B3FF4";
   const GRAD_PRIMARY = `linear-gradient(135deg, ${B1}, ${B2})`;
   const GRAD_HERO = "linear-gradient(135deg,#001040 0%,#001888 35%,#0033CC 70%,#0055FF 100%)";
-  const GRAD_BLUE = "linear-gradient(140deg,#F0F5FF 0%,#DCE7FF 55%,#C8D8FF 100%)";
-  const GRAD_GREEN = "linear-gradient(140deg,#EAFBF1 0%,#CFEEDA 55%,#B4E2C2 100%)";
-  const GRAD_VIOLET = "linear-gradient(140deg,#F6EEFF 0%,#E7D6FF 55%,#D6BEFF 100%)";
-  const GRAD_GOLD = "linear-gradient(140deg,#FFFAE0 0%,#FFEEB0 55%,#FFE082 100%)";
-  const GRAD_RED = "linear-gradient(140deg,#FFECEE 0%,#FFCAD2 55%,#FFA8B4 100%)";
+  const GRAD_BLUE   = "linear-gradient(135deg,#F7FAFF 0%,#EEF3FF 100%)";
+  const GRAD_GREEN  = "linear-gradient(135deg,#F5FCF8 0%,#E9F8EF 100%)";
+  const GRAD_VIOLET = "linear-gradient(135deg,#FAF7FF 0%,#F2EBFF 100%)";
+  const GRAD_GOLD   = "linear-gradient(135deg,#FFFCF0 0%,#FEF5DC 100%)";
+  const GRAD_RED    = "linear-gradient(135deg,#FEF8F9 0%,#FCEAEE 100%)";
   const SHADOW_SM = "0 0 0 .5px rgba(0,85,255,.08), 0 2px 8px rgba(0,85,255,.08), 0 10px 26px rgba(0,85,255,.10)";
   const SHADOW_LG = "0 0 0 .5px rgba(0,85,255,.10), 0 4px 16px rgba(0,85,255,.11), 0 18px 44px rgba(0,85,255,.13)";
   const SHADOW_BTN = "0 6px 22px rgba(0,85,255,.40), 0 2px 5px rgba(0,85,255,.20)";
 
   /* ─── Score tier helper (new design) ─── */
   const tierStyle = (s: number) => {
-    if (s >= 80) return { label: "Excellent", grad: GRAD_GREEN, color: GREEN, bg: "rgba(0,200,83,.10)" };
-    if (s >= 60) return { label: "Good", grad: GRAD_BLUE, color: B1, bg: "rgba(0,85,255,.08)" };
-    if (s >= 40) return { label: "Average", grad: GRAD_GOLD, color: GOLD, bg: "rgba(255,170,0,.10)" };
-    if (s > 0) return { label: "Needs Work", grad: GRAD_RED, color: RED, bg: "rgba(255,51,85,.10)" };
-    return { label: "No Data", grad: "linear-gradient(135deg,#99AACC,#5070B0)", color: T4, bg: "rgba(153,170,204,.10)" };
+    if (s >= 80) return { label: "Excellent", grad: GRAD_GREEN, solidGrad: "linear-gradient(135deg,#10B981 0%,#059669 100%)", color: GREEN, bg: "rgba(0,200,83,.10)" };
+    if (s >= 60) return { label: "Good", grad: GRAD_BLUE, solidGrad: "linear-gradient(135deg,#0055FF 0%,#1166FF 100%)", color: B1, bg: "rgba(0,85,255,.08)" };
+    if (s >= 40) return { label: "Average", grad: GRAD_GOLD, solidGrad: "linear-gradient(135deg,#F59E0B 0%,#D97706 100%)", color: GOLD, bg: "rgba(255,170,0,.10)" };
+    if (s > 0) return { label: "Needs Work", grad: GRAD_RED, solidGrad: "linear-gradient(135deg,#FF3355 0%,#DC2626 100%)", color: RED, bg: "rgba(255,51,85,.10)" };
+    return { label: "No Data", grad: "linear-gradient(135deg,#99AACC,#5070B0)", solidGrad: "linear-gradient(135deg,#99AACC,#5070B0)", color: T4, bg: "rgba(153,170,204,.10)" };
   };
 
   const globalStyles = (
@@ -442,7 +443,7 @@ export default function TeacherPerformance() {
   /* ─────────────────────────────────────────────────── */
   if (loading) {
     return (
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:260, background:"#EEF4FF", minHeight:"100vh", margin: isMobile ? "-12px -12px 0" : "-16px -24px 0" }}>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:260, background:"#EEF4FF", minHeight:"100vh", margin: isMobile ? "-12px -12px 0" : "-40px -40px 0" }}>
         <Loader2 className="animate-spin" size={32} color={B1}/>
       </div>
     );
@@ -457,9 +458,9 @@ export default function TeacherPerformance() {
         {globalStyles}
         <div
           style={{
-            fontFamily:"'DM Sans', -apple-system, sans-serif",
+            fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
             background:"#EEF4FF", minHeight:"100vh",
-            margin: isMobile ? "-12px -12px 0" : "-16px -24px 0",
+            margin: isMobile ? "-12px -12px 0" : "-40px -40px 0",
             padding: isMobile ? "14px 14px 28px" : "24px 32px 40px",
           }}
         >
@@ -497,7 +498,7 @@ export default function TeacherPerformance() {
               <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 12 : 16, minWidth:0, flex: isMobile ? "1 1 100%" : undefined }}>
                 <div
                   style={{
-                    width: isMobile ? 52 : 64, height: isMobile ? 52 : 64, borderRadius: isMobile ? 15 : 18, background:sl.grad,
+                    width: isMobile ? 52 : 64, height: isMobile ? 52 : 64, borderRadius: isMobile ? 15 : 18, background:sl.solidGrad,
                     display:"flex", alignItems:"center", justifyContent:"center",
                     color:"#fff", fontSize: isMobile ? 18 : 22, fontWeight:800, flexShrink:0,
                     boxShadow:"0 10px 28px rgba(0,0,0,.26), 0 0 0 2px rgba(255,255,255,.2)",
@@ -520,7 +521,7 @@ export default function TeacherPerformance() {
               <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 6 : 10, flexWrap:"wrap", width: isMobile ? "100%" : "auto" }}>
                 <span style={{
                   fontSize: isMobile ? 9 : 10, fontWeight:800, padding: isMobile ? "6px 10px" : "8px 14px", borderRadius:10,
-                  background:sl.grad, color:"#fff", letterSpacing:"0.12em", textTransform:"uppercase",
+                  background:sl.solidGrad, color:"#fff", letterSpacing:"0.12em", textTransform:"uppercase",
                   boxShadow:"0 4px 12px rgba(0,0,0,.24)",
                 }}>
                   {sl.label}
@@ -594,6 +595,7 @@ export default function TeacherPerformance() {
                   },
                 ].map(s=>{
                   const Icon = s.icon;
+                  const accent = GRAD_ACCENTS[s.grad] || "#4F46E5";
                   return (
                     <div
                       key={s.label}
@@ -601,25 +603,28 @@ export default function TeacherPerformance() {
                       role="button" tabIndex={0}
                       {...tilt3D}
                       style={{
-                        background:s.grad, borderRadius: isMobile ? 16 : 22, padding: isMobile ? "14px 14px" : "20px 22px", color:T1,
+                        background:s.grad, borderRadius: isMobile ? 16 : 22, padding: isMobile ? "14px 14px" : "20px 22px",
                         cursor:"pointer", position:"relative", overflow:"hidden",
-                        boxShadow:"0 0 0 .5px rgba(0,16,64,.06), 0 10px 28px rgba(0,85,255,.12), 0 4px 12px rgba(0,85,255,.08)",
+                        boxShadow:"0 4px 8px rgba(0,85,255,.12), 0 12px 24px rgba(0,85,255,.16), 0 28px 56px rgba(0,85,255,.18)",
                         ...tilt3DStyle,
                       }}
                     >
-                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: isMobile ? 10 : 14, position:"relative", zIndex:1 }}>
-                        <div style={{ width: isMobile ? 32 : 38, height: isMobile ? 32 : 38, borderRadius: isMobile ? 10 : 12, background:"rgba(255,255,255,.65)", border:"0.5px solid rgba(0,16,64,.08)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                          <Icon size={isMobile ? 16 : 19} color={T1} strokeWidth={2.4}/>
-                        </div>
-                        {s.delta && (
-                          <div style={{ display:"inline-flex", alignItems:"center", gap:3, padding:"4px 8px", borderRadius:8, background:"rgba(255,255,255,.55)" }}>
-                            <ArrowUpRight size={11} color={T1}/>
-                          </div>
-                        )}
+                      {/* Decorative faded icon — bottom-right */}
+                      <div style={{ position:"absolute", bottom: isMobile ? 8 : 12, right: isMobile ? 10 : 16, color: accent, opacity: 0.22, pointerEvents:"none", lineHeight: 0 }}>
+                        <Icon size={isMobile ? 48 : 64} strokeWidth={2}/>
                       </div>
-                      <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:800, color:T3, letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 4px 0", position:"relative", zIndex:1 }}>{s.label}</p>
-                      <p style={{ fontSize: isMobile ? 22 : 30, fontWeight:800, color:T1, letterSpacing:"-0.6px", margin:0, lineHeight:1.1, position:"relative", zIndex:1 }}>{s.value}</p>
-                      <p style={{ fontSize: isMobile ? 10 : 11, fontWeight:600, color:T3, margin:"6px 0 0 0", position:"relative", zIndex:1 }}>{s.sub}</p>
+                      {/* Solid icon badge — top-left */}
+                      <div style={{ width: isMobile ? 36 : 44, height: isMobile ? 36 : 44, borderRadius: isMobile ? 10 : 12, display:"flex", alignItems:"center", justifyContent:"center", background: accent, marginBottom: isMobile ? 10 : 14, boxShadow: `0 4px 12px ${accent}33`, position:"relative", zIndex:1 }}>
+                        <Icon size={isMobile ? 18 : 20} color="#FFFFFF" strokeWidth={2.5}/>
+                      </div>
+                      {s.delta && (
+                        <div style={{ position:"absolute", top: isMobile ? 14 : 20, right: isMobile ? 14 : 20, display:"inline-flex", alignItems:"center", gap:3, padding:"4px 8px", borderRadius:8, background: `${accent}1A`, zIndex:1 }}>
+                          <ArrowUpRight size={11} color={accent}/>
+                        </div>
+                      )}
+                      <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:700, color:"#94A3B8", letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 6px 0", position:"relative", zIndex:1 }}>{s.label}</p>
+                      <p style={{ fontSize: isMobile ? 22 : 30, fontWeight:800, color:"#0F172A", letterSpacing:"-0.6px", margin:0, lineHeight:1.1, position:"relative", zIndex:1 }}>{s.value}</p>
+                      <p style={{ fontSize: isMobile ? 10 : 11, fontWeight:600, color:"#64748B", margin:"6px 0 0 0", position:"relative", zIndex:1 }}>{s.sub}</p>
                     </div>
                   );
                 })}
@@ -784,9 +789,9 @@ export default function TeacherPerformance() {
       {globalStyles}
       <div
         style={{
-          fontFamily:"'DM Sans', -apple-system, sans-serif",
+          fontFamily:"'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
           background:"#EEF4FF", minHeight:"100vh",
-          margin: isMobile ? "-12px -12px 0" : "-16px -24px 0",
+          margin: isMobile ? "-12px -12px 0" : "-40px -40px 0",
           padding: isMobile ? "16px 14px 28px" : "24px 32px 40px",
         }}
       >
@@ -797,10 +802,10 @@ export default function TeacherPerformance() {
               <Award size={isMobile ? 20 : 24} color="#fff" strokeWidth={2.2}/>
             </div>
             <div style={{ minWidth:0 }}>
-              <h1 style={{ fontSize: isMobile ? 20 : 32, fontWeight:700, color:T1, letterSpacing: isMobile ? "-0.4px" : "-0.8px", margin:0, lineHeight:1.1 }}>
+              <h1 style={{ fontSize: isMobile ? 20 : 28, fontWeight:700, color:T1, letterSpacing: isMobile ? "-0.4px" : "-0.6px", margin:0, lineHeight:1.15 }}>
                 Teacher Performance
               </h1>
-              <p style={{ fontSize: isMobile ? 10 : 12, color:T3, fontWeight:500, margin:"5px 0 0 0", letterSpacing:"0.10em", textTransform:"uppercase" }}>
+              <p style={{ fontSize: isMobile ? 12 : 14, color:T3, fontWeight:500, margin:"4px 0 0 0", letterSpacing:0 }}>
                 Effectiveness metrics &amp; evaluation analytics
               </p>
             </div>
@@ -893,7 +898,7 @@ export default function TeacherPerformance() {
                 style={{
                   background:s.grad, borderRadius: isMobile ? 16 : 22, padding: isMobile ? "14px 14px" : "20px 22px", color:T1,
                   cursor:"pointer", position:"relative", overflow:"hidden",
-                  boxShadow:"0 0 0 .5px rgba(0,16,64,.06), 0 10px 28px rgba(0,85,255,.12), 0 4px 12px rgba(0,85,255,.08)",
+                  boxShadow:"0 4px 8px rgba(0,85,255,.12), 0 12px 24px rgba(0,85,255,.16), 0 28px 56px rgba(0,85,255,.18)",
                   ...tilt3DStyle,
                 }}
               >
@@ -1045,7 +1050,7 @@ export default function TeacherPerformance() {
                     >
                       <span style={{ fontSize:14, fontWeight:800, color: i===0 ? GOLD : i===1 ? T3 : i===2 ? "#CD7F32" : T4, width:20, flexShrink:0 }}>{i + 1}</span>
                       <div style={{
-                        width:34, height:34, borderRadius:10, background:tr.grad,
+                        width:34, height:34, borderRadius:10, background:tr.solidGrad,
                         display:"flex", alignItems:"center", justifyContent:"center",
                         color:"#fff", fontSize:10, fontWeight:800, flexShrink:0,
                       }}>
@@ -1157,10 +1162,10 @@ export default function TeacherPerformance() {
                 >
                   <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 12, marginBottom: isMobile ? 12 : 14 }}>
                     <div style={{
-                      width: isMobile ? 40 : 44, height: isMobile ? 40 : 44, borderRadius: isMobile ? 12 : 13, background:tr.grad,
+                      width: isMobile ? 40 : 44, height: isMobile ? 40 : 44, borderRadius: isMobile ? 12 : 13, background:tr.solidGrad,
                       display:"flex", alignItems:"center", justifyContent:"center",
                       color:"#fff", fontSize:12, fontWeight:800,
-                      boxShadow:"0 6px 14px rgba(0,85,255,.2)", flexShrink:0,
+                      boxShadow:`0 6px 14px ${tr.color}33`, flexShrink:0,
                     }}>
                       {initials(t.name)}
                     </div>
