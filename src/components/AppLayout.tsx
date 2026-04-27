@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore";
 import { signOut, onAuthStateChanged } from "firebase/auth";
 import SearchModal from "@/components/SearchModal";
+import MobileTabBar from "@/components/MobileTabBar";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Notification {
@@ -277,7 +278,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const handleLogout = () => signOut(auth);
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden font-sans bg-[#EEF4FF]">
+    <div className="flex flex-col h-svh min-h-svh overflow-hidden font-sans bg-[#EEF4FF]">
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div
@@ -287,7 +288,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* ── Top Header (full width) ─────────────────────────────────────── */}
-      <header className="h-14 lg:h-16 bg-white flex items-center justify-between px-4 lg:px-6 shrink-0 z-30 gap-4 border-b border-slate-100">
+      <header className="min-h-14 lg:min-h-16 safe-top bg-white flex items-center justify-between px-4 lg:px-6 shrink-0 z-30 gap-4 border-b border-slate-100">
         {/* Mobile menu button + School identifier */}
         <div className="flex items-center gap-3 min-w-0">
           <button
@@ -446,7 +447,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         transition-all duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-auto lg:my-3 lg:ml-3 lg:rounded-3xl
         ${isSidebarOpen ? "translate-x-0 shadow-xl" : "-translate-x-full"}
       `}>
-        <div className="flex items-center justify-end px-3 py-3 lg:hidden">
+        <div className="flex items-center justify-end px-3 py-3 lg:hidden safe-top">
           <button
             className="p-2 text-slate-400 hover:text-[#1e3a8a] transition-colors"
             onClick={() => setIsSidebarOpen(false)}
@@ -487,7 +488,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           ))}
         </nav>
-        <div className="px-3 py-3 border-t border-slate-100">
+        <div className="px-3 py-3 border-t border-slate-100 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <NavLink
             to={settingsItem.to}
             className={({ isActive }) => `
@@ -510,11 +511,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Main */}
       <main className="flex-1 overflow-auto bg-[#EEF4FF]">
-        <div className="p-4 lg:px-8 lg:pt-6 lg:pb-8 mb-20 lg:mb-0">
+        <div className="p-4 lg:px-8 lg:pt-6 lg:pb-8 mb-[calc(5rem+env(safe-area-inset-bottom))] lg:mb-0">
           {children}
         </div>
       </main>
       </div>
+
+      {/* ── Mobile bottom tab bar ───────────────────────────────────────────── */}
+      <MobileTabBar onMoreClick={() => setIsSidebarOpen(true)} />
 
       {/* ── Global Search Modal ─────────────────────────────────────────────── */}
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
