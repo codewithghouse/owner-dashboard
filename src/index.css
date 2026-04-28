@@ -153,6 +153,120 @@ th {
   letter-spacing: -0.02em;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   APPLE-STYLE SPACING SYSTEM (8px grid)
+   Allowed steps: 4 / 8 / 12 / 16 / 20 / 24 / 32 / 40
+   Goal: card padding consistency, section rhythm, alignment.
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+}
+
+/* Body base line-height for readability */
+html,
+body {
+  line-height: 1.5;
+}
+
+p,
+li,
+.t-body,
+.text-muted-foreground,
+small,
+.t-secondary {
+  line-height: 1.5;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  line-height: 1.3;
+}
+
+/* ── Card padding normalization ──────────────────────────────
+   Cards get a consistent 20px (large) or 16px (compact) inner
+   padding so heterogeneous Tailwind p-3/p-5/p-6/p-8 usage
+   resolves to the 8px grid without touching component code.
+   Selectors target the standard card patterns in this app. */
+.bg-white[class*="rounded-"]:not(.dash3d):not(.dash-tile):not(.dash-card),
+.bg-card[class*="rounded-"]:not(.dash3d):not(.dash-tile):not(.dash-card),
+[class*="bg-white"][class*="border"][class*="rounded-"]:not(.dash3d):not(.dash-tile):not(.dash-card),
+.stat-card {
+  padding: 20px;
+}
+
+/* Compact cards in tight grids stay at 16px */
+.grid [class*="rounded-"][class*="bg-white"][class*="p-3"],
+.grid [class*="rounded-"][class*="bg-white"][class*="p-4"],
+.stat-card[class*="p-3"],
+.stat-card[class*="p-4"] {
+  padding: 16px;
+}
+
+/* Don't pad layout shells / wrappers */
+.bg-white[class*="rounded-"]:not(.dash3d):not(.dash-tile):not(.dash-card):where(:empty) {
+  padding: 0;
+}
+
+/* ── Section rhythm ──────────────────────────────────────────
+   Vertical breathing room between successive blocks within a page. */
+main > div > * + *,
+main > section + section,
+main > div > section + section {
+  margin-top: 24px;
+}
+
+@media (min-width: 1024px) {
+  main > div > * + *,
+  main > section + section,
+  main > div > section + section {
+    margin-top: 32px;
+  }
+}
+
+/* ── Inner stack rhythm ──────────────────────────────────────
+   Headings sit closer to their following content; paragraphs
+   and labels get a soft 12–16px stack gap. */
+h1 + *, h2 + *, h3 + *, h4 + *, h5 + *, h6 + * {
+  margin-top: 12px;
+}
+
+p + p,
+.t-body + .t-body,
+label + p,
+label + div {
+  margin-top: 12px;
+}
+
+/* ── Grid alignment safety ──────────────────────────────────
+   Force grid items to stretch to equal heights so KPI rows
+   line up perfectly even when content lengths differ. */
+.grid > * {
+  align-self: stretch;
+}
+
+/* Tables: consistent vertical rhythm */
+th, td {
+  padding: 12px 16px;
+  vertical-align: middle;
+}
+
+/* Form controls breathe */
+input, select, textarea {
+  padding: 8px 12px;
+  line-height: 1.4;
+}
+
+/* Buttons consistent vertical padding */
+button {
+  line-height: 1.4;
+}
+
 @layer base {
   :root {
     --background: 210 20% 98%;
