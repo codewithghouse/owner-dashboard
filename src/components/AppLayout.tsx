@@ -287,8 +287,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      {/* ── Top Header (full width) ─────────────────────────────────────── */}
-      <header className="min-h-14 lg:min-h-16 safe-top bg-white flex items-center justify-between px-4 lg:px-6 shrink-0 z-30 gap-4 border-b border-slate-100">
+      {/* ── Top Header (floating) ─────────────────────────────────────── */}
+      <header className="min-h-14 lg:min-h-16 safe-top bg-white flex items-center justify-between px-4 lg:px-6 shrink-0 z-30 gap-4 mx-3 mt-3 rounded-2xl border border-slate-100 shadow-[0_4px_24px_rgba(0,16,64,.06)]">
         {/* Mobile menu button + School identifier */}
         <div className="flex items-center gap-3 min-w-0">
           <button
@@ -459,7 +459,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <nav className="flex-1 px-3 py-4 overflow-y-auto">
           {navSections.map((section, idx) => (
             <div key={section.heading} className={idx === 0 ? "" : "mt-5"}>
-              <p className="px-4 mb-2 text-[10px] font-bold text-slate-400 tracking-widest uppercase">
+              <p className="px-4 mb-2 text-[10px] font-bold text-black tracking-widest uppercase">
                 {section.heading}
               </p>
               <div className="space-y-1">
@@ -469,16 +469,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     to={item.to}
                     end={item.to === "/"}
                     className={({ isActive }) => `
-                      flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200
+                      flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition-all duration-200 text-black
                       ${isActive
-                        ? "bg-[#EEF4FF] text-[#1e3a8a] font-bold"
-                        : "text-slate-500 hover:bg-slate-50 hover:text-[#1e3a8a]"
+                        ? "bg-[#EEF4FF]"
+                        : "hover:bg-slate-50"
                       }
                     `}
                   >
                     {({ isActive }) => (
                       <>
-                        <item.icon className={`w-[18px] h-[18px] ${isActive ? "text-[#1e3a8a]" : "text-slate-400"}`} />
+                        <item.icon className={`w-[18px] h-[18px] ${isActive ? "text-[#1e3a8a]" : "text-black"}`} />
                         {item.label}
                       </>
                     )}
@@ -492,16 +492,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <NavLink
             to={settingsItem.to}
             className={({ isActive }) => `
-              flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200
+              flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition-all duration-200 text-black
               ${isActive
-                ? "bg-[#EEF4FF] text-[#1e3a8a] font-bold"
-                : "text-slate-500 hover:bg-slate-50 hover:text-[#1e3a8a]"
+                ? "bg-[#EEF4FF]"
+                : "hover:bg-slate-50"
               }
             `}
           >
             {({ isActive }) => (
               <>
-                <settingsItem.icon className={`w-[18px] h-[18px] ${isActive ? "text-[#1e3a8a]" : "text-slate-400"}`} />
+                <settingsItem.icon className={`w-[18px] h-[18px] ${isActive ? "text-[#1e3a8a]" : "text-black"}`} />
                 {settingsItem.label}
               </>
             )}
