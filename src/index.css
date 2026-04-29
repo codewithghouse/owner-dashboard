@@ -497,10 +497,9 @@ button {
 [class*="bg-white"][class*="border"][class*="rounded-"]:not(.dash3d):not(.dash-tile):not(.dash-card),
 div[class*="shadow-sm"][class*="rounded-"]:not(.dash3d):not(.dash-tile):not(.dash-card),
 .stat-card {
-  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+  transition: transform 0.2s ease-out,
               box-shadow 0.3s ease,
               border-color 0.3s ease !important;
-  will-change: transform;
   position: relative;
 }
 
@@ -510,7 +509,7 @@ div[class*="shadow-sm"][class*="rounded-"]:not(.dash3d):not(.dash-tile):not(.das
   [class*="bg-white"][class*="border"][class*="rounded-"]:not(.dash3d):not(.dash-tile):not(.dash-card):hover,
   div[class*="shadow-sm"][class*="rounded-"]:not(.dash3d):not(.dash-tile):not(.dash-card):hover,
   .stat-card:hover {
-    transform: translateY(-4px) scale(1.008) !important;
+    transform: translate3d(0, -4px, 0) !important;
     box-shadow: 0 20px 40px rgba(30, 58, 138, 0.08),
                 0 8px 16px rgba(0, 0, 0, 0.04),
                 0 0 0 1px rgba(59, 91, 219, 0.1) !important;
@@ -549,7 +548,7 @@ button[class*="rounded-"][class*="border"] {
 }
 .clickable-card:active,
 [role="button"][class*="rounded-"]:active {
-  transform: translateY(-2px) scale(0.99) !important;
+  transform: translate3d(0, -2px, 0) !important;
   transition: transform 0.1s ease !important;
 }
 
@@ -588,12 +587,5 @@ main > div,
   animation: ownerFadeSlideIn 0.4s ease-out;
 }
 
-/* ── Stat number scale on card hover ──────────────────────────── */
-@media (hover: hover) and (pointer: fine) {
-  .stat-card:hover [class*="text-2xl"],
-  .stat-card:hover [class*="text-3xl"],
-  .stat-card:hover [class*="text-4xl"] {
-    transform: scale(1.05);
-    transition: transform 0.25s ease;
-  }
-}
+/* Stat number hover scale removed — was causing text blur on Windows
+   sub-pixel rendering. Card translate3d lift is enough motion. */
