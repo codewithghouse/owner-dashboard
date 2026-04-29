@@ -199,9 +199,13 @@ export async function exportEmail(payload: ExportPayload): Promise<{ success: bo
   }
 
   try {
+    const idToken = await auth.currentUser?.getIdToken();
     const response = await fetch("/api/send-email", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+      },
       body: JSON.stringify({
         type: "report",
         to: ownerEmail,
