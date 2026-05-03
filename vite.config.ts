@@ -41,8 +41,8 @@ export default defineConfig(({ mode }) => {
         ],
         manifest: {
           id: "/",
-          name: "Edullent — Owner Dashboard",
-          short_name: "Edullent",
+          name: "edullent-owner",
+          short_name: "edullent-owner",
           description: "Multi-branch school analytics, finance, academics and operations.",
           theme_color: "#1e3a8a",
           background_color: "#EEF4FF",

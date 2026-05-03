@@ -20,6 +20,7 @@ import { db, auth } from "./firebase";
 import {
   collection, getDocs, query, where, orderBy,
 } from "firebase/firestore";
+import { PASS_THRESHOLD_PERCENT } from "./analyticsService";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface BoardReportInput {
@@ -39,38 +40,53 @@ const AMBER  = [245, 158, 11]  as [number, number, number];
 const RED    = [239, 68, 68]   as [number, number, number];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+/* Apple-style section header: minimal uppercase label + thin hairline.
+   Replaces the heavy navy block from the previous design. */
 function addSection(doc: jsPDF, y: number, title: string): number {
   if (y > 260) { doc.addPage(); y = 20; }
-  doc.setFillColor(...NAVY);
-  doc.roundedRect(14, y, 182, 8, 2, 2, "F");
-  doc.setTextColor(...WHITE);
-  doc.setFontSize(9);
+  doc.setTextColor(...NAVY);
+  doc.setFontSize(7.5);
   doc.setFont("helvetica", "bold");
-  doc.text(title.toUpperCase(), 18, y + 5.5);
+  doc.text(title.toUpperCase(), 14, y, { charSpace: 1.2 });
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.2);
+  doc.line(14, y + 2, 196, y + 2);
   doc.setTextColor(0, 0, 0);
-  return y + 13;
+  return y + 9;
 }
 
+/* Apple-style KPI tile: clean white card with hairline border, big number,
+   subdued label/sub. Color used only on the number itself (status semaphore)
+   — no left accent stripe, no flood fill. Lets typography do the work. */
 function kpiBox(
   doc: jsPDF, x: number, y: number, w: number,
   label: string, value: string, sub: string,
   color: [number, number, number],
 ) {
-  doc.setFillColor(...LIGHT);
-  doc.roundedRect(x, y, w, 22, 3, 3, "F");
-  doc.setFillColor(...color);
-  doc.roundedRect(x, y, 3, 22, 1, 1, "F");
-  doc.setTextColor(...color);
-  doc.setFontSize(14);
-  doc.setFont("helvetica", "bold");
-  doc.text(value, x + 6, y + 10);
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(7);
-  doc.setFont("helvetica", "bold");
-  doc.text(label, x + 6, y + 15);
+  // Hairline-bordered card on white
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.2);
+  doc.setFillColor(...WHITE);
+  doc.roundedRect(x, y, w, 24, 2, 2, "FD");
+
+  // Tiny uppercase label (slate)
   doc.setTextColor(...SLATE);
+  doc.setFontSize(6);
+  doc.setFont("helvetica", "bold");
+  doc.text(label.toUpperCase(), x + 5, y + 6, { charSpace: 0.6 });
+
+  // Big number (color-coded by status)
+  doc.setTextColor(...color);
+  doc.setFontSize(18);
+  doc.setFont("helvetica", "bold");
+  doc.text(value, x + 5, y + 16);
+
+  // Sub-line (slate, normal weight)
+  doc.setTextColor(...SLATE);
+  doc.setFontSize(7);
   doc.setFont("helvetica", "normal");
-  doc.text(sub, x + 6, y + 20);
+  doc.text(sub, x + 5, y + 21);
+
   doc.setTextColor(0, 0, 0);
 }
 
@@ -80,13 +96,22 @@ export async function generateBoardReportPDF({ schoolName, quarter, ownerName }:
   if (!uid) throw new Error("Not authenticated");
 
   // ── Fetch data ─────────────────────────────────────────────────────────────
+  /* Every root-collection read scoped by schoolId. Previously enrollments,
+     test_scores, and attendance were unscoped — Owner's PDF would silently
+     pull in other schools' enrollments / scores / attendance rows when
+     Firestore rules allowed, or come back empty when they didn't. Fees +
+     risks were already correctly scoped; the rest now match. */
+  const scoped = (col: string) =>
+    getDocs(query(collection(db, col), where("schoolId", "==", uid)))
+      .catch(() => ({ docs: [] as any[] }));
+
   const [branchSnap, enrollSnap, scoresSnap, attSnap, feesSnap, risksSnap] = await Promise.all([
-    getDocs(collection(db, "schools", uid, "branches")),
-    getDocs(collection(db, "enrollments")),
-    getDocs(collection(db, "test_scores")),
-    getDocs(collection(db, "attendance")),
-    getDocs(query(collection(db, "fees"), where("schoolId", "==", uid))),
-    getDocs(query(collection(db, "risks"), where("schoolId", "==", uid))),
+    getDocs(collection(db, "schools", uid, "branches")), // subcollection — already scoped by path
+    scoped("enrollments"),
+    scoped("test_scores"),
+    scoped("attendance"),
+    scoped("fees"),
+    scoped("risks"),
   ]);
 
   // Branch map
@@ -151,7 +176,7 @@ export async function generateBoardReportPDF({ schoolName, quarter, ownerName }:
   });
 
   const overallAtt     = totalAtt   > 0 ? Math.round((totalPresent / totalAtt) * 100) : 0;
-  const overallPass    = allScores.length > 0 ? Math.round(allScores.filter(s => s >= 40).length / allScores.length * 100) : 0;
+  const overallPass    = allScores.length > 0 ? Math.round(allScores.filter(s => s >= PASS_THRESHOLD_PERCENT).length / allScores.length * 100) : 0;
   const overallFeeRate = totalFees > 0 ? Math.round((totalPaid / totalFees) * 100) : 0;
   const overallAvg     = allScores.length > 0 ? Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length) : 0;
   const overallAHI     = Math.round(overallAtt * 0.4 + overallPass * 0.4 + overallFeeRate * 0.2);
@@ -162,84 +187,128 @@ export async function generateBoardReportPDF({ schoolName, quarter, ownerName }:
   // ── Build PDF ──────────────────────────────────────────────────────────────
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
-  // ── Cover Page ─────────────────────────────────────────────────────────────
+  /* ════════════════════════════════════════════════════════════════════════
+     COVER PAGE — Apple-premium minimal layout
+     ────────────────────────────────────────────────────────────────────────
+     Layout grid (A4 portrait, 210×297 mm):
+       · Top-left:    Edullent monogram (E in colored disc) + wordmark
+       · Vertical center: School name (HUGE light typography) — the hero
+       · Below center:    "BOARD REPORT" eyebrow · quarter · date stamp
+       · Bottom:      Hairline divider + minimal confidential footer
+     Design principles:
+       · White background, single navy accent (no slabs/blocks of color)
+       · Generous whitespace, no heavy panels
+       · Type hierarchy carries the design (size + weight, not color)
+     ════════════════════════════════════════════════════════════════════════ */
+
+  /* —— Brand block: top-left ——— */
+  // Monogram disc
   doc.setFillColor(...NAVY);
-  doc.rect(0, 0, 210, 297, "F");
-
-  // Header accent
-  doc.setFillColor(...BLUE);
-  doc.roundedRect(14, 30, 182, 60, 8, 8, "F");
-
+  doc.circle(20, 22, 4.2, "F");
   doc.setTextColor(...WHITE);
-  doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.text("EDULLENT", 18, 40);
-  doc.setFontSize(6);
-  doc.setFont("helvetica", "normal");
-  doc.text("School Management Platform", 18, 45);
-
-  doc.setFontSize(20);
-  doc.setFont("helvetica", "bold");
-  doc.text("Board Report", 18, 60);
-  doc.setFontSize(14);
-  doc.text(quarter, 18, 70);
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.text(schoolName, 18, 80);
-
-  // Details block
-  doc.setFillColor(15, 30, 70);
-  doc.roundedRect(14, 110, 182, 40, 6, 6, "F");
-  doc.setTextColor(...WHITE);
   doc.setFontSize(9);
-  doc.setFont("helvetica", "bold");
-  doc.text("Prepared for:", 20, 122);
-  doc.setFont("helvetica", "normal");
-  doc.text(ownerName || "School Owner", 20, 128);
-  doc.setFont("helvetica", "bold");
-  doc.text("Generated:", 20, 136);
-  doc.setFont("helvetica", "normal");
-  doc.text(new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }), 20, 142);
+  doc.text("E", 18.45, 23.6);
 
-  // Footer
-  doc.setTextColor(100, 120, 180);
+  // Wordmark + tagline
+  doc.setTextColor(...NAVY);
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.text("Edullent", 27, 21);
+  doc.setTextColor(...SLATE);
+  doc.setFontSize(6.5);
+  doc.setFont("helvetica", "normal");
+  doc.text("School Management Platform", 27, 25);
+
+  /* —— Hero block: vertically centered school name ——— */
+  /* "BOARD REPORT" eyebrow — small uppercase, wide letter-spacing feel */
+  doc.setTextColor(...SLATE);
   doc.setFontSize(7);
-  doc.text("Confidential — For Board Members Only", 14, 280);
-  doc.text("Powered by Edullent Cloud Platform", 120, 280);
+  doc.setFont("helvetica", "bold");
+  doc.text("BOARD REPORT  ·  " + quarter.toUpperCase(), 105, 130, { align: "center", charSpace: 1.2 });
+
+  /* School name — the hero. Big light typography, dark navy, centered.
+     splitTextToSize handles long names, then we center each line. */
+  doc.setTextColor(...NAVY);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(34);
+  const heroLines = doc.splitTextToSize(schoolName, 170) as string[];
+  let heroY = 148;
+  heroLines.forEach(line => {
+    doc.text(line, 105, heroY, { align: "center" });
+    heroY += 12;
+  });
+
+  /* Thin accent line under the hero — Apple-style separator */
+  doc.setDrawColor(...NAVY);
+  doc.setLineWidth(0.4);
+  doc.line(95, heroY + 4, 115, heroY + 4);
+
+  /* Date stamp + ownership line — small, slate, centered */
+  doc.setTextColor(...SLATE);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  const dateStr = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+  doc.text(`Generated ${dateStr}`, 105, heroY + 13, { align: "center" });
+  if (ownerName) {
+    doc.text(`Prepared for ${ownerName}`, 105, heroY + 19, { align: "center" });
+  }
+
+  /* —— Footer: hairline + minimal text ——— */
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.2);
+  doc.line(14, 278, 196, 278);
+  doc.setTextColor(...SLATE);
+  doc.setFontSize(6.5);
+  doc.setFont("helvetica", "normal");
+  doc.text("CONFIDENTIAL · FOR BOARD MEMBERS ONLY", 14, 285, { charSpace: 0.5 });
+  doc.text("Powered by Edullent", 196, 285, { align: "right" });
 
   // ── Page 2 — Executive Summary ─────────────────────────────────────────────
   doc.addPage();
-  let y = 20;
+  let y = 22;
 
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(16);
+  /* Page header: brand mark top-left + page title centered. Echoes the cover
+     mark so every page is recognizably part of the same document. */
+  doc.setFillColor(...NAVY);
+  doc.circle(18, y - 4, 2.6, "F");
+  doc.setTextColor(...WHITE);
   doc.setFont("helvetica", "bold");
-  doc.text(`${quarter} — Executive Summary`, 14, y);
-  y += 5;
+  doc.setFontSize(6);
+  doc.text("E", 17.05, -3 + y);
+  doc.setTextColor(...NAVY);
+  doc.setFontSize(8);
+  doc.text("Edullent", 22, y - 2.5);
+
+  // Page title (bold, dark) + meta (slate, normal) — Apple's left-aligned headers
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(18);
+  doc.setFont("helvetica", "bold");
+  doc.text("Executive Summary", 14, y + 8);
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...SLATE);
-  doc.text(`${schoolName} · Generated ${new Date().toLocaleDateString("en-IN")}`, 14, y + 3);
+  doc.text(`${schoolName} · ${quarter}`, 14, y + 13);
   doc.setTextColor(0, 0, 0);
-  y += 12;
+  y += 22;
 
-  // KPI boxes (2 rows × 2)
+  // KPI grid (3 rows × 2). Boxes are 24mm tall, gap 5mm = 29mm row pitch.
   kpiBox(doc, 14, y, 87, "Academic Health Index", `${overallAHI}%`,
     overallAHI >= 75 ? "Good standing" : overallAHI >= 50 ? "Needs attention" : "Critical",
     overallAHI >= 75 ? GREEN : overallAHI >= 50 ? AMBER : RED);
   kpiBox(doc, 109, y, 87, "Total Students", totalStudents.toLocaleString(),
     `Across ${branchMap.size} branch${branchMap.size !== 1 ? "es" : ""}`, NAVY);
-  y += 27;
+  y += 29;
   kpiBox(doc, 14, y, 87, "Attendance Rate", `${overallAtt}%`,
     overallAtt >= 85 ? "On target" : "Below target", overallAtt >= 85 ? GREEN : AMBER);
   kpiBox(doc, 109, y, 87, "Pass Rate", `${overallPass}%`,
     overallPass >= 70 ? "Good" : "Needs improvement", overallPass >= 70 ? GREEN : AMBER);
-  y += 27;
+  y += 29;
   kpiBox(doc, 14, y, 87, "Fee Collection Rate", `${overallFeeRate}%`,
     overallFeeRate >= 80 ? "Healthy" : "Follow-up required", overallFeeRate >= 80 ? GREEN : RED);
   kpiBox(doc, 109, y, 87, "Average Score", `${overallAvg}%`,
     overallAvg >= 60 ? "Passing" : "Concerning", overallAvg >= 60 ? GREEN : RED);
-  y += 30;
+  y += 33;
 
   // Summary paragraph
   y = addSection(doc, y, "Executive Summary");
@@ -261,7 +330,7 @@ export async function generateBoardReportPDF({ schoolName, quarter, ownerName }:
 
   const branchRows = Array.from(branchStats.values()).map(bs => {
     const att  = bs.total > 0 ? Math.round((bs.present / bs.total) * 100) : 0;
-    const pass = bs.scores.length > 0 ? Math.round(bs.scores.filter(s => s >= 40).length / bs.scores.length * 100) : 0;
+    const pass = bs.scores.length > 0 ? Math.round(bs.scores.filter(s => s >= PASS_THRESHOLD_PERCENT).length / bs.scores.length * 100) : 0;
     const fee  = bs.totalFees > 0 ? Math.round((bs.paidFees / bs.totalFees) * 100) : 0;
     const ahi  = Math.round(att * 0.4 + pass * 0.4 + fee * 0.2);
     const avg  = bs.scores.length > 0 ? Math.round(bs.scores.reduce((a, b) => a + b, 0) / bs.scores.length) : 0;
@@ -272,10 +341,23 @@ export async function generateBoardReportPDF({ schoolName, quarter, ownerName }:
     startY: y,
     head: [["Branch", "Students", "Attendance", "Pass Rate", "Avg Score", "Fee Coll.", "AHI"]],
     body: branchRows,
-    theme: "grid",
-    headStyles: { fillColor: NAVY, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
-    bodyStyles: { fontSize: 8 },
-    alternateRowStyles: { fillColor: LIGHT },
+    theme: "plain", // hairline-only borders, no chrome
+    headStyles: {
+      fillColor: WHITE,
+      textColor: SLATE,
+      fontStyle: "bold",
+      fontSize: 7,
+      cellPadding: { top: 3, bottom: 3, left: 3, right: 3 },
+      lineWidth: { bottom: 0.4 },
+      lineColor: NAVY,
+    },
+    bodyStyles: {
+      fontSize: 8,
+      cellPadding: { top: 3.5, bottom: 3.5, left: 3, right: 3 },
+      lineWidth: { bottom: 0.1 },
+      lineColor: [226, 232, 240],
+    },
+    alternateRowStyles: { fillColor: [250, 251, 253] }, // very subtle row banding
     margin: { left: 14, right: 14 },
     didParseCell: (data) => {
       if (data.section === "body" && data.column.index >= 2) {
@@ -307,9 +389,23 @@ export async function generateBoardReportPDF({ schoolName, quarter, ownerName }:
     startY: y,
     head: [["Branch", "Critical", "Warning", "Status"]],
     body: riskBranchRows.slice(0, 8),
-    theme: "grid",
-    headStyles: { fillColor: [190, 18, 60], textColor: WHITE, fontStyle: "bold", fontSize: 8 },
-    bodyStyles: { fontSize: 8 },
+    theme: "plain",
+    headStyles: {
+      fillColor: WHITE,
+      textColor: SLATE,
+      fontStyle: "bold",
+      fontSize: 7,
+      cellPadding: { top: 3, bottom: 3, left: 3, right: 3 },
+      lineWidth: { bottom: 0.4 },
+      lineColor: RED, // accent — risk section
+    },
+    bodyStyles: {
+      fontSize: 8,
+      cellPadding: { top: 3.5, bottom: 3.5, left: 3, right: 3 },
+      lineWidth: { bottom: 0.1 },
+      lineColor: [226, 232, 240],
+    },
+    alternateRowStyles: { fillColor: [250, 251, 253] },
     margin: { left: 14, right: 14 },
   });
   y = (doc as any).lastAutoTable.finalY + 8;
@@ -331,10 +427,23 @@ export async function generateBoardReportPDF({ schoolName, quarter, ownerName }:
         rate >= 80 ? "✓ On Track" : rate >= 60 ? "⚠ Follow Up" : "✗ Critical",
       ];
     }),
-    theme: "grid",
-    headStyles: { fillColor: [6, 182, 212], textColor: WHITE, fontStyle: "bold", fontSize: 8 },
-    bodyStyles: { fontSize: 8 },
-    alternateRowStyles: { fillColor: LIGHT },
+    theme: "plain",
+    headStyles: {
+      fillColor: WHITE,
+      textColor: SLATE,
+      fontStyle: "bold",
+      fontSize: 7,
+      cellPadding: { top: 3, bottom: 3, left: 3, right: 3 },
+      lineWidth: { bottom: 0.4 },
+      lineColor: [6, 182, 212], // accent — fee section
+    },
+    bodyStyles: {
+      fontSize: 8,
+      cellPadding: { top: 3.5, bottom: 3.5, left: 3, right: 3 },
+      lineWidth: { bottom: 0.1 },
+      lineColor: [226, 232, 240],
+    },
+    alternateRowStyles: { fillColor: [250, 251, 253] },
     margin: { left: 14, right: 14 },
   });
   y = (doc as any).lastAutoTable.finalY + 8;

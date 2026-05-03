@@ -85,18 +85,18 @@ function buildExportPayload(report: AnyReportData, title: string) {
     tableRows = report.byBranch.map(b => [b.branch, b.count.toString(), `${b.avgScore}%`]);
   } else if (report._type === "revenue") {
     stats.push(
-      { label: "Total Revenue", value: `$${report.totalRevenue.toLocaleString()}` },
-      { label: "Collected", value: `$${report.totalCollected.toLocaleString()}` },
-      { label: "Outstanding", value: `$${report.outstanding.toLocaleString()}` },
+      { label: "Total Revenue", value: `₹${report.totalRevenue.toLocaleString("en-IN")}` },
+      { label: "Collected", value: `₹${report.totalCollected.toLocaleString("en-IN")}` },
+      { label: "Outstanding", value: `₹${report.outstanding.toLocaleString("en-IN")}` },
       { label: "Collection Rate", value: `${report.collectionRate}%` },
     );
     tableHeaders = ["Branch", "Collected", "Total"];
-    tableRows = report.byBranch.map(b => [b.branch, `$${b.collected.toLocaleString()}`, `$${b.total.toLocaleString()}`]);
+    tableRows = report.byBranch.map(b => [b.branch, `₹${b.collected.toLocaleString("en-IN")}`, `₹${b.total.toLocaleString("en-IN")}`]);
   } else if (report._type === "fee-collection") {
     stats.push(
-      { label: "Total Billed", value: `$${report.totalBilled.toLocaleString()}` },
-      { label: "Total Paid", value: `$${report.totalPaid.toLocaleString()}` },
-      { label: "Pending", value: `$${report.pendingAmount.toLocaleString()}` },
+      { label: "Total Billed", value: `₹${report.totalBilled.toLocaleString("en-IN")}` },
+      { label: "Total Paid", value: `₹${report.totalPaid.toLocaleString("en-IN")}` },
+      { label: "Pending", value: `₹${report.pendingAmount.toLocaleString("en-IN")}` },
       { label: "Collection %", value: `${report.collectionPct}%` },
     );
     tableHeaders = ["Branch", "Collection %"];
@@ -135,19 +135,19 @@ function buildExportPayload(report: AnyReportData, title: string) {
       { label: "Total Defaulters",    value: report.totalDefaulters.toString() },
       { label: "30+ Days Overdue",    value: report.above30Days.toString() },
       { label: "60+ Days Overdue",    value: report.above60Days.toString() },
-      { label: "Amount Outstanding",  value: `$${report.amountOutstanding.toLocaleString()}` },
+      { label: "Amount Outstanding",  value: `₹${report.amountOutstanding.toLocaleString("en-IN")}` },
     );
     tableHeaders = ["Branch", "Defaulters", "Amount"];
-    tableRows = report.byBranch.map(b => [b.branch, b.count.toString(), `$${b.amount.toLocaleString()}`]);
+    tableRows = report.byBranch.map(b => [b.branch, b.count.toString(), `₹${b.amount.toLocaleString("en-IN")}`]);
   } else if (report._type === "expense") {
     stats.push(
-      { label: "Total Expenses",    value: `$${report.totalExpenses.toLocaleString()}` },
+      { label: "Total Expenses",    value: `₹${report.totalExpenses.toLocaleString("en-IN")}` },
       { label: "Largest Category",  value: report.largestCategory },
       { label: "Categories",        value: report.byCategory.length.toString() },
       { label: "Top Category %",    value: `${report.byCategory[0]?.pct || 0}%` },
     );
     tableHeaders = ["Category", "Amount", "% of Total"];
-    tableRows = report.byCategory.map(c => [c.category, `$${c.amount.toLocaleString()}`, `${c.pct}%`]);
+    tableRows = report.byCategory.map(c => [c.category, `₹${c.amount.toLocaleString("en-IN")}`, `${c.pct}%`]);
   }
 
   return { ...base, stats, tableHeaders, tableRows };
@@ -240,6 +240,14 @@ export default function ReportsCenter() {
       toast.error("Enter a recipient email first.");
       return;
     }
+    /* Reject obviously invalid emails up front so we don't write a doc that
+       can never deliver. Pattern is intentionally permissive (no perfect
+       email regex exists) — just rejects "abc", "abc@", "@xyz" etc. */
+    const trimmedEmail = schedEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      toast.error("That doesn't look like a valid email address.");
+      return;
+    }
     const reg = REPORT_REGISTRY[selectedSlug];
     setScheduling(true);
     try {
@@ -253,10 +261,15 @@ export default function ReportsCenter() {
         reportSlug:  selectedSlug,
         frequency:   FREQ_MAP[schedFreq].label,
         nextRun:     FREQ_MAP[schedFreq].nextRun,
-        email:       schedEmail.trim().toLowerCase(),
+        email:       trimmedEmail,
         recipients:  1,
         status:      "Active",
         ownerUid:    auth.currentUser?.uid || "",
+        /* schoolId so reportsService scopedDocs("scheduled_reports", uid)
+           can find this row on the next dashboard load. ownerUid is kept for
+           backward compat — both fields equal uid in current single-owner
+           model, but the scoped read uses schoolId. */
+        schoolId:    auth.currentUser?.uid || "",
         createdAt:   serverTimestamp(),
       });
       setSchedDone(true);
@@ -1109,8 +1122,8 @@ function renderCharts(data: AnyReportData, isMobile: boolean = false): JSX.Eleme
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.byBranch} margin={{ left: -10, right: 10 }}>
                   <XAxis dataKey="branch" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
-                  <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} formatter={(v: number) => [`$${v.toLocaleString()}`, "Collected"]} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} tickFormatter={v => `₹${(v/1000).toFixed(0)}K`} />
+                  <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} formatter={(v: number) => [`₹${v.toLocaleString("en-IN")}`, "Collected"]} />
                   <Bar dataKey="collected" name="Collected" fill="#1e3a8a" radius={[4, 4, 0, 0]} barSize={24} />
                   <Bar dataKey="total" name="Total" fill="#e2e8f0" radius={[4, 4, 0, 0]} barSize={24} />
                 </BarChart>
@@ -1132,7 +1145,7 @@ function renderCharts(data: AnyReportData, isMobile: boolean = false): JSX.Eleme
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: "bold" }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} tickFormatter={v => `₹${(v/1000).toFixed(0)}K`} />
                   <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} />
                   <Area type="monotone" dataKey="amount" stroke="#22c55e" strokeWidth={3} fill="url(#colorRev)" dot={{ r: 5, fill: "#22c55e", strokeWidth: 2.5, stroke: "#fff" }} />
                 </AreaChart>
@@ -1362,7 +1375,7 @@ function renderCharts(data: AnyReportData, isMobile: boolean = false): JSX.Eleme
                 <BarChart data={agingData} margin={{ left: -10, right: 10 }}>
                   <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} dy={10} />
                   <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} />
-                  <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} formatter={(v: number, name: string) => [name === "count" ? `${v} students` : `$${v.toLocaleString()}`, name === "count" ? "Defaulters" : "Amount"]} />
+                  <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} formatter={(v: number, name: string) => [name === "count" ? `${v} students` : `₹${v.toLocaleString("en-IN")}`, name === "count" ? "Defaulters" : "Amount"]} />
                   <Bar dataKey="count" name="count" radius={[4,4,0,0]} barSize={40} label={{ position: "top", fill: "#64748b", fontSize: 10, fontWeight: "bold" }}>
                     {agingData.map((e, i) => <Cell key={i} fill={e.fill} />)}
                   </Bar>
@@ -1378,8 +1391,8 @@ function renderCharts(data: AnyReportData, isMobile: boolean = false): JSX.Eleme
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.byBranch} margin={{ left: -10, right: 10 }}>
                   <XAxis dataKey="branch" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
-                  <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} formatter={(v: number) => [`$${v.toLocaleString()}`, "Outstanding"]} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} tickFormatter={v => `₹${(v/1000).toFixed(0)}K`} />
+                  <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} formatter={(v: number) => [`₹${v.toLocaleString("en-IN")}`, "Outstanding"]} />
                   <Bar dataKey="amount" name="amount" fill="#ef4444" radius={[4,4,0,0]} barSize={32} />
                 </BarChart>
               </ResponsiveContainer>
@@ -1405,7 +1418,7 @@ function renderCharts(data: AnyReportData, isMobile: boolean = false): JSX.Eleme
                   <Pie data={data.byCategory} cx="50%" cy="50%" outerRadius={90} dataKey="amount" nameKey="category" label={({ category, pct }) => `${category} ${pct}%`} labelLine={false}>
                     {data.byCategory.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Pie>
-                  <Tooltip contentStyle={{ borderRadius: "12px", border: "none" }} formatter={(v: number) => [`$${v.toLocaleString()}`, "Amount"]} />
+                  <Tooltip contentStyle={{ borderRadius: "12px", border: "none" }} formatter={(v: number) => [`₹${v.toLocaleString("en-IN")}`, "Amount"]} />
                   <Legend wrapperStyle={{ fontSize: 11, fontWeight: 700 }} />
                 </PieChart>
               </ResponsiveContainer>
@@ -1426,8 +1439,8 @@ function renderCharts(data: AnyReportData, isMobile: boolean = false): JSX.Eleme
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: "bold" }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
-                  <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} formatter={(v: number) => [`$${v.toLocaleString()}`, "Expenses"]} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: "bold" }} tickFormatter={v => `₹${(v/1000).toFixed(0)}K`} />
+                  <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} formatter={(v: number) => [`₹${v.toLocaleString("en-IN")}`, "Expenses"]} />
                   <Area type="monotone" dataKey="amount" stroke="#ef4444" strokeWidth={3} fill="url(#expGrad)" dot={{ r: 4, fill: "#ef4444", strokeWidth: 2, stroke: "#fff" }} />
                 </AreaChart>
               </ResponsiveContainer>

@@ -19,17 +19,43 @@ import { GRAD_ACCENTS } from "@/lib/dashboardTokens";
 /* ── constants ────────────────────────────────────────── */
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
+/* Performance thresholds on the 0-100 avg test-score scale.
+   70 = top-performer cutoff (pure exam scores). Lower than TeachersDirectory's
+   75 — that's the activity-WEIGHTED score (tests + attendance + assignments
+   + parent notes etc.), which is easier to clear than pure exam %. For typical
+   schools where avg sits at 70-75%, an 80%+ teacher would never be matched here,
+   so we'd show "0 Top Performers" even with strong data. 70 catches the genuine
+   top scorers without being permissive. */
+const TOP_SCORE_THRESHOLD = 70;
+const PASS_THRESHOLD      = 60;
+const AVG_TIER_THRESHOLD  = 40;
+
+/* Attendance signal threshold — below this, the teacher's attendance value is
+   shown in red on cards so an "Excellent" tier (based on exam scores alone)
+   doesn't visually mask a punctuality problem. */
+const LOW_ATTENDANCE_PCT  = 70;
+
 /* ── helpers ──────────────────────────────────────────── */
 function initials(name: string) {
   return (name || "?").split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
 }
 
-function last6Months() {
+/* Returns last 6 months including the current month, in chronological order.
+   Each entry has a year-aware bucket key ("YYYY-MM") so December 2024 doesn't
+   collide with December 2025 in monthly aggregations. `label` is for display. */
+function last6Months(): Array<{ key: string; label: string }> {
   const now = new Date();
   return Array.from({ length: 6 }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
-    return MONTH_NAMES[d.getMonth()];
+    const yy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    return { key: `${yy}-${mm}`, label: MONTH_NAMES[d.getMonth()] };
   });
+}
+
+/* Stable year-month key for a Date — same shape as last6Months keys. */
+function ymKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
 /* ══════════════════════════════════════════════════════ */
@@ -103,68 +129,113 @@ export default function TeacherPerformance() {
             if (!sMap.has(tid)) sMap.set(tid, []);
             sMap.get(tid)!.push(pct);
           }
-          // monthly
+          // monthly — year-aware key so Dec 2024 ≠ Dec 2025
           const ts = data.timestamp?.toDate?.();
           if (ts && !isNaN(pct)) {
-            const mk = MONTH_NAMES[ts.getMonth()];
+            const mk = ymKey(ts);
             if (!monthScoreMap.has(mk)) monthScoreMap.set(mk, []);
             monthScoreMap.get(mk)!.push(pct);
           }
         });
         setScoreMap(sMap);
 
-        /* 4. attendance → teacherId → {p,t} — scoped */
+        /* 4a. attendance — STUDENT attendance rows, used ONLY for the school-wide
+              "Performance vs Attendance" trend chart. Each row is one student, not
+              the teacher's own punctuality. Year-aware month key prevents Dec 2024
+              merging with Dec 2025. */
         const attSnap = await getDocs(
           query(collection(db, "attendance"), where("schoolId", "==", ownerUid))
         );
-        const aMap = new Map<string, { p: number; t: number }>();
         const monthAttMap = new Map<string, { p: number; t: number }>();
         attSnap.docs.forEach(d => {
           const data = d.data() as any;
-          const tid  = data.teacherId || "";
           const isPresent = (data.status || "").toLowerCase() === "present";
-          if (tid) {
-            if (!aMap.has(tid)) aMap.set(tid, { p: 0, t: 0 });
-            const cur = aMap.get(tid)!;
-            cur.t++;
-            if (isPresent) cur.p++;
-          }
-          // monthly
           let date: Date | null = null;
           if (data.timestamp?.toDate) date = data.timestamp.toDate();
           else if (typeof data.date === "string" && data.date) date = new Date(data.date + "T00:00:00");
           if (date && !isNaN(date.getTime())) {
-            const mk = MONTH_NAMES[date.getMonth()];
+            const mk = ymKey(date);
             if (!monthAttMap.has(mk)) monthAttMap.set(mk, { p: 0, t: 0 });
             const mc = monthAttMap.get(mk)!;
             mc.t++;
             if (isPresent) mc.p++;
           }
         });
+
+        /* 4b. teacher_attendance — teacher's OWN punctuality (canonical source,
+              used by Owner TeacherLeaderboard, Principal scorer, TeachersDirectory).
+              Replaces the previous reading of `attendance` rows which were student
+              rows attributed to the marking teacher (gave students' attendance %
+              instead of teacher's own attendance). */
+        const tAttSnap = await getDocs(
+          query(collection(db, "teacher_attendance"), where("schoolId", "==", ownerUid))
+        );
+        const aMap = new Map<string, { p: number; t: number }>();
+        tAttSnap.docs.forEach(d => {
+          const data = d.data() as any;
+          const tid  = data.teacherId || "";
+          if (!tid) return;
+          if (!aMap.has(tid)) aMap.set(tid, { p: 0, t: 0 });
+          const cur = aMap.get(tid)!;
+          cur.t++;
+          const status = (data.status || "").toLowerCase();
+          if (status === "present" || status === "late") cur.p++;
+        });
         setAttMap(aMap);
 
-        /* 5. classes → teacherId → classes[] — scoped */
+        /* 5a. classes — load all class docs */
         const clSnap = await getDocs(
           query(collection(db, "classes"), where("schoolId", "==", ownerUid))
         );
+        const classDocs = clSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
+
+        /* 5b. teaching_assignments — canonical multi-teacher map. classes.teacherId
+              only stores the PRIMARY/class teacher; subject teachers (e.g. Maths
+              assigned to Class 10A) live ONLY here. Without this, subject teachers
+              show classCount: 0 and miss the leaderboard / detail-view classes. */
+        const ctMap = new Map<string, Set<string>>();
+        try {
+          const taSnap = await getDocs(
+            query(collection(db, "teaching_assignments"), where("schoolId", "==", ownerUid))
+          );
+          taSnap.docs.forEach(d => {
+            const a = d.data() as any;
+            const cid = a.classId;
+            const tid = a.teacherId;
+            const status = (a.status || "active").toLowerCase();
+            if (!cid || !tid || status !== "active") return;
+            if (!ctMap.has(cid)) ctMap.set(cid, new Set());
+            ctMap.get(cid)!.add(tid);
+          });
+        } catch { /* ignore */ }
+        /* Fold direct classes.teacherId into the same map. */
+        classDocs.forEach(c => {
+          if (!c.teacherId) return;
+          if (!ctMap.has(c.id)) ctMap.set(c.id, new Set());
+          ctMap.get(c.id)!.add(c.teacherId);
+        });
+
+        /* Build teacherId → classes[] from the unioned map. */
         const cMap = new Map<string, any[]>();
-        clSnap.docs.forEach(d => {
-          const data = d.data() as any;
-          const tid  = data.teacherId || "";
-          if (tid) {
+        classDocs.forEach(c => {
+          const teacherIds = ctMap.get(c.id);
+          if (!teacherIds) return;
+          teacherIds.forEach(tid => {
             if (!cMap.has(tid)) cMap.set(tid, []);
-            cMap.get(tid)!.push({ id: d.id, ...data });
-          }
+            const list = cMap.get(tid)!;
+            if (!list.find(x => x.id === c.id)) list.push(c);
+          });
         });
         setClassMap(cMap);
 
-        /* 6. monthly aggregates for overview chart */
+        /* 6. monthly aggregates for overview chart — lookup by year-aware key,
+              display by month label. */
         const months = last6Months();
         const monthly = months.map(m => {
-          const sc = monthScoreMap.get(m);
-          const at = monthAttMap.get(m);
+          const sc = monthScoreMap.get(m.key);
+          const at = monthAttMap.get(m.key);
           return {
-            month: m,
+            month: m.label,
             performance: sc ? Math.round(sc.reduce((a, b) => a + b, 0) / sc.length) : 0,
             attendance:  at && at.t > 0 ? Math.round((at.p / at.t) * 100) : 0,
           };
@@ -189,13 +260,20 @@ export default function TeacherPerformance() {
       const avgScore = scores.length
         ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
         : 0;
+      /* Real per-teacher pass rate from raw test_scores percentages.
+         Pass threshold 60 matches the existing detail-view tPassRate calc. */
+      const passRate = scores.length
+        ? Math.round((scores.filter(s => s >= 60).length / scores.length) * 100)
+        : 0;
       const attPct   = att && att.t > 0 ? Math.round((att.p / att.t) * 100) : 0;
-      const branchName = branchMap.get(t.branchId || "") || t.branch || "—";
+      /* branchName fallback chain mirrors TeachersDirectory: map → branchName → branch → "—" */
+      const branchName = branchMap.get(t.branchId || "") || t.branchName || t.branch || "—";
       return {
         ...t,
         id:         tid,
         branchName,
         avgScore,
+        passRate,
         attPct,
         classCount: classes.length,
       };
@@ -223,16 +301,16 @@ export default function TeacherPerformance() {
       ? (withScore.reduce((a, t) => a + t.avgScore, 0) / withScore.length).toFixed(1)
       : "—";
   }, [filtered]);
-  const topPerformers    = filtered.filter(t => t.avgScore >= 80).length;
-  const needsImprovement = filtered.filter(t => t.avgScore > 0 && t.avgScore < 60).length;
+  const topPerformers    = filtered.filter(t => t.avgScore >= TOP_SCORE_THRESHOLD).length;
+  const needsImprovement = filtered.filter(t => t.avgScore > 0 && t.avgScore < PASS_THRESHOLD).length;
 
   /* ── performance distribution pie ────────────────── */
   const perfDist = useMemo(() => {
     let excellent = 0, good = 0, average = 0, needsWork = 0;
     filtered.forEach(t => {
-      if (t.avgScore >= 80) excellent++;
-      else if (t.avgScore >= 60) good++;
-      else if (t.avgScore >= 40) average++;
+      if (t.avgScore >= TOP_SCORE_THRESHOLD) excellent++;
+      else if (t.avgScore >= PASS_THRESHOLD) good++;
+      else if (t.avgScore >= AVG_TIER_THRESHOLD) average++;
       else if (t.avgScore > 0) needsWork++;
     });
     return [
@@ -244,7 +322,8 @@ export default function TeacherPerformance() {
   }, [filtered]);
 
   /* ── subject-wise avg score ───────────────────────── */
-  const subjectRatings = useMemo(() => {
+  const SUBJECT_CHART_CAP = 7;
+  const subjectRatingsAll = useMemo(() => {
     const map: Record<string, number[]> = {};
     filtered.forEach(t => {
       if (!t.subject || !t.avgScore) return;
@@ -256,9 +335,12 @@ export default function TeacherPerformance() {
         subject,
         rating: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
       }))
-      .sort((a, b) => b.rating - a.rating)
-      .slice(0, 7);
+      .sort((a, b) => b.rating - a.rating);
   }, [filtered]);
+  const subjectRatings = useMemo(
+    () => subjectRatingsAll.slice(0, SUBJECT_CHART_CAP),
+    [subjectRatingsAll]
+  );
 
   /* ══════════════════════════════════════════════════ */
   /* ── TEACHER DETAIL: fetch when id changes ─────── */
@@ -291,62 +373,76 @@ export default function TeacherPerformance() {
         );
         const tScores = scSnap.docs.map(d => d.data() as any);
 
-        // monthly performance timeline
+        // monthly performance timeline — year-aware key prevents Dec across years collapsing
         const byMonth = new Map<string, number[]>();
         tScores.forEach(d => {
           const ts  = d.timestamp?.toDate?.();
           const pct = parseFloat(d.percentage ?? d.score ?? "");
           if (ts && !isNaN(pct)) {
-            const mk = MONTH_NAMES[ts.getMonth()];
+            const mk = ymKey(ts);
             if (!byMonth.has(mk)) byMonth.set(mk, []);
             byMonth.get(mk)!.push(pct);
           }
         });
         const timeline = last6Months().map(m => {
-          const sc = byMonth.get(m);
-          return { month: m, score: sc ? Math.round(sc.reduce((a, b) => a + b, 0) / sc.length) : 0 };
+          const sc = byMonth.get(m.key);
+          return { month: m.label, score: sc ? Math.round(sc.reduce((a, b) => a + b, 0) / sc.length) : 0 };
         });
         setDetailTimeline(timeline);
 
-        /* b. attendance for this teacher — scoped */
-        const attSnap = await getDocs(
+        /* b. teacher_attendance for this teacher — canonical own punctuality.
+              Reads from `teacher_attendance` (not `attendance`) because `attendance`
+              docs are STUDENT rows the teacher marked, not the teacher's own status. */
+        const tAttSnap = await getDocs(
           query(
-            collection(db, "attendance"),
+            collection(db, "teacher_attendance"),
             where("schoolId", "==", ownerUid),
             where("teacherId", "==", id),
           )
         );
-        const attDocs = attSnap.docs.map(d => d.data() as any);
-        const attP = attDocs.filter(d => (d.status || "").toLowerCase() === "present").length;
-        const attT = attDocs.length;
+        const tAttDocs = tAttSnap.docs.map(d => d.data() as any);
+        const attP = tAttDocs.filter(d => {
+          const s = (d.status || "").toLowerCase();
+          return s === "present" || s === "late";
+        }).length;
+        const attT = tAttDocs.length;
         const tAttPct = attT > 0 ? Math.round((attP / attT) * 100) : null;
         setDetailAttPct(tAttPct);
 
-        /* c. classes for this teacher — scoped */
-        const clSnap = await getDocs(
-          query(
-            collection(db, "classes"),
-            where("schoolId", "==", ownerUid),
-            where("teacherId", "==", id),
-          )
-        );
-        const tClasses = clSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
+        /* c. classes for this teacher — pulled from the overview-built classMap
+              which already unions classes.teacherId AND teaching_assignments, so
+              subject teachers (Maths in 10A) appear here. Avoids a second roundtrip
+              and guarantees consistency between overview and detail views. */
+        const tClasses = classMap.get(id) || [];
         setDetailClasses(tClasses);
 
-        /* d. students taught: enrollments in those classes — scoped */
-        let studentCount = 0;
+        /* d. students taught: unique studentIds enrolled in those classes — scoped.
+              Chunk classIds in groups of 10 (Firestore `in` cap) so teachers with
+              more than 10 classes don't silently undercount. Dedup by studentId so
+              a student enrolled in multiple of this teacher's classes is counted
+              once (per `bug_pattern_enrollment_row_dedup` memory rule). */
+        const studentSet = new Set<string>();
         if (tClasses.length > 0) {
-          const classIds = tClasses.map(c => c.id).slice(0, 10);
-          const enSnap = await getDocs(
-            query(
-              collection(db, "enrollments"),
-              where("schoolId", "==", ownerUid),
-              where("classId", "in", classIds),
-            )
-          );
-          studentCount = enSnap.size;
+          const allClassIds = tClasses.map(c => c.id).filter(Boolean);
+          const chunks: string[][] = [];
+          for (let i = 0; i < allClassIds.length; i += 10) chunks.push(allClassIds.slice(i, i + 10));
+          for (const chunk of chunks) {
+            try {
+              const enSnap = await getDocs(
+                query(
+                  collection(db, "enrollments"),
+                  where("schoolId", "==", ownerUid),
+                  where("classId", "in", chunk),
+                )
+              );
+              enSnap.docs.forEach(d => {
+                const sid = (d.data() as any).studentId;
+                if (sid) studentSet.add(sid);
+              });
+            } catch { /* ignore */ }
+          }
         }
-        setDetailStudents(studentCount);
+        setDetailStudents(studentSet.size);
 
         /* e. vs branch avg — compare teacher avg score & att vs branch teachers */
         const branchId = selectedTeacher.branchId || "";
@@ -375,9 +471,12 @@ export default function TeacherPerformance() {
         const tPassRate = tScores.length
           ? Math.round(tScores.filter(d => (parseFloat(d.percentage ?? d.score ?? "0") || 0) >= 60).length / tScores.length * 100)
           : 0;
+        /* Real branch peer pass rates from each peer's enriched.passRate (computed
+           from raw test_scores in the overview fetch). Replaces the prior bogus
+           formula `t.avgScore >= 60 ? 100 : avgScore` which wasn't a pass rate. */
         const branchPassRates = enriched
           .filter(t => t.branchId === branchId && t.id !== id && t.avgScore > 0)
-          .map(t => t.avgScore >= 60 ? 100 : t.avgScore);
+          .map(t => t.passRate);
         const branchAvgPass = branchPassRates.length
           ? branchPassRates.reduce((a, b) => a + b, 0) / branchPassRates.length
           : tPassRate;
@@ -396,7 +495,7 @@ export default function TeacherPerformance() {
     };
 
     fetchDetail();
-  }, [id, selectedTeacher?.id]);
+  }, [id, selectedTeacher?.id, classMap]);
 
   /* ─── Design tokens (principal/owner dashboard system) ─── */
   const B1 = "#0055FF", B2 = "#1166FF";
@@ -413,12 +512,13 @@ export default function TeacherPerformance() {
   const SHADOW_LG = "0 0 0 .5px rgba(0,85,255,.10), 0 4px 16px rgba(0,85,255,.11), 0 18px 44px rgba(0,85,255,.13)";
   const SHADOW_BTN = "0 6px 22px rgba(0,85,255,.40), 0 2px 5px rgba(0,85,255,.20)";
 
-  /* ─── Score tier helper (new design) ─── */
+  /* ─── Score tier helper — uses module-level thresholds so stat tile, pie, and
+         per-teacher tier badge all agree on what "Excellent" means. ─── */
   const tierStyle = (s: number) => {
-    if (s >= 80) return { label: "Excellent", grad: GRAD_GREEN, solidGrad: "linear-gradient(135deg,#10B981 0%,#059669 100%)", color: GREEN, bg: "rgba(0,200,83,.10)" };
-    if (s >= 60) return { label: "Good", grad: GRAD_BLUE, solidGrad: "linear-gradient(135deg,#0055FF 0%,#1166FF 100%)", color: B1, bg: "rgba(0,85,255,.08)" };
-    if (s >= 40) return { label: "Average", grad: GRAD_GOLD, solidGrad: "linear-gradient(135deg,#F59E0B 0%,#D97706 100%)", color: GOLD, bg: "rgba(255,170,0,.10)" };
-    if (s > 0) return { label: "Needs Work", grad: GRAD_RED, solidGrad: "linear-gradient(135deg,#FF3355 0%,#DC2626 100%)", color: RED, bg: "rgba(255,51,85,.10)" };
+    if (s >= TOP_SCORE_THRESHOLD) return { label: "Excellent", grad: GRAD_GREEN, solidGrad: "linear-gradient(135deg,#10B981 0%,#059669 100%)", color: GREEN, bg: "rgba(0,200,83,.10)" };
+    if (s >= PASS_THRESHOLD)      return { label: "Good", grad: GRAD_BLUE, solidGrad: "linear-gradient(135deg,#0055FF 0%,#1166FF 100%)", color: B1, bg: "rgba(0,85,255,.08)" };
+    if (s >= AVG_TIER_THRESHOLD)  return { label: "Average", grad: GRAD_GOLD, solidGrad: "linear-gradient(135deg,#F59E0B 0%,#D97706 100%)", color: GOLD, bg: "rgba(255,170,0,.10)" };
+    if (s > 0)                    return { label: "Needs Work", grad: GRAD_RED, solidGrad: "linear-gradient(135deg,#FF3355 0%,#DC2626 100%)", color: RED, bg: "rgba(255,51,85,.10)" };
     return { label: "No Data", grad: "linear-gradient(135deg,#99AACC,#5070B0)", solidGrad: "linear-gradient(135deg,#99AACC,#5070B0)", color: T4, bg: "rgba(153,170,204,.10)" };
   };
 
@@ -982,7 +1082,11 @@ export default function TeacherPerformance() {
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
               <div>
                 <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Subject-wise Scores</h3>
-                <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Average ratings</p>
+                <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>
+                  {subjectRatingsAll.length > SUBJECT_CHART_CAP
+                    ? `Top ${SUBJECT_CHART_CAP} of ${subjectRatingsAll.length}`
+                    : "Average ratings"}
+                </p>
               </div>
               <div style={{ width:32, height:32, borderRadius:10, background:"rgba(0,200,83,.1)", display:"flex", alignItems:"center", justifyContent:"center" }}>
                 <BookOpen size={16} color={GREEN} strokeWidth={2.3}/>
@@ -1183,12 +1287,15 @@ export default function TeacherPerformance() {
                   </div>
                   {isMobile ? (
                     <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:6, paddingTop:10, borderTop:"0.5px solid rgba(0,85,255,.08)" }}>
-                      {[
-                        ["Score", t.avgScore > 0 ? `${t.avgScore}%` : "—", tr.color],
-                        ["Att.", t.attPct > 0 ? `${t.attPct}%` : "—", T1],
-                        ["Classes", t.classCount.toString(), T1],
-                        ["Branch", (t.branchName || "—").split(" ")[0], T3],
-                      ].map(([k, v, c]) => (
+                      {(() => {
+                        const attLow = t.attPct > 0 && t.attPct < LOW_ATTENDANCE_PCT;
+                        return [
+                          ["Score", t.avgScore > 0 ? `${t.avgScore}%` : "—", tr.color],
+                          ["Att.", t.attPct > 0 ? `${t.attPct}%` : "—", attLow ? RED : T1],
+                          ["Classes", t.classCount.toString(), T1],
+                          ["Branch", (t.branchName || "—").split(" ")[0], T3],
+                        ];
+                      })().map(([k, v, c]) => (
                         <div key={k as string} style={{ minWidth:0 }}>
                           <p style={{ fontSize:8, fontWeight:700, color:T4, letterSpacing:"0.10em", textTransform:"uppercase", margin:0 }}>{k}</p>
                           <p style={{ fontSize:12, fontWeight:800, color: c as string, margin:"2px 0 0 0", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{v}</p>
@@ -1203,12 +1310,21 @@ export default function TeacherPerformance() {
                           ["Avg Score", t.avgScore > 0 ? `${t.avgScore}%` : "—"],
                           ["Attendance", t.attPct > 0 ? `${t.attPct}%` : "—"],
                           ["Classes", t.classCount.toString()],
-                        ].map(([k, v]) => (
-                          <div key={k} style={{ display:"flex", justifyContent:"space-between", fontSize:10 }}>
-                            <span style={{ fontWeight:600, color:T4, letterSpacing:"0.06em" }}>{k}</span>
-                            <span style={{ fontWeight:800, color: k==="Avg Score" ? tr.color : T3, maxWidth:110, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{v}</span>
-                          </div>
-                        ))}
+                        ].map(([k, v]) => {
+                          /* Attendance value goes red when below LOW_ATTENDANCE_PCT
+                             so an "Excellent" tier doesn't mask poor punctuality. */
+                          const attLow = k === "Attendance" && t.attPct > 0 && t.attPct < LOW_ATTENDANCE_PCT;
+                          const valColor =
+                            k === "Avg Score" ? tr.color :
+                            attLow            ? RED :
+                                                T3;
+                          return (
+                            <div key={k} style={{ display:"flex", justifyContent:"space-between", fontSize:10 }}>
+                              <span style={{ fontWeight:600, color:T4, letterSpacing:"0.06em" }}>{k}</span>
+                              <span style={{ fontWeight:800, color: valColor, maxWidth:110, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{v}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", paddingTop:10, borderTop:"0.5px solid rgba(0,85,255,.08)" }}>
                         <span style={{

@@ -18,6 +18,7 @@ import {
   DashGlobalStyles, PageHead, StatTile, DarkHero, Card3D, AIInsightCard,
 } from "@/lib/dashboardTokens";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { tilt3D, tilt3DStyle } from "@/lib/use3DTilt";
 import {
   subscribeBranchesComparison, subscribeBranchDetail,
   BranchComparisonData, BranchDetailData,
@@ -25,7 +26,7 @@ import {
 import { auth, db } from "@/lib/firebase";
 import {
   collection, addDoc, updateDoc, deleteDoc,
-  doc, serverTimestamp
+  doc, serverTimestamp, getDocs, query, where,
 } from "firebase/firestore";
 import { invalidateCache } from "@/lib/analyticsService";
 import { addAuditLog } from "@/lib/auditService";
@@ -196,10 +197,19 @@ function BranchModal({
           </div>
           <div>
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Established Year</label>
+            {/* Digits-only via onChange filter — `maxLength` alone allowed
+                "abcd" through. inputMode="numeric" hints mobile keyboards to
+                show the number pad. We strip non-digits eagerly so even paste
+                from clipboard gets sanitised. */}
             <input
               type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={form.established}
-              onChange={e => onChange({ ...form, established: e.target.value })}
+              onChange={e => onChange({
+                ...form,
+                established: e.target.value.replace(/\D/g, "").slice(0, 4),
+              })}
               placeholder="e.g. 2018"
               maxLength={4}
               className="w-full h-12 px-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-semibold text-[#1e293b] outline-none focus:border-blue-300 focus:bg-white transition-all"
@@ -250,13 +260,25 @@ function BranchModal({
 }
 
 // ── Delete Confirm Modal ──────────────────────────────────────────────────────
+interface OrphanCounts {
+  loading: boolean;
+  teachers: number;
+  students: number;
+}
+
 function DeleteModal({
-  open, branchName, onClose, onConfirm, deleting
+  open, branchName, orphans, onClose, onConfirm, deleting
 }: {
   open: boolean; branchName: string;
+  orphans: OrphanCounts;
   onClose: () => void; onConfirm: () => void; deleting: boolean;
 }) {
   if (!open) return null;
+  /* When the count finishes loading and is non-zero, highlight the impact in
+     amber/rose so the Owner sees concrete consequences before clicking delete.
+     Generic "X may remain in the system" copy was easy to skim past — actual
+     numbers force a beat of consideration. */
+  const hasOrphans = !orphans.loading && (orphans.teachers > 0 || orphans.students > 0);
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-3 md:p-4 animate-in fade-in duration-200">
       <div className="bg-white rounded-2xl md:rounded-[2rem] shadow-2xl w-full max-w-sm p-5 md:p-8 animate-in zoom-in-95 duration-200">
@@ -268,8 +290,41 @@ function DeleteModal({
             <h2 className="text-base md:text-lg font-black text-[#1e293b]">Delete Branch?</h2>
             <p className="text-[13px] md:text-sm text-slate-400 font-medium mt-2 leading-relaxed">
               You're about to delete <strong className="text-[#1e293b]">{branchName}</strong>.
-              This removes the branch record. Existing students and teachers linked to this branch remain in the system.
             </p>
+          </div>
+          {/* Impact panel — counts orphan teachers + students linked by branchId */}
+          <div className={`w-full px-4 py-3 rounded-xl border text-left ${
+            hasOrphans
+              ? "bg-amber-50 border-amber-200"
+              : "bg-slate-50 border-slate-100"
+          }`}>
+            {orphans.loading ? (
+              <div className="flex items-center gap-2 text-[12px] font-semibold text-slate-500">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Checking what depends on this branch…
+              </div>
+            ) : hasOrphans ? (
+              <>
+                <p className="text-[11px] font-black text-amber-700 uppercase tracking-widest mb-1.5">
+                  ⚠ Will be left without a branch
+                </p>
+                <ul className="text-[12px] font-semibold text-amber-900 space-y-0.5">
+                  {orphans.teachers > 0 && (
+                    <li>· {orphans.teachers} teacher{orphans.teachers !== 1 ? "s" : ""}</li>
+                  )}
+                  {orphans.students > 0 && (
+                    <li>· {orphans.students} student{orphans.students !== 1 ? "s" : ""}</li>
+                  )}
+                </ul>
+                <p className="text-[11px] text-amber-700/80 mt-2 leading-snug">
+                  Records remain in the system but lose their branch link. Reassign them after deletion to restore filtering & reporting.
+                </p>
+              </>
+            ) : (
+              <p className="text-[12px] font-semibold text-slate-500">
+                No teachers or students currently linked to this branch — safe to delete.
+              </p>
+            )}
           </div>
           <div className="flex gap-3 w-full mt-1">
             <button
@@ -280,7 +335,7 @@ function DeleteModal({
             </button>
             <button
               onClick={onConfirm}
-              disabled={deleting}
+              disabled={deleting || orphans.loading}
               className="flex-1 h-11 md:h-12 rounded-2xl bg-rose-500 text-white text-[13px] md:text-sm font-black hover:bg-rose-600 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
@@ -310,25 +365,49 @@ export default function BranchesComparison() {
   const [crudDocId,  setCrudDocId]  = useState("");  // Firestore doc ID (not branchId)
   const [crudName,   setCrudName]   = useState("");   // for delete confirm
   const [crudSaving, setCrudSaving] = useState(false);
+  /* Counts of teachers + unique students whose branchId points at the branch
+     being deleted. Loaded async on openDelete and shown in the modal so the
+     Owner sees concrete impact (not just a generic "may remain in system"). */
+  const [orphanCounts, setOrphanCounts] = useState<OrphanCounts>({
+    loading: false, teachers: 0, students: 0,
+  });
 
   // ── Add branch ────────────────────────────────────────────────────────
   const handleAddBranch = async () => {
     const uid = auth.currentUser?.uid;
     if (!uid || !crudForm.name.trim()) return;
+    const trimmedName = crudForm.name.trim();
+    /* Block duplicate branch names (case-insensitive). Two branches called
+       "Banjarahills" make every cross-page join (Principal whitelist, teacher
+       branchId fallback by name, student-branch resolver) ambiguous — Owner
+       can't tell them apart on the dropdown either. Rejecting here is cheaper
+       than untangling duplicates later. */
+    const existing = (listData?.branches || []).find(b =>
+      (b.name || "").toLowerCase().trim() === trimmedName.toLowerCase()
+    );
+    if (existing) {
+      toast.error(`A branch named "${trimmedName}" already exists.`);
+      return;
+    }
     setCrudSaving(true);
     try {
+      /* Store empty strings, NOT "—" / "N/A" sentinels. analyticsService
+         already maps `|| "—"` and `|| "N/A"` on read for display, so writing
+         empty here keeps the sentinel logic in ONE place. Bonus: a user who
+         legitimately types "—" as a location no longer collides with our
+         "this means empty" convention. */
       const docRef = await addDoc(collection(db, "schools", uid, "branches"), {
-        name:        crudForm.name.trim(),
-        location:    crudForm.location.trim() || "—",
-        established: crudForm.established.trim() || "N/A",
+        name:        trimmedName,
+        location:    crudForm.location.trim(),
+        established: crudForm.established.trim(),
         color:       crudForm.color,
         createdAt:   serverTimestamp(),
       });
       // Set branchId = doc.id for easy resolution
       await updateDoc(docRef, { branchId: docRef.id });
       invalidateCache(`core:${uid}`);
-      addAuditLog("branch_added", `Branch "${crudForm.name}" added`, crudForm.location || undefined);
-      toast.success(`Branch "${crudForm.name}" added!`);
+      addAuditLog("branch_added", `Branch "${trimmedName}" added`, crudForm.location || undefined).catch(() => {});
+      toast.success(`Branch "${trimmedName}" added!`);
       setAddOpen(false);
       setCrudForm(EMPTY_FORM);
     } catch (e) {
@@ -343,17 +422,29 @@ export default function BranchesComparison() {
   const handleEditBranch = async () => {
     const uid = auth.currentUser?.uid;
     if (!uid || !crudDocId || !crudForm.name.trim()) return;
+    const trimmedName = crudForm.name.trim();
+    /* Same uniqueness rule as Add — but exclude the branch being edited so
+       a no-op rename (or just changing color/location) doesn't trigger the
+       check against itself. */
+    const collision = (listData?.branches || []).find(b =>
+      b.id !== crudDocId &&
+      (b.name || "").toLowerCase().trim() === trimmedName.toLowerCase()
+    );
+    if (collision) {
+      toast.error(`Another branch is already named "${trimmedName}".`);
+      return;
+    }
     setCrudSaving(true);
     try {
       await updateDoc(doc(db, "schools", uid, "branches", crudDocId), {
-        name:        crudForm.name.trim(),
-        location:    crudForm.location.trim() || "—",
-        established: crudForm.established.trim() || "N/A",
+        name:        trimmedName,
+        location:    crudForm.location.trim(),
+        established: crudForm.established.trim(),
         color:       crudForm.color,
         updatedAt:   serverTimestamp(),
       });
       invalidateCache(`core:${uid}`);
-      addAuditLog("branch_edited", `Branch "${crudForm.name}" updated`);
+      addAuditLog("branch_edited", `Branch "${trimmedName}" updated`).catch(() => {});
       toast.success(`Branch updated!`);
       setEditOpen(false);
     } catch (e) {
@@ -372,7 +463,7 @@ export default function BranchesComparison() {
     try {
       await deleteDoc(doc(db, "schools", uid, "branches", crudDocId));
       invalidateCache(`core:${uid}`);
-      addAuditLog("branch_deleted", `Branch "${crudName}" deleted`);
+      addAuditLog("branch_deleted", `Branch "${crudName}" deleted`).catch(() => {});
       toast.success(`Branch "${crudName}" deleted.`);
       setDeleteOpen(false);
     } catch (e) {
@@ -384,21 +475,74 @@ export default function BranchesComparison() {
   };
 
   // ── Open edit ─────────────────────────────────────────────────────────
+  /* analyticsService normalises empty location/established to "—"/"N/A" for
+     display. The form should open with a blank input when the branch has no
+     value set, so we strip those exact display sentinels back to "". A user
+     who typed literal "—" or "N/A" as their actual value will see it cleared
+     on edit — acceptable trade-off because (a) we no longer write those
+     sentinels (so this only affects branches created before this fix), and
+     (b) those strings are visually identical to "no value" anyway. */
   const openEdit = (branch: any, docId: string) => {
+    const rawLocation    = String(branch.location ?? "");
+    const rawEstablished = String(branch.established ?? "");
     setCrudForm({
       name:        branch.name,
-      location:    branch.location !== "—" ? branch.location : "",
-      established: branch.established !== "N/A" ? branch.established : "",
+      location:    rawLocation === "—"   ? "" : rawLocation,
+      established: rawEstablished === "N/A" ? "" : rawEstablished,
       color:       branch.color,
     });
     setCrudDocId(docId);
     setEditOpen(true);
   };
 
-  const openDelete = (docId: string, name: string) => {
+  const openDelete = async (docId: string, name: string) => {
     setCrudDocId(docId);
     setCrudName(name);
+    /* Reset state and start counting in parallel — modal opens immediately
+       with a "checking…" indicator while the count resolves. Branches with
+       large rosters could take a moment, so blocking modal-open on the count
+       would feel laggy. */
+    setOrphanCounts({ loading: true, teachers: 0, students: 0 });
     setDeleteOpen(true);
+
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      setOrphanCounts({ loading: false, teachers: 0, students: 0 });
+      return;
+    }
+
+    try {
+      /* Match by canonical branchId — branch.docId === branchId since
+         handleAddBranch sets it on creation (line 328). Stale name-only
+         references are a separate hygiene concern; the canonical orphan set
+         is what truly breaks on delete. Dedup students by studentId per the
+         enrollment-row dedup memory rule. */
+      const [tSnap, eSnap] = await Promise.all([
+        getDocs(query(
+          collection(db, "teachers"),
+          where("schoolId", "==", uid),
+          where("branchId", "==", docId),
+        )),
+        getDocs(query(
+          collection(db, "enrollments"),
+          where("schoolId", "==", uid),
+          where("branchId", "==", docId),
+        )),
+      ]);
+      const studentSet = new Set<string>();
+      eSnap.docs.forEach(d => {
+        const sid = (d.data() as any).studentId;
+        if (sid) studentSet.add(sid);
+      });
+      setOrphanCounts({
+        loading: false,
+        teachers: tSnap.size,
+        students: studentSet.size,
+      });
+    } catch (e) {
+      console.error("[BranchesComparison] orphan count fetch failed:", e);
+      setOrphanCounts({ loading: false, teachers: 0, students: 0 });
+    }
   };
 
   useEffect(() => {
@@ -665,15 +809,28 @@ export default function BranchesComparison() {
     }
 
     const { summary, historicalTrend, benchmarkComparison, strengths, improvements, actionPlan, kpiNotes } = detailData;
-    const hasTrendData    = historicalTrend.some(t => t.score > 0);
-    const benchmarkFiltered = benchmarkComparison.filter(row => row.branch > 0);
+    /* `score` can be null for empty months — only positive numbers count as
+       "has data" so we don't render a chart of nulls or fake zeros. */
+    const hasTrendData    = historicalTrend.some(t => typeof t.score === "number" && t.score > 0);
+    /* Drop empty rows (no data) but ALWAYS keep Growth — `0` for Growth means
+       "stable" (valid signal), not "no data". Other metrics treat 0 as "no data
+       recorded yet" because they're percentages where 0% is rare-real and
+       almost always means "untracked". Negative growth also legitimate, so
+       use a metric-aware filter rather than a blanket `> 0`. */
+    const benchmarkFiltered = benchmarkComparison.filter(row =>
+      row.metric === "Growth" || row.branch > 0
+    );
 
-    // KPI cards matching screenshot: AHI, Fee Collection, Pass Rate, Active Alerts
+    // KPI cards matching screenshot: AHI, Fee Collection, Pass Rate, At-Risk Students
+    // (renamed from "Active Alerts" — the underlying metric is specifically
+    //  students with attendance below 80%, NOT all alert types in the system.
+    //  See bug_pattern_misleading_label memory: surface what the metric
+    //  actually measures so Owner doesn't conflate this with full risk count.)
     const kpiCards = [
       { label: "Academic Health Index", value: `${summary.ahi}%`,           note: kpiNotes.ahi,      borderColor: "border-amber-200",  bgColor: "bg-amber-50/50",  textColor: summary.ahi >= 85 ? "text-emerald-500" : summary.ahi >= 70 ? "text-amber-500" : "text-red-500" },
       { label: "Fee Collection",        value: summary.feeCollection > 0 ? `${summary.feeCollection}%` : "N/A", note: kpiNotes.fee, borderColor: "border-amber-200", bgColor: "bg-amber-50/50", textColor: summary.feeCollection >= 90 ? "text-emerald-500" : "text-amber-500" },
       { label: "Pass Rate",             value: summary.passRate > 0 ? `${summary.passRate}%` : "N/A", note: kpiNotes.passRate, borderColor: "border-amber-200", bgColor: "bg-amber-50/50", textColor: summary.passRate >= 85 ? "text-emerald-500" : "text-amber-500" },
-      { label: "Active Alerts",         value: summary.activeAlerts.toString(), note: kpiNotes.alerts, borderColor: "border-red-200",  bgColor: "bg-red-50/50",    textColor: summary.activeAlerts === 0 ? "text-emerald-500" : "text-red-500" },
+      { label: "At-Risk Students",      value: summary.activeAlerts.toString(), note: kpiNotes.alerts, borderColor: "border-red-200",  bgColor: "bg-red-50/50",    textColor: summary.activeAlerts === 0 ? "text-emerald-500" : "text-red-500" },
     ];
 
     // Build bright KPI tiles with gradient
@@ -681,7 +838,7 @@ export default function BranchesComparison() {
       { label:"Academic Health", value:`${summary.ahi}%`, sub:kpiNotes.ahi, grad: summary.ahi >= 85 ? GRAD_GREEN : summary.ahi >= 70 ? GRAD_BLUE : GRAD_RED, icon:Activity },
       { label:"Fee Collection", value:summary.feeCollection > 0 ? `${summary.feeCollection}%` : "N/A", sub:kpiNotes.fee, grad: summary.feeCollection >= 90 ? GRAD_GREEN : summary.feeCollection > 0 ? GRAD_GOLD : GRAD_BLUE, icon:CircleDollarSign },
       { label:"Pass Rate", value:summary.passRate > 0 ? `${summary.passRate}%` : "N/A", sub:kpiNotes.passRate, grad: summary.passRate >= 85 ? GRAD_GREEN : summary.passRate > 0 ? GRAD_GOLD : GRAD_BLUE, icon:GraduationCap },
-      { label:"Active Alerts", value:summary.activeAlerts.toString(), sub:kpiNotes.alerts, grad: summary.activeAlerts === 0 ? GRAD_GREEN : GRAD_RED, icon:AlertTriangle },
+      { label:"At-Risk Students", value:summary.activeAlerts.toString(), sub:kpiNotes.alerts, grad: summary.activeAlerts === 0 ? GRAD_GREEN : GRAD_RED, icon:AlertTriangle },
     ];
 
     return (
@@ -741,14 +898,34 @@ export default function BranchesComparison() {
                 </div>
               </div>
               <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 8 : 10, flexWrap:"wrap", width: isMobile ? "100%" : "auto" }}>
-                <span style={{
-                  fontSize: isMobile ? 9 : 10, fontWeight:800, padding: isMobile ? "6px 10px" : "8px 14px", borderRadius:10,
-                  background: summary.status === "High Risk" ? GRAD_RED : summary.status === "Low Risk" ? GRAD_GREEN : GRAD_GOLD,
-                  color:"#fff", letterSpacing:"0.12em", textTransform:"uppercase",
-                  boxShadow:"0 4px 12px rgba(0,0,0,.24)",
-                }}>
-                  {summary.status}
-                </span>
+                {/* Status pill — two bugs fixed together:
+                    1) Status strings are "Strong" / "Good" / "Needs Focus"
+                       (per branchesService.computeStatus). The earlier
+                       checks for "High Risk" / "Low Risk" never matched,
+                       so every pill fell through to GRAD_GOLD.
+                    2) GRAD_GREEN / GRAD_GOLD / GRAD_RED are PASTEL card
+                       backgrounds — white text on them is invisible (memory:
+                       bug_pattern_pastel_grad_on_button). Use solid
+                       gradients for active pills with white text. */}
+                {(() => {
+                  const SOLID_GREEN = "linear-gradient(135deg,#10B981 0%,#059669 100%)";
+                  const SOLID_GOLD  = "linear-gradient(135deg,#F59E0B 0%,#D97706 100%)";
+                  const SOLID_RED   = "linear-gradient(135deg,#FF3355 0%,#DC2626 100%)";
+                  const pillBg =
+                    summary.status === "Strong" ? SOLID_GREEN :
+                    summary.status === "Good"   ? SOLID_GOLD :
+                                                  SOLID_RED;   // "Needs Focus"
+                  return (
+                    <span style={{
+                      fontSize: isMobile ? 9 : 10, fontWeight:800, padding: isMobile ? "6px 10px" : "8px 14px", borderRadius:10,
+                      background: pillBg,
+                      color:"#fff", letterSpacing:"0.12em", textTransform:"uppercase",
+                      boxShadow:"0 4px 12px rgba(0,0,0,.24)",
+                    }}>
+                      {summary.status}
+                    </span>
+                  );
+                })()}
                 <button
                   onClick={() => navigate("/reports")}
                   className="dash-btn"
@@ -934,13 +1111,18 @@ export default function BranchesComparison() {
     );
   }
 
-  const { branches, performanceRanking, comparativeTrends, efficiencyMetrics } = listData;
+  const { branches, performanceRanking, comparativeTrends, efficiencyMetrics, mappingIssue } = listData;
 
   // Show all ranking rows always (0 will render as short bar)
   const rankingWithData = performanceRanking;
-  // Only show trends chart if any month has real attendance data
+  // Only show trends chart if any month has real attendance data. Note: row
+  // values are now `number | null | string` — `null` means "no data this month"
+  // (don't plot the point), so we explicitly check for finite numbers > 0.
   const hasTrendsData = comparativeTrends.some(row =>
-    branches.some((_, i) => (row[`b${i}`] as number) > 0)
+    branches.some((_, i) => {
+      const v = row[`b${i}`];
+      return typeof v === "number" && v > 0;
+    })
   );
 
   // Compute list-view AHI avg for hero
@@ -968,6 +1150,7 @@ export default function BranchesComparison() {
       />
       <DeleteModal
         open={deleteOpen} branchName={crudName}
+        orphans={orphanCounts}
         onClose={() => setDeleteOpen(false)}
         onConfirm={handleDeleteBranch} deleting={crudSaving}
       />
@@ -1003,9 +1186,49 @@ export default function BranchesComparison() {
           stats={[
             { label:"Branches", value: branches.length.toString() },
             { label:"Students", value: totalStudentsList.toLocaleString() },
-            { label:"Alerts",   value: totalAlertsList.toString() },
+            /* "At-Risk" is more accurate than "Alerts" — the count is
+               attendance-based at-risk students, not all alert types. */
+            { label:"At-Risk",  value: totalAlertsList.toString() },
           ]}
         />
+      )}
+
+      {/* ── Mapping issue banner ────────────────────────────────────────────
+          Surfaced from analyticsService when student-branch attribution is
+          partial or fully broken. We render it loudly here because every
+          downstream metric (AHI, fees, attendance) is computed off that
+          attribution — Owner needs to know the dashboard might be wrong
+          before making decisions. */}
+      {mappingIssue && (
+        <div
+          className={`rounded-2xl md:rounded-[1.5rem] border p-4 md:p-5 flex items-start gap-3 md:gap-4 ${
+            mappingIssue.fallbackTriggered
+              ? "bg-rose-50 border-rose-200"
+              : "bg-amber-50 border-amber-200"
+          }`}
+        >
+          <AlertTriangle
+            className={`w-5 h-5 md:w-6 md:h-6 shrink-0 mt-0.5 ${
+              mappingIssue.fallbackTriggered ? "text-rose-600" : "text-amber-600"
+            }`}
+          />
+          <div className="min-w-0 flex-1">
+            <p className={`text-[12px] md:text-[13px] font-black uppercase tracking-widest mb-1 ${
+              mappingIssue.fallbackTriggered ? "text-rose-700" : "text-amber-700"
+            }`}>
+              {mappingIssue.fallbackTriggered
+                ? "Branch attribution may be incorrect"
+                : `${mappingIssue.unmapped} of ${mappingIssue.total} students unmapped`}
+            </p>
+            <p className={`text-[11px] md:text-[12px] font-medium leading-snug ${
+              mappingIssue.fallbackTriggered ? "text-rose-600/90" : "text-amber-700/90"
+            }`}>
+              {mappingIssue.fallbackTriggered
+                ? `No students could be matched to any branch via branchId/schoolId, so all ${mappingIssue.total.toLocaleString()} are temporarily attributed to the first branch. Update student records with valid branchId values matching this school's branches to fix.`
+                : `These students have no branchId/schoolId field that matches a known branch — they are excluded from per-branch metrics. Update their records to restore accurate attribution.`}
+            </p>
+          </div>
+        </div>
       )}
 
       {/* Branch Cards */}
@@ -1022,236 +1245,192 @@ export default function BranchesComparison() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-7">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
           {branches.map(b => {
             const hasData = b.ahi > 0 || b.feeCollection > 0 || b.passRate > 0 || b.attendance > 0;
-            const theme   = tierTheme(b.status, hasData);
-            const isDark  = theme.key === "luxury" || theme.key === "premium" || theme.key === "standard";
+            const accent = b.color || "#3B82F6";
 
-            /* Color for metric value text — tier-aware */
-            const metricValColor = (v: number) => {
-              if (!isDark) return metricColor(v);
-              if (v >= 85) return "text-emerald-300";
-              if (v >= 70) return theme.key === "luxury" ? "text-[#C5A770]" : "text-white";
-              return "text-rose-300";
-            };
+            /* Pastel background — branch color tinted at ~12% over a near-white
+               base. Mirrors Dashboard.tsx 4-card aesthetic: clean, light, with
+               a subtle accent corner. `${accent}1F` = hex alpha 0x1F (~12%). */
+            const cardBg = hasData
+              ? `linear-gradient(135deg, #FAFCFF 0%, #F5F9FF 55%, ${accent}1F 100%)`
+              : `linear-gradient(135deg, #FCFDFE 0%, #F5F7FB 100%)`;
+            const cardBorder = hasData
+              ? `0.5px solid ${accent}33`
+              : `0.5px solid rgba(148,163,184,0.18)`;
 
-            /* Tier-specific HUGE title text (top-left, like LUXURY / PREMIUM / STANDARD) */
-            const tierTitleText =
-              theme.key === "luxury"  ? "LUXURY"   :
-              theme.key === "premium" ? "PREMIUM"  :
-              theme.key === "standard"? "STANDARD" :
-                                        "BRANCH";
+            /* Status pill colors — clean, low-opacity per Dashboard. */
+            const statusPalette = !hasData
+              ? { bg: "rgba(148,163,184,0.12)", fg: "#64748B" }
+              : b.status === "Strong"
+                ? { bg: "rgba(16,185,129,0.12)", fg: "#10B981" }
+                : b.status === "Good"
+                  ? { bg: "rgba(59,130,246,0.12)", fg: "#3B82F6" }
+                  : { bg: "rgba(244,63,94,0.12)", fg: "#F43F5E" };
 
-            const tierTitleColor =
-              theme.key === "luxury"  ? "text-[#C5A770]" :
-              isDark                  ? "text-white"     :
-                                        "text-[#1e294b]";
-
-            /* Tier descriptive tagline — same slot as Hajj card's description */
-            const tagline =
-              theme.key === "luxury"  ? "Top-performing branch · highest academic health &\u00A0pass rates" :
-              theme.key === "premium" ? "Well-rounded performance · healthy balance of attendance &\u00A0results" :
-              theme.key === "standard"? "Needs focus · boost attendance &\u00A0results to raise tier" :
-                                        "Awaiting performance data · track will appear here";
-
-            const metrics = [
-              { icon: Building2,     label: "AHI",             value: b.ahi,           has: b.ahi > 0 },
-              { icon: CircleDollarSign, label: "Fee Collection", value: b.feeCollection, has: b.feeCollection > 0 },
-              { icon: GraduationCap, label: "Pass Rate",       value: b.passRate,      has: b.passRate > 0 },
-              { icon: CalendarCheck2,label: "Attendance",      value: b.attendance,    has: b.attendance > 0 },
+            const cardMetrics = [
+              { label: "AHI",        value: b.ahi,           has: b.ahi > 0,           icon: Activity },
+              { label: "Pass Rate",  value: b.passRate,      has: b.passRate > 0,      icon: GraduationCap },
+              { label: "Fee Coll.",  value: b.feeCollection, has: b.feeCollection > 0, icon: CircleDollarSign },
+              { label: "Attendance", value: b.attendance,    has: b.attendance > 0,    icon: CalendarCheck2 },
             ];
+            /* Per-metric value color — same ramp as Dashboard StatTile so a
+               75% here looks the same shade as a 75% on the home page. */
+            const valColor = (v: number) =>
+              v >= 85 ? "#10B981" :
+              v >= 70 ? "#3B82F6" :
+              v >= 50 ? "#F59E0B" :
+                        "#F43F5E";
 
             return (
-              <BranchTiltCard
+              <div
                 key={b.id}
                 onClick={() => navigate(`/branches/${b.id}`)}
-                isDark={isDark}
-                disableTilt={isMobile}
-                outerStyle={{
-                  background: theme.bg,
-                  /* Layered shadow:
-                     ① outer drop (lift) ② tight depth ③ inner top-edge highlight
-                        ④ inner bottom-edge gloom — gives the card metal-edge bevel */
-                  boxShadow: isDark
-                    ? [
-                        "0 30px 60px -18px rgba(8,14,28,0.55)",
-                        "0 12px 24px -10px rgba(0,0,0,0.30)",
-                        "inset 0 1px 0 rgba(255,255,255,0.18)",
-                        "inset 0 -1px 0 rgba(0,0,0,0.35)",
-                      ].join(",")
-                    : [
-                        "0 18px 38px -14px rgba(15,23,42,0.18)",
-                        "0 6px 14px -8px rgba(15,23,42,0.10)",
-                        "inset 0 1px 0 rgba(255,255,255,0.85)",
-                        "inset 0 -1px 0 rgba(15,23,42,0.05)",
-                      ].join(","),
-                  minHeight: isMobile ? 280 : 340,
-                  /* Gradient ring border via padding-trick: inner card sits inside */
-                  padding: 1.5,
-                  backgroundImage: theme.ringBorder,
+                role="button"
+                tabIndex={0}
+                {...tilt3D}
+                style={{
+                  background: cardBg,
+                  border: cardBorder,
+                  borderRadius: isMobile ? 18 : 22,
+                  padding: isMobile ? 18 : 22,
+                  boxShadow: SHADOW_LG,
+                  position: "relative",
+                  overflow: "hidden",
+                  cursor: "pointer",
+                  minHeight: isMobile ? 230 : 270,
+                  ...tilt3DStyle,
                 }}
-                outerClassName={`clickable-card relative overflow-hidden rounded-[1.75rem] border ${theme.border} group cursor-pointer`}
+                className="clickable-card group"
               >
-                {/* Inner card surface — the "metal plate" itself */}
-                <div
-                  className="relative h-full w-full overflow-hidden rounded-[1.65rem]"
-                  style={{
-                    background: theme.bg,
-                    transform: "translateZ(0)",
-                  }}
-                >
+                {/* Decorative faded icon — bottom-right (Dashboard pattern) */}
+                <div style={{
+                  position: "absolute",
+                  bottom: isMobile ? 10 : 14,
+                  right: isMobile ? 12 : 18,
+                  color: accent,
+                  opacity: hasData ? 0.18 : 0.10,
+                  pointerEvents: "none",
+                  lineHeight: 0,
+                }}>
+                  <Building2 size={isMobile ? 56 : 76} strokeWidth={1.8}/>
+                </div>
 
-                {/* ── Layer 1: noise grain — gives real metal texture ── */}
-                <div
-                  className="absolute inset-0 pointer-events-none mix-blend-overlay"
-                  style={{
-                    backgroundImage: `url("${NOISE_SVG}")`,
-                    backgroundSize: "180px 180px",
-                    opacity: theme.noiseOpacity,
-                  }}
-                />
-
-                {/* ── Layer 2: specular gloss highlight (the "shine") ── */}
-                <div
-                  className="absolute inset-0 pointer-events-none"
-                  style={{ background: theme.gloss }}
-                />
-
-                {/* ── Layer 3: decorative flowing silk curves ── */}
-                <div
-                  className="absolute inset-0 pointer-events-none"
-                  style={{
-                    color: theme.accent,
-                    backgroundImage: `url("${LINES_PATTERN}")`,
-                    backgroundRepeat: "no-repeat",
-                    backgroundPosition: "right -30px center",
-                    backgroundSize: "70% 120%",
-                    opacity: theme.patternOpacity,
-                    mixBlendMode: isDark ? "screen" : "multiply",
-                  }}
-                />
-
-                {/* ── Edit / Delete — appear on hover, glass/subtle depending on tier. On mobile, always visible. ── */}
-                <div className={`absolute top-5 right-5 flex items-center gap-1 transition-all duration-200 z-[3] ${isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+                {/* Edit / Delete — top-right, hover-revealed on desktop */}
+                <div className={`absolute top-3 right-3 flex items-center gap-1 z-[3] transition-opacity duration-200 ${
+                  isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                }`}>
                   <button
                     onClick={(e) => { e.stopPropagation(); openEdit(b, b.id); }}
-                    className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
-                      isDark
-                        ? "bg-white/15 border border-white/25 hover:bg-white/25 text-white backdrop-blur"
-                        : "bg-slate-50 border border-slate-100 hover:bg-blue-50 hover:border-blue-200 hover:text-[#1e3a8a] text-slate-400"
-                    }`}
+                    className="w-7 h-7 rounded-lg bg-white/85 border border-slate-200 hover:bg-white hover:border-blue-300 flex items-center justify-center transition-all backdrop-blur-sm"
                     title="Edit branch"
                   >
-                    <Pencil className="w-3.5 h-3.5" />
+                    <Pencil className="w-3 h-3 text-slate-500" />
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); openDelete(b.id, b.name); }}
-                    className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
-                      isDark
-                        ? "bg-white/15 border border-white/25 hover:bg-rose-500/40 text-white backdrop-blur"
-                        : "bg-slate-50 border border-slate-100 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-500 text-slate-400"
-                    }`}
+                    className="w-7 h-7 rounded-lg bg-white/85 border border-slate-200 hover:bg-rose-50 hover:border-rose-300 flex items-center justify-center transition-all backdrop-blur-sm"
                     title="Delete branch"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="w-3 h-3 text-slate-500" />
                   </button>
                 </div>
 
-                {/* ── Card body — content on LEFT, decorative pattern flows on RIGHT ── */}
-                <div
-                  className="relative z-[2] p-5 md:p-8 flex flex-col h-full"
-                  style={isMobile ? undefined : { transform: "translateZ(30px)", transformStyle: "preserve-3d" }}
-                >
-
-                  {/* Big tier title — mirrors LUXURY/PREMIUM/STANDARD in ref image */}
-                  <h2
-                    className={`text-[26px] md:text-[40px] leading-[1.05] font-black tracking-tight ${tierTitleColor} mb-2 md:mb-3 uppercase`}
-                    style={{ letterSpacing: "-0.015em" }}
-                  >
-                    {tierTitleText}
-                  </h2>
-
-                  {/* Description/tagline — max two lines, like ref image */}
-                  <p className={`text-[12px] md:text-[13px] leading-relaxed font-medium max-w-[85%] ${theme.subtitle} mb-5 md:mb-7`}>
-                    {tagline}
-                  </p>
-
-                  {/* Branch name + student count — compact line beneath tagline */}
-                  <div className="flex items-center gap-2.5 mb-5 md:mb-6">
-                    <div
-                      className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-md"
-                      style={{
-                        background: theme.iconBg,
-                        color: theme.key === "premium" ? "#A57B45" : "#ffffff",
-                      }}
-                    >
-                      <Building2 className="w-4.5 h-4.5" strokeWidth={2.2} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className={`text-[13px] font-extrabold ${theme.title} truncate`}>{b.name}</p>
-                      <p className={`text-[10px] font-bold uppercase tracking-wider ${theme.metricLabel}`}>
-                        {b.studentCount.toLocaleString()} student{b.studentCount !== 1 ? "s" : ""}
-                      </p>
-                    </div>
+                {/* Header: solid icon badge + branch name + meta */}
+                <div className="relative z-[2] flex items-start gap-3 mb-4 md:mb-5">
+                  <div style={{
+                    width: isMobile ? 40 : 44,
+                    height: isMobile ? 40 : 44,
+                    borderRadius: isMobile ? 11 : 12,
+                    background: accent,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: `0 4px 12px ${accent}44`,
+                    flexShrink: 0,
+                  }}>
+                    <Building2 size={isMobile ? 18 : 20} color="#FFFFFF" strokeWidth={2.5}/>
                   </div>
+                  <div className="flex-1 min-w-0 pr-12">
+                    <h3
+                      className="text-[15px] md:text-base font-bold text-[#0F172A] truncate"
+                      style={{ letterSpacing: "-0.2px" }}
+                    >
+                      {b.name}
+                    </h3>
+                    <p className="text-[10px] md:text-[11px] font-bold text-slate-400 uppercase tracking-wider mt-1 truncate">
+                      {b.studentCount.toLocaleString()} {b.studentCount === 1 ? "student" : "students"}
+                      {b.location && b.location !== "—" ? ` · ${b.location}` : ""}
+                    </p>
+                  </div>
+                </div>
 
-                  {/* 2-column feature grid — metrics as icon + label/value (Hajj card style) */}
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-3 md:gap-x-5 md:gap-y-3.5 mb-5 md:mb-6">
-                    {metrics.map(m => (
-                      <div key={m.label} className="flex items-start gap-2.5">
-                        <div
-                          className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
-                            isDark ? "bg-white/10 border border-white/15" : "bg-slate-50 border border-slate-100"
-                          }`}
-                        >
-                          <m.icon className={`w-3.5 h-3.5 ${isDark ? "text-white/90" : "text-slate-500"}`} strokeWidth={2} />
-                        </div>
-                        <div className="min-w-0">
-                          <p className={`text-[10px] font-bold uppercase tracking-wider ${theme.metricLabel} leading-tight`}>
+                {/* 2x2 metric grid — frosted white tiles over the pastel grad */}
+                <div className="relative z-[2] grid grid-cols-2 gap-2 md:gap-2.5 mb-4">
+                  {cardMetrics.map(m => {
+                    const Icon = m.icon;
+                    return (
+                      <div
+                        key={m.label}
+                        className="rounded-xl p-2.5 md:p-3"
+                        style={{
+                          background: "rgba(255,255,255,0.72)",
+                          border: "0.5px solid rgba(255,255,255,0.6)",
+                          backdropFilter: "blur(4px)",
+                        }}
+                      >
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Icon size={11} color="#94A3B8" strokeWidth={2}/>
+                          <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                             {m.label}
                           </p>
-                          <p className={`text-[14px] font-extrabold leading-tight mt-0.5 ${
-                            m.has ? metricValColor(m.value) : (isDark ? "text-white/45" : "text-slate-400")
-                          }`}>
-                            {m.has ? `${m.value}%` : "N/A"}
-                          </p>
                         </div>
+                        <p
+                          className="text-[14px] md:text-[15px] font-bold leading-tight mt-0.5"
+                          style={{ color: m.has ? valColor(m.value) : "#CBD5E1" }}
+                        >
+                          {m.has ? `${m.value}%` : "—"}
+                        </p>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
+                </div>
 
-                  {/* Spacer to push footer down */}
-                  <div className="flex-1" />
-
-                  {/* Footer: alerts + tier pill */}
-                  <div className="flex items-center justify-between gap-3 flex-wrap mt-2">
-                    {hasData ? (
+                {/* Footer: status pill + at-risk count, OR explicit empty hint */}
+                <div className="relative z-[2] flex items-center justify-between gap-3 flex-wrap">
+                  {hasData ? (
+                    <>
                       <span
-                        className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-[0.2em] shadow ${theme.badgeBg} ${theme.badgeText}`}
+                        style={{
+                          background: statusPalette.bg,
+                          color: statusPalette.fg,
+                          fontSize: 9,
+                          fontWeight: 800,
+                          padding: "4px 10px",
+                          borderRadius: 999,
+                          letterSpacing: "0.14em",
+                          textTransform: "uppercase",
+                        }}
                       >
                         {b.status}
                       </span>
-                    ) : (
-                      <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${theme.metricLabel}`}>
-                        {theme.label}
-                      </span>
-                    )}
-
-                    {b.activeAlerts > 0 && (
-                      <span className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold ${
-                        isDark
-                          ? "bg-rose-500/15 border-rose-400/30 text-rose-200"
-                          : "bg-[#fef2f2] border-rose-100 text-rose-500"
-                      }`}>
-                        <AlertTriangle className="w-3 h-3 shrink-0" />
-                        {b.activeAlerts} at&nbsp;risk
-                      </span>
-                    )}
-                  </div>
+                      {b.activeAlerts > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-rose-50 border border-rose-100 text-rose-500">
+                          <AlertTriangle className="w-3 h-3 shrink-0"/>
+                          {b.activeAlerts} at-risk
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-[10px] md:text-[11px] font-semibold text-slate-400 leading-snug">
+                      {b.studentCount === 0
+                        ? "0 students enrolled — first enrollment will appear here"
+                        : "Awaiting performance data — appears once attendance/scores are recorded"}
+                    </p>
+                  )}
                 </div>
-                </div>{/* /inner metal plate */}
-              </BranchTiltCard>
+              </div>
             );
           })}
         </div>

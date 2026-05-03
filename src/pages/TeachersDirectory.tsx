@@ -6,6 +6,7 @@ import {
   TrendingDown, Award, Building2, BookOpen, AlertTriangle,
   ChevronRight, Trophy, Medal, Target, CheckCircle2, Filter, X,
   ClipboardCheck, FileText, MessageSquare, Sparkles, Activity,
+  BarChart3,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -86,6 +87,8 @@ export default function TeachersDirectory() {
   const [teachers,  setTeachers]  = useState<any[]>([]);
   const [branchMap, setBranchMap] = useState<Map<string, string>>(new Map());
   const [classes,   setClasses]   = useState<any[]>([]);
+  /* classId → Set<teacherId> built from teaching_assignments (subject + class teachers union) */
+  const [classTeacherMap, setClassTeacherMap] = useState<Map<string, Set<string>>>(new Map());
 
   /* activity aggregates per teacherId */
   const [scoreMap,      setScoreMap]      = useState<Map<string, number[]>>(new Map());
@@ -222,60 +225,65 @@ export default function TeachersDirectory() {
         );
         setScoreMap(sMap);
 
-        /* 4. attendance — teacher's OWN attendance (when teacherId === self)
-              AND attendance marking count (how many records teacher created) */
-        const aMap        = new Map<string, { p: number; t: number }>();
-        const markingMap  = new Map<string, number>();
+        /* 4a. attendance — student attendance ROWS written by teacher.
+              We count UNIQUE marking DAYS (not raw rows) — a teacher who marked
+              30 students on a single day is doing one marking event, not thirty.
+              Source: `attendance` collection (each row = one student, has `date`). */
+        const markingDays = new Map<string, Set<string>>();
         for (const chunk of idChunks) {
+          const fetchAtt = async (withSchool: boolean) => {
+            const constraints: any[] = [where("teacherId", "in", chunk)];
+            if (withSchool) constraints.unshift(where("schoolId", "==", ownerUid));
+            return getDocs(query(collection(db, "attendance"), ...constraints));
+          };
           try {
-            const snap = await getDocs(
-              query(
-                collection(db, "attendance"),
-                where("schoolId", "==", ownerUid),
-                where("teacherId", "in", chunk),
-              )
-            );
+            let snap;
+            try { snap = await fetchAtt(true); }
+            catch { snap = await fetchAtt(false); }
+            snap.docs.forEach(d => {
+              const data = d.data() as any;
+              const tid  = data.teacherId;
+              const date = data.date;
+              if (!tid || !date) return;
+              if (!markingDays.has(tid)) markingDays.set(tid, new Set());
+              markingDays.get(tid)!.add(String(date));
+            });
+          } catch { /* ignore */ }
+        }
+        const markingMap = new Map<string, number>();
+        markingDays.forEach((dates, tid) => markingMap.set(tid, dates.size));
+
+        /* 4b. teacher_attendance — teacher's OWN punctuality.
+              Canonical collection used by Owner TeacherLeaderboard, Principal scorer,
+              and TeacherProfile. Replaces the previous (broken) self-detection on
+              `attendance` rows that always carry `studentId`. */
+        const aMap = new Map<string, { p: number; t: number }>();
+        for (const chunk of idChunks) {
+          const fetchTAtt = async (withSchool: boolean) => {
+            const constraints: any[] = [where("teacherId", "in", chunk)];
+            if (withSchool) constraints.unshift(where("schoolId", "==", ownerUid));
+            return getDocs(query(collection(db, "teacher_attendance"), ...constraints));
+          };
+          try {
+            let snap;
+            try { snap = await fetchTAtt(true); }
+            catch { snap = await fetchTAtt(false); }
             snap.docs.forEach(d => {
               const data = d.data() as any;
               const tid  = data.teacherId;
               if (!tid) return;
-              /* attendance marking = every record written by this teacher */
-              markingMap.set(tid, (markingMap.get(tid) || 0) + 1);
-              /* teacher's own attendance = rows where studentId is absent / row targets teacher */
-              const isSelf = !data.studentId || data.studentId === tid;
-              if (isSelf) {
-                if (!aMap.has(tid)) aMap.set(tid, { p: 0, t: 0 });
-                const cur = aMap.get(tid)!;
-                cur.t++;
-                if ((data.status || "").toLowerCase() === "present") cur.p++;
-              }
+              if (!aMap.has(tid)) aMap.set(tid, { p: 0, t: 0 });
+              const cur = aMap.get(tid)!;
+              cur.t++;
+              const status = (data.status || "").toLowerCase();
+              if (status === "present" || status === "late") cur.p++;
             });
-          } catch {
-            /* retry without schoolId */
-            try {
-              const snap = await getDocs(
-                query(collection(db, "attendance"), where("teacherId", "in", chunk))
-              );
-              snap.docs.forEach(d => {
-                const data = d.data() as any;
-                const tid  = data.teacherId;
-                if (!tid) return;
-                markingMap.set(tid, (markingMap.get(tid) || 0) + 1);
-                const isSelf = !data.studentId || data.studentId === tid;
-                if (isSelf) {
-                  if (!aMap.has(tid)) aMap.set(tid, { p: 0, t: 0 });
-                  const cur = aMap.get(tid)!;
-                  cur.t++;
-                  if ((data.status || "").toLowerCase() === "present") cur.p++;
-                }
-              });
-            } catch { /* ignore */ }
-          }
+          } catch { /* ignore */ }
         }
         setAttMap(aMap);
         setAttMarkingMap(markingMap);
 
-        /* 5. classes — filter by schoolId */
+        /* 5a. classes — filter by schoolId */
         let clList: any[] = [];
         try {
           const clSnap = await getDocs(
@@ -284,6 +292,33 @@ export default function TeachersDirectory() {
           clList = clSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
         } catch { /* ignore */ }
         setClasses(clList);
+
+        /* 5b. teaching_assignments — canonical map of which teachers teach which class.
+              `classes.teacherId` only stores the PRIMARY/class teacher. Subject teachers
+              (English/Maths assigned to an existing class) live ONLY here. Without this,
+              subject teachers show classCount: 0 and miss "By Class" grouping. */
+        const ctMap = new Map<string, Set<string>>();
+        try {
+          const taSnap = await getDocs(
+            query(collection(db, "teaching_assignments"), where("schoolId", "==", ownerUid))
+          );
+          taSnap.docs.forEach(d => {
+            const a = d.data() as any;
+            const cid = a.classId;
+            const tid = a.teacherId;
+            const status = (a.status || "active").toLowerCase();
+            if (!cid || !tid || status !== "active") return;
+            if (!ctMap.has(cid)) ctMap.set(cid, new Set());
+            ctMap.get(cid)!.add(tid);
+          });
+        } catch { /* ignore */ }
+        /* Also fold direct classes.teacherId into the map so a single lookup is enough downstream. */
+        clList.forEach(c => {
+          if (!c.teacherId) return;
+          if (!ctMap.has(c.id)) ctMap.set(c.id, new Set());
+          ctMap.get(c.id)!.add(c.teacherId);
+        });
+        setClassTeacherMap(ctMap);
 
         /* 6-10. Activity counters — assignments, tests, lessonPlans, parent_notes, reports */
         const countReducer = (acc: Map<string, number>, data: any) => {
@@ -319,7 +354,11 @@ export default function TeachersDirectory() {
       const scores        = scoreMap.get(tid) || [];
       const att           = attMap.get(tid);
       const attMarkCount  = attMarkingMap.get(tid) || 0;
-      const teacherClasses = classes.filter(c => c.teacherId === tid);
+      /* Class membership: union of `classes.teacherId === tid` and `teaching_assignments`.
+         Subject teachers only appear in teaching_assignments, so single-source lookup misses them. */
+      const teacherClasses = classes.filter(c =>
+        c.teacherId === tid || classTeacherMap.get(c.id)?.has(tid)
+      );
       const assignCount   = assignMap.get(tid)  || 0;
       const testCount     = testsMap.get(tid)   || 0;
       const lessonCount   = lessonMap.get(tid)  || 0;
@@ -404,7 +443,7 @@ export default function TeachersDirectory() {
         reasons,
       };
     });
-  }, [teachers, scoreMap, attMap, attMarkingMap, classes, branchMap,
+  }, [teachers, scoreMap, attMap, attMarkingMap, classes, classTeacherMap, branchMap,
       assignMap, testsMap, lessonMap, noteMap, reportMap]);
 
   /* ── filter dropdown options ────────────────────── */
@@ -990,11 +1029,12 @@ function TeacherCard({ teacher, onClick, isMobile = false }: { teacher: any; onC
         </div>
       </div>
       <div style={{ display:"flex", justifyContent:"space-between", background:"#F5F9FF", borderRadius:10, padding: isMobile ? "6px 8px" : "6px 10px", gap:4 }}>
-        <ActivityChip icon={ClipboardCheck} count={teacher.attMarkCount} label="Attendance" color={B1}/>
+        <ActivityChip icon={ClipboardCheck} count={teacher.attMarkCount} label="Attendance Days" color={B1}/>
         <ActivityChip icon={FileText}       count={teacher.assignCount}  label="Assignments" color={ORANGE}/>
         <ActivityChip icon={Activity}       count={teacher.testCount}    label="Tests" color={VIOLET}/>
         <ActivityChip icon={BookOpen}       count={teacher.lessonCount}  label="Lessons" color={GREEN}/>
         <ActivityChip icon={MessageSquare}  count={teacher.noteCount}    label="Notes" color={GOLD}/>
+        <ActivityChip icon={BarChart3}      count={teacher.reportCount}  label="Reports" color="#0EA5E9"/>
       </div>
     </div>
   );
@@ -1065,12 +1105,13 @@ function TopCard({ teacher, rank, onClick, isMobile = false }: { teacher: any; r
           </div>
         </div>
 
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(5, 1fr)", gap:4, paddingTop:10, borderTop:"0.5px solid rgba(0,85,255,.08)" }}>
-          <ActivityChip icon={ClipboardCheck} count={teacher.attMarkCount} label="Attendance" color={B1}/>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(6, 1fr)", gap:4, paddingTop:10, borderTop:"0.5px solid rgba(0,85,255,.08)" }}>
+          <ActivityChip icon={ClipboardCheck} count={teacher.attMarkCount} label="Attendance Days" color={B1}/>
           <ActivityChip icon={FileText}       count={teacher.assignCount}  label="Assignments" color={ORANGE}/>
           <ActivityChip icon={Activity}       count={teacher.testCount}    label="Tests" color={VIOLET}/>
           <ActivityChip icon={BookOpen}       count={teacher.lessonCount}  label="Lessons" color={GREEN}/>
           <ActivityChip icon={MessageSquare}  count={teacher.noteCount}    label="Notes" color={GOLD}/>
+          <ActivityChip icon={BarChart3}      count={teacher.reportCount}  label="Reports" color="#0EA5E9"/>
         </div>
       </div>
     </div>
@@ -1137,12 +1178,13 @@ function DefaulterCard({ teacher, onClick, isMobile = false }: { teacher: any; o
           </div>
         </div>
 
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(5, 1fr)", gap:4, paddingTop:10, borderTop:"0.5px solid rgba(0,85,255,.08)" }}>
-          <ActivityChip icon={ClipboardCheck} count={teacher.attMarkCount} label="Attendance" color={B1}/>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(6, 1fr)", gap:4, paddingTop:10, borderTop:"0.5px solid rgba(0,85,255,.08)" }}>
+          <ActivityChip icon={ClipboardCheck} count={teacher.attMarkCount} label="Attendance Days" color={B1}/>
           <ActivityChip icon={FileText}       count={teacher.assignCount}  label="Assignments" color={ORANGE}/>
           <ActivityChip icon={Activity}       count={teacher.testCount}    label="Tests" color={VIOLET}/>
           <ActivityChip icon={BookOpen}       count={teacher.lessonCount}  label="Lessons" color={GREEN}/>
           <ActivityChip icon={MessageSquare}  count={teacher.noteCount}    label="Notes" color={GOLD}/>
+          <ActivityChip icon={BarChart3}      count={teacher.reportCount}  label="Reports" color="#0EA5E9"/>
         </div>
       </div>
     </div>

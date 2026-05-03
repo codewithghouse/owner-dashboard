@@ -5,7 +5,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { db, auth } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, getDocs, serverTimestamp } from "firebase/firestore";
 import {
   Brain, AlertTriangle, TrendingDown, TrendingUp, Users,
   Search, ChevronDown, ChevronUp, RefreshCw, Share2,
@@ -24,7 +24,12 @@ import {
   SHADOW_SM, SHADOW_LG, SHADOW_BTN, usePageShellStyle,
   DashGlobalStyles, PageHead, StatTile, DarkHero, Card3D, AIInsightCard,
 } from "@/lib/dashboardTokens";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useBreakpoint } from "@/hooks/useBreakpoint";
+
+// 30-day expiry for parent share links. Mirrored in the parent-portal
+// validation. Surfaced as a constant so the toast text + the Firestore
+// write never drift apart.
+const PARENT_LINK_EXPIRY_DAYS = 30;
 
 // ── Risk visual config ────────────────────────────────────────────────────────
 const RISK_TIER: Record<RiskLevel, { label: string; grad: string; solidGrad: string; color: string; bg: string }> = {
@@ -46,36 +51,97 @@ function getInitials(name: string) {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
+// Cards per page — keeps the rendered DOM small even at 1000+ students.
+// The full prediction set is loaded upfront (one cached fetch); pagination
+// is client-side over the filtered list.
+const PAGE_SIZE = 10;
+
 export default function AIPredictorPage() {
   const navigate = useNavigate();
-  const isMobile = useIsMobile();
+  const isMobile = useBreakpoint() === "mobile";
   const pageShellStyle = usePageShellStyle();
   const [predictions, setPredictions] = useState<StudentRiskPrediction[]>([]);
+  // Canonical branch list from schools/{uid}/branches. Empty branches (no
+  // enrolled students yet) still need to appear in the dropdown — the
+  // user should see they exist before populating them.
+  const [knownBranches, setKnownBranches] = useState<string[]>([]);
   const [loading,     setLoading]     = useState(true);
   const [search,      setSearch]      = useState("");
   const [filterLevel, setFilterLevel] = useState<RiskLevel | "All">("All");
   const [expanded,    setExpanded]    = useState<string | null>(null);
   const [copiedId,    setCopiedId]    = useState<string | null>(null);
+  // Page-level branch filter — drives the stat cards, hero subtitle, and
+  // student list. Same pattern as the StudentsIntelligence page so the
+  // user has one consistent gesture across owner pages.
+  const [pageBranch,  setPageBranch]  = useState<string>("All");
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const load = async () => {
+  // Initial mount uses cache (instant if warm); the Refresh button forces
+  // a fresh fetch so users can manually reload after entering new scores.
+  const load = async (force = false) => {
     setLoading(true);
-    const data = await fetchAllPredictions();
+    const data = await fetchAllPredictions({ force });
     setPredictions(data);
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
 
+  // Fetch canonical branch list once on mount. Independent of predictions
+  // because branches without students still need to be selectable.
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    getDocs(collection(db, "schools", uid, "branches"))
+      .then(snap => {
+        const names = snap.docs
+          .map(d => {
+            const data = d.data() as any;
+            return (data.name || data.branchName || "") as string;
+          })
+          .filter(Boolean);
+        setKnownBranches(names);
+      })
+      .catch(err => console.warn("[AIPredictor] branches fetch failed:", err));
+  }, []);
+
+  // Union of canonical branches (subcollection) + any branches that appear
+  // on prediction rows. The fallback covers schools whose student docs
+  // carry a branch name that isn't in the subcollection (legacy data).
+  const branchList = useMemo(() => {
+    const set = new Set<string>(knownBranches);
+    predictions.forEach(p => { if (p.branch && p.branch !== "—") set.add(p.branch); });
+    return ["All", ...[...set].sort()];
+  }, [predictions, knownBranches]);
+
+  // Single source of truth for "students currently in scope". Top stat
+  // cards + hero number + filter pill counts all derive from this so
+  // selecting a branch re-scopes the entire page coherently.
+  const branchScopedPredictions = useMemo(
+    () => pageBranch === "All" ? predictions : predictions.filter(p => p.branch === pageBranch),
+    [predictions, pageBranch],
+  );
+
+  const filtersActive = filterLevel !== "All" || search.trim() !== "" || pageBranch !== "All";
+  const clearFilters = () => { setFilterLevel("All"); setSearch(""); setPageBranch("All"); };
+
+  // Reset to page 1 whenever any upstream filter changes — otherwise the
+  // user can land on page 4 of an empty filtered list.
+  useEffect(() => { setCurrentPage(1); }, [pageBranch, filterLevel, search]);
+
+  // Stats are branch-scoped so the top cards reflect "students currently
+  // in scope" — selecting a branch flips them to that branch's tier
+  // counts, not the whole school.
   const stats = useMemo(() => ({
-    total:    predictions.length,
-    critical: predictions.filter(p => p.riskLevel === "Critical").length,
-    high:     predictions.filter(p => p.riskLevel === "High").length,
-    watch:    predictions.filter(p => p.riskLevel === "Watch").length,
-    safe:     predictions.filter(p => p.riskLevel === "Safe").length,
-  }), [predictions]);
+    total:    branchScopedPredictions.length,
+    critical: branchScopedPredictions.filter(p => p.riskLevel === "Critical").length,
+    high:     branchScopedPredictions.filter(p => p.riskLevel === "High").length,
+    watch:    branchScopedPredictions.filter(p => p.riskLevel === "Watch").length,
+    safe:     branchScopedPredictions.filter(p => p.riskLevel === "Safe").length,
+  }), [branchScopedPredictions]);
 
   const filtered = useMemo(() => {
-    let list = predictions;
+    let list = branchScopedPredictions;
     if (filterLevel !== "All") list = list.filter(p => p.riskLevel === filterLevel);
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -86,7 +152,13 @@ export default function AIPredictorPage() {
       );
     }
     return list;
-  }, [predictions, filterLevel, search]);
+  }, [branchScopedPredictions, filterLevel, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pagedPredictions = useMemo(
+    () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filtered, currentPage],
+  );
 
   const generateParentLink = async (p: StudentRiskPrediction) => {
     const uid = auth.currentUser?.uid;
@@ -94,13 +166,19 @@ export default function AIPredictorPage() {
     try {
       const token  = crypto.randomUUID();
       const expiry = new Date();
-      expiry.setDate(expiry.getDate() + 30);
+      expiry.setDate(expiry.getDate() + PARENT_LINK_EXPIRY_DAYS);
 
       await addDoc(collection(db, "parent_tokens"), {
         token,
         studentId:   p.studentId,
         studentName: p.studentName,
         schoolId:    uid,
+        // branchId added so cross-dashboard reads (Parent portal + Owner
+        // alerts) can scope by branch without a second lookup. (See
+        // memory: cross_dashboard_linking_rule.) `branch` (the branch
+        // name) is preserved for backwards compat with existing portal
+        // code paths.
+        branchId:    (p as any).branchId || "",
         branch:      p.branch,
         grade:       p.grade,
         attendance:  p.attendance,
@@ -112,6 +190,10 @@ export default function AIPredictorPage() {
         riskFactors: p.riskFactors,
         recommendation: p.recommendation,
         expiresAt:   expiry.toISOString(),
+        // expiresAtMs is the field a Firestore TTL policy can target — set
+        // up the policy in the Firebase console to auto-delete expired
+        // tokens. Without it, this collection grows unbounded.
+        expiresAtMs: expiry.getTime(),
         createdAt:   serverTimestamp(),
       });
 
@@ -150,7 +232,7 @@ export default function AIPredictorPage() {
           subtitle="Probability of failing this semester · with explanations"
           right={
             <button
-              onClick={load}
+              onClick={() => load(true)}
               className="dash-btn"
               style={{
                 display:"inline-flex", alignItems:"center", justifyContent:"center", gap:6,
@@ -170,7 +252,7 @@ export default function AIPredictorPage() {
           icon={Brain}
           eyebrow={<><Sparkles size={11} style={{ display:"inline", marginRight:4 }}/> AI-Powered Intelligence</> as any}
           title={stats.total.toString()}
-          subtitle={`Student${stats.total!==1?"s":""} analysed · ${atRiskTotal} at risk · ${criticalSafe}% currently safe`}
+          subtitle={`Student${stats.total!==1?"s":""} analysed${pageBranch !== "All" ? ` in ${pageBranch}` : ""} · ${atRiskTotal} at risk · ${criticalSafe}% currently safe`}
           stats={[
             { label:"Critical", value: stats.critical.toString() },
             { label:"High",     value: stats.high.toString() },
@@ -180,10 +262,14 @@ export default function AIPredictorPage() {
 
         {/* Bright Stat Grid — each is a filter */}
         <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: isMobile ? 10 : 16 }}>
+          {/* Sublabels MUST match the bands in getRiskLevel():
+              ≥70 Critical · 45–69 High · 20–44 Watch · <20 Safe.
+              Earlier they read 50-69 / 30-49 / <30 — drift between the
+              service thresholds and what the user saw on screen. */}
           <StatTile label="Critical Risk" value={stats.critical.toString()} sub="≥70% fail probability" grad={GRAD_RED}    icon={ShieldAlert}    onClick={() => setFilterLevel(filterLevel === "Critical" ? "All" : "Critical")} />
-          <StatTile label="High Risk"     value={stats.high.toString()}     sub="50-69%"                 grad={GRAD_ORANGE} icon={AlertTriangle}  onClick={() => setFilterLevel(filterLevel === "High" ? "All" : "High")} />
-          <StatTile label="Watch List"    value={stats.watch.toString()}    sub="30-49%"                 grad={GRAD_GOLD}   icon={Eye}            onClick={() => setFilterLevel(filterLevel === "Watch" ? "All" : "Watch")} />
-          <StatTile label="Safe"          value={stats.safe.toString()}     sub="<30%"                   grad={GRAD_GREEN}  icon={CheckCircle2}   onClick={() => setFilterLevel(filterLevel === "Safe" ? "All" : "Safe")} />
+          <StatTile label="High Risk"     value={stats.high.toString()}     sub="45-69%"                 grad={GRAD_ORANGE} icon={AlertTriangle}  onClick={() => setFilterLevel(filterLevel === "High" ? "All" : "High")} />
+          <StatTile label="Watch List"    value={stats.watch.toString()}    sub="20-44%"                 grad={GRAD_GOLD}   icon={Eye}            onClick={() => setFilterLevel(filterLevel === "Watch" ? "All" : "Watch")} />
+          <StatTile label="Safe"          value={stats.safe.toString()}     sub="<20%"                   grad={GRAD_GREEN}  icon={CheckCircle2}   onClick={() => setFilterLevel(filterLevel === "Safe" ? "All" : "Safe")} />
         </div>
 
         {/* Filters */}
@@ -202,6 +288,33 @@ export default function AIPredictorPage() {
                 }}
               />
             </div>
+            {/* Page-level branch selector — drives the stat cards, hero
+                subtitle, filter pill counts, and student list. Active
+                branch gets the GRAD_PRIMARY treatment so it reads as
+                "scoped" rather than "default". */}
+            {branchList.length > 1 && (
+              <select
+                value={pageBranch}
+                onChange={e => setPageBranch(e.target.value)}
+                aria-label="Filter page by branch"
+                style={{
+                  padding: isMobile ? "9px 12px" : "10px 14px", borderRadius:12,
+                  background: pageBranch === "All" ? "#F5F9FF" : GRAD_PRIMARY,
+                  color: pageBranch === "All" ? T3 : "#fff",
+                  border: pageBranch === "All" ? "0.5px solid rgba(0,85,255,.14)" : "none",
+                  fontSize: isMobile ? 11 : 12, fontWeight:800, letterSpacing:"0.06em",
+                  outline:"none", fontFamily:"inherit",
+                  boxShadow: pageBranch === "All" ? "none" : SHADOW_BTN,
+                  cursor:"pointer", flexShrink:0,
+                }}
+              >
+                {branchList.map(b => (
+                  <option key={b} value={b} style={{ color: T1 }}>
+                    {b === "All" ? "All Branches" : b}
+                  </option>
+                ))}
+              </select>
+            )}
             <div style={{
               display:"flex",
               gap: isMobile ? 5 : 6,
@@ -216,10 +329,17 @@ export default function AIPredictorPage() {
             }}>
               {(["All", "Critical", "High", "Watch", "Safe"] as const).map(lvl => {
                 const active = filterLevel === lvl;
-                const tierGrad = lvl === "All" ? GRAD_PRIMARY :
-                                 lvl === "Critical" ? GRAD_RED :
-                                 lvl === "High" ? GRAD_ORANGE :
-                                 lvl === "Watch" ? GRAD_GOLD : GRAD_GREEN;
+                // Use SOLID gradients for active state — the imported
+                // GRAD_RED / GRAD_ORANGE / GRAD_GOLD / GRAD_GREEN tokens are
+                // pastel CARD backgrounds (e.g. #FEF8F9 → #FCEAEE), which
+                // render as near-white pills with white text → unreadable.
+                // RISK_TIER.solidGrad gives the correct vivid pill colour.
+                const activeGrad =
+                  lvl === "All"      ? GRAD_PRIMARY :
+                  lvl === "Critical" ? RISK_TIER.Critical.solidGrad :
+                  lvl === "High"     ? RISK_TIER.High.solidGrad :
+                  lvl === "Watch"    ? RISK_TIER.Watch.solidGrad :
+                                       RISK_TIER.Safe.solidGrad;
                 return (
                   <button
                     key={lvl}
@@ -227,7 +347,7 @@ export default function AIPredictorPage() {
                     className="dash-btn"
                     style={{
                       padding: isMobile ? "7px 12px" : "8px 14px", borderRadius: isMobile ? 999 : 11,
-                      background: active ? tierGrad : "#F5F9FF",
+                      background: active ? activeGrad : "#F5F9FF",
                       color: active ? "#fff" : T3,
                       fontSize: isMobile ? 9 : 10, fontWeight:800, letterSpacing:"0.10em", textTransform:"uppercase",
                       border: active ? "none" : "0.5px solid rgba(0,85,255,.12)",
@@ -240,6 +360,26 @@ export default function AIPredictorPage() {
                   </button>
                 );
               })}
+              {/* Clear affordance — only renders when a filter or search is
+                  active. Mirrors the StudentsIntelligence header pattern so
+                  the user has the same reset gesture across pages. */}
+              {filtersActive && (
+                <button
+                  onClick={clearFilters}
+                  className="dash-btn"
+                  aria-label="Clear filters"
+                  style={{
+                    padding: isMobile ? "7px 12px" : "8px 14px", borderRadius: isMobile ? 999 : 11,
+                    background:"#fff", color:T3, border:"0.5px solid rgba(0,85,255,.18)",
+                    fontSize: isMobile ? 9 : 10, fontWeight:800, letterSpacing:"0.10em", textTransform:"uppercase",
+                    cursor:"pointer", fontFamily:"inherit",
+                    whiteSpace:"nowrap", flexShrink:0,
+                    display:"inline-flex", alignItems:"center", gap:4,
+                  }}
+                >
+                  Clear
+                </button>
+              )}
             </div>
           </div>
         </Card3D>
@@ -252,13 +392,22 @@ export default function AIPredictorPage() {
                 <Brain size={isMobile ? 24 : 28} color={T4}/>
               </div>
               <p style={{ fontSize: isMobile ? 12 : 13, fontWeight:800, color:T3, margin:0, textAlign:"center" }}>
-                {predictions.length === 0 ? "No student data found" : "No students match the filter"}
+                {predictions.length === 0
+                  ? "No student data found"
+                  : pageBranch !== "All" && branchScopedPredictions.length === 0
+                    ? `No predictions for ${pageBranch} yet`
+                    : "No students match the filter"}
               </p>
+              {pageBranch !== "All" && branchScopedPredictions.length === 0 && (
+                <p style={{ fontSize: isMobile ? 10 : 11, fontWeight:600, color:T4, margin:"4px 0 0 0", textAlign:"center", maxWidth:280 }}>
+                  Predictions appear once students have attendance or test-score data recorded for this branch.
+                </p>
+              )}
             </div>
           </Card3D>
         ) : (
           <div style={{ display:"flex", flexDirection:"column", gap: isMobile ? 10 : 12 }}>
-            {filtered.map(p => {
+            {pagedPredictions.map(p => {
               const tier = RISK_TIER[p.riskLevel];
               const Icon = RISK_ICON[p.riskLevel];
               const isExpanded = expanded === p.studentId;
@@ -565,6 +714,58 @@ export default function AIPredictorPage() {
               );
             })}
           </div>
+        )}
+
+        {/* Pagination strip — only renders when filtered set spills past
+            one page. Numbered buttons cap at 5 visible to keep mobile width
+            sane; on larger sets the user pages via prev/next instead. */}
+        {filtered.length > PAGE_SIZE && (
+          <Card3D padding={isMobile ? "12px 14px" : "14px 18px"}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap: isMobile ? 10 : 16, flexWrap:"wrap" }}>
+              <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:800, color:T4, letterSpacing:"0.14em", textTransform:"uppercase", margin:0, width: isMobile ? "100%" : "auto", textAlign: isMobile ? "center" : "left" }}>
+                Showing {Math.min((currentPage - 1) * PAGE_SIZE + 1, filtered.length)}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length}
+              </p>
+              <div style={{ display:"flex", gap:6, margin: isMobile ? "0 auto" : 0, flexWrap:"wrap", justifyContent:"center" }}>
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  className="dash-btn"
+                  style={{
+                    padding:"7px 14px", borderRadius:10,
+                    background:"#F5F9FF", border:"0.5px solid rgba(0,85,255,.12)",
+                    fontSize:11, fontWeight:800, color:T3, cursor: currentPage === 1 ? "not-allowed" : "pointer",
+                    opacity: currentPage === 1 ? 0.4 : 1, fontFamily:"inherit",
+                  }}
+                >Prev</button>
+                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map(n => (
+                  <button
+                    key={n}
+                    onClick={() => setCurrentPage(n)}
+                    className="dash-btn"
+                    style={{
+                      width:32, height:32, borderRadius:10,
+                      background: currentPage === n ? GRAD_PRIMARY : "#F5F9FF",
+                      color: currentPage === n ? "#fff" : T3,
+                      border: currentPage === n ? "none" : "0.5px solid rgba(0,85,255,.12)",
+                      fontSize:11, fontWeight:800, cursor:"pointer",
+                      boxShadow: currentPage === n ? SHADOW_BTN : "none", fontFamily:"inherit",
+                    }}
+                  >{n}</button>
+                ))}
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  className="dash-btn"
+                  style={{
+                    padding:"7px 14px", borderRadius:10,
+                    background:"#F5F9FF", border:"0.5px solid rgba(0,85,255,.12)",
+                    fontSize:11, fontWeight:800, color:T3, cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+                    opacity: currentPage === totalPages ? 0.4 : 1, fontFamily:"inherit",
+                  }}
+                >Next</button>
+              </div>
+            </div>
+          </Card3D>
         )}
 
         {/* How it works banner */}

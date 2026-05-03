@@ -9,6 +9,7 @@ import {
   calculateAHI, calculatePassRate,
   generateInsights, getBranchTrends,
   computeStatus, avg,
+  type MappingIssue,
 } from "./analyticsService";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -29,13 +30,25 @@ export type BranchSummary = {
   activeAlerts: number;
   status: "Strong" | "Good" | "Needs Focus";
   growthRate: number; // % YoY student growth (0 if no prior data)
+  /** Raw count of test entries (results + test_scores) that did NOT pass.
+   *  Use this in action-plan recommendations instead of deriving from
+   *  studentCount × (1 - passRate) — the latter overstates because not every
+   *  enrolled student takes every test. */
+  failedTestCount: number;
 };
 
 export type BranchComparisonData = {
   branches: BranchSummary[];
   performanceRanking: Record<string, string | number>[];
-  comparativeTrends: Record<string, string | number>[];
+  /** Trend rows allow `null` per-branch values for months with no attendance
+   *  data — the Recharts <Line> will gap at those points instead of dipping
+   *  to 0%, which would falsely signal "branch attendance crashed". */
+  comparativeTrends: Record<string, string | number | null>[];
   efficiencyMetrics: { label: string; value: string; note: string; col: string }[];
+  /** Surfaced from analyticsService — non-null when student-branch attribution
+   *  is partially or fully broken. UI should render a banner so the Owner
+   *  knows the dashboard data may be misleading. */
+  mappingIssue: MappingIssue | null;
 };
 
 export type BranchDetailData = {
@@ -43,7 +56,8 @@ export type BranchDetailData = {
   schoolAvgAhi: number;
   schoolAvgAttendance: number;
   schoolAvgPassRate: number;
-  historicalTrend: { period: string; score: number; schoolAvg: number }[];
+  /** `score` is null for months with no attendance recorded — chart will gap. */
+  historicalTrend: { period: string; score: number | null; schoolAvg: number }[];
   benchmarkComparison: { metric: string; branch: number; avg: number }[];
   strengths: string[];
   improvements: string[];
@@ -58,6 +72,7 @@ async function computeSummaries(): Promise<{
   branches: BranchSummary[];
   branchMonthAtt: Map<string, Map<string, { total: number; present: number }>>;
   months: { key: string; label: string }[];
+  mappingIssue: MappingIssue | null;
 }> {
   const uid = auth.currentUser?.uid;
   if (!uid) throw new Error("Not authenticated");
@@ -65,7 +80,7 @@ async function computeSummaries(): Promise<{
   const snap = await loadCoreSnapshot(uid);
   const { branches: rawBranches, branchStudents, studentAttMap,
           branchAtt, branchRes, branchFees, branchTeachers,
-          branchMonthAtt, months } = snap;
+          branchMonthAtt, months, mappingIssue } = snap;
 
   const branches: BranchSummary[] = rawBranches.map(b => {
     const att   = branchAtt.get(b.id)!;
@@ -99,6 +114,10 @@ async function computeSummaries(): Promise<{
       growthRate = Math.round(((newest.total - oldest.total) / oldest.total) * 100);
     }
 
+    /* Real failed-test count from raw results. Used by action plan so we
+       don't overstate failures by extrapolating from total enrolled count. */
+    const failedTestCount = Math.max(0, res.total - res.passed);
+
     return {
       id: b.id, name: b.name, color: b.color,
       studentCount, teacherCount: tct,
@@ -106,16 +125,17 @@ async function computeSummaries(): Promise<{
       ahi, attendance, passRate, feeCollection,
       revenuePerStudent, activeAlerts, growthRate,
       status: computeStatus(ahi),
+      failedTestCount,
     };
   });
 
-  return { branches, branchMonthAtt, months };
+  return { branches, branchMonthAtt, months, mappingIssue };
 }
 
 // ── Public: list view ─────────────────────────────────────────────────────────
 
 export async function fetchBranchesComparison(): Promise<BranchComparisonData> {
-  const { branches, branchMonthAtt, months } = await computeSummaries();
+  const { branches, branchMonthAtt, months, mappingIssue } = await computeSummaries();
 
   // Performance ranking chart
   const performanceRanking = (["Attendance", "Pass Rate", "Fee Coll.", "AHI"] as const).map(metric => {
@@ -130,12 +150,14 @@ export async function fetchBranchesComparison(): Promise<BranchComparisonData> {
     return row;
   });
 
-  // Comparative trends — monthly AHI proxy (attendance %)
+  // Comparative trends — monthly attendance %. Use `null` for months with no
+  // data so the line chart shows a gap instead of plotting 0% (which would
+  // visually claim the branch had a catastrophic attendance drop).
   const comparativeTrends = months.map(m => {
-    const row: Record<string, string | number> = { month: m.label };
+    const row: Record<string, string | number | null> = { month: m.label };
     branches.forEach((b, i) => {
       const mAtt = branchMonthAtt.get(b.id)?.get(m.key);
-      row[`b${i}`] = mAtt?.total ? Math.round((mAtt.present / mAtt.total) * 100) : 0;
+      row[`b${i}`] = mAtt?.total ? Math.round((mAtt.present / mAtt.total) * 100) : null;
     });
     return row;
   });
@@ -158,8 +180,11 @@ export async function fetchBranchesComparison(): Promise<BranchComparisonData> {
   const efficiencyMetrics = [
     {
       label: "Revenue/Student",
+      /* ₹ — Indian school context. Fee data in `fees` collection is rupees,
+         and `toLocaleString("en-IN")` formats with the lakh/crore grouping
+         conventions Indian users expect (e.g. "1,50,000" instead of "150,000"). */
       value: bestRevB && bestRevB.revenuePerStudent > 0
-        ? `$${bestRevB.revenuePerStudent.toLocaleString()}`
+        ? `₹${bestRevB.revenuePerStudent.toLocaleString("en-IN")}`
         : "N/A",
       note: bestRevB && bestRevB.revenuePerStudent > 0
         ? `${bestRevB.name.split(" ")[0]} leads`
@@ -196,40 +221,63 @@ export async function fetchBranchesComparison(): Promise<BranchComparisonData> {
     },
   ];
 
-  return { branches, performanceRanking, comparativeTrends, efficiencyMetrics };
+  return { branches, performanceRanking, comparativeTrends, efficiencyMetrics, mappingIssue };
 }
 
 // ── Public: detail view ───────────────────────────────────────────────────────
 
 export async function fetchBranchDetail(branchId: string): Promise<BranchDetailData> {
   const { branches, branchMonthAtt, months } = await computeSummaries();
+  /* mappingIssue is intentionally NOT propagated to detail-view return type —
+     the banner already shows on list view, and a single-branch view doesn't
+     need the global warning. The Owner sees it on /branches before drilling in. */
 
   const summaryIdx = branches.findIndex(b => b.id === branchId);
   if (summaryIdx === -1) throw new Error("Branch not found");
   const summary = branches[summaryIdx];
 
-  const schoolAvgAhi           = avg(branches.map(b => b.ahi));
+  // School averages — every metric filtered to "branches with data > 0"
+  // so a branch with no exam scores doesn't drag the school passRate
+  // toward 0. Earlier `schoolAvgAhi` was the only one that did NOT filter,
+  // which made the Benchmark Comparison chart show "school avg" massively
+  // below the active branch whenever sibling branches had no data yet.
+  // (See memory: bug_pattern_score_zero_no_data — same pattern.)
+  const schoolAvgAhi           = avg(branches.filter(b => b.ahi > 0).map(b => b.ahi));
   const schoolAvgAttendance    = avg(branches.filter(b => b.attendance > 0).map(b => b.attendance));
   const schoolAvgPassRate      = avg(branches.filter(b => b.passRate > 0).map(b => b.passRate));
   const schoolAvgFeeCollection = avg(branches.filter(b => b.feeCollection > 0).map(b => b.feeCollection));
 
-  // Best branch (highest AHI) for comparison notes
-  const bestBranch = branches.reduce((a, b) => b.ahi > a.ahi ? b : a, branches[0]);
+  // Best-branch lookup is gated on `ahi > 0` — without the gate, when ALL
+  // branches have no data, `branches.reduce(...)` falls back to
+  // `branches[0]` and labels it "Best performing branch" even though it
+  // has zero data. Now we only have a "best" when at least one branch
+  // has positive AHI.
+  const branchesWithAhi = branches.filter(b => b.ahi > 0);
+  const bestBranch     = branchesWithAhi.length > 0
+    ? branchesWithAhi.reduce((a, b) => b.ahi > a.ahi ? b : a)
+    : null;
   const bestBranchName = bestBranch?.name.split(" ")[0] || "Top";
-  const isTopBranch = bestBranch?.id === summary.id;
+  const isTopBranch    = bestBranch?.id === summary.id;
+  const onlyBranchWithAhi = branchesWithAhi.length === 1 && isTopBranch;
 
-  // Comparison notes for KPI cards — all framed against real school/best-branch values
-  const ahiDiff  = isTopBranch ? 0 : summary.ahi - bestBranch.ahi;
-  const passDiff = isTopBranch ? 0 : summary.passRate - bestBranch.passRate;
+  // Comparison notes for KPI cards — framed against real school/best-branch
+  // values, with explicit no-data guards so we never claim "Highest pass
+  // rate" or "Best performing branch" when the underlying value is N/A.
+  const ahiDiff  = bestBranch && !isTopBranch ? summary.ahi - bestBranch.ahi : 0;
+  const passDiff = bestBranch && !isTopBranch ? summary.passRate - bestBranch.passRate : 0;
   const feeDiff  = summary.feeCollection > 0 ? summary.feeCollection - schoolAvgFeeCollection : 0;
   const bestFeeBranch = branches.filter(b => b.feeCollection > 0)
     .reduce((a, b) => b.feeCollection > a.feeCollection ? b : a, branches.find(b => b.feeCollection > 0) || summary);
-  const isTopFee = bestFeeBranch.id === summary.id;
+  const isTopFee = bestFeeBranch.id === summary.id && summary.feeCollection > 0;
 
   const kpiNotes = {
-    ahi: isTopBranch
-      ? "Best performing branch"
-      : `↓ ${Math.abs(ahiDiff)}% below ${bestBranchName}`,
+    ahi: summary.ahi === 0
+      ? "No academic data yet"
+      : onlyBranchWithAhi
+        ? "Only branch with data"
+        : isTopBranch
+          ? "Best performing branch"
+          : `↓ ${Math.abs(ahiDiff)}% below ${bestBranchName}`,
     fee: summary.feeCollection === 0
       ? "No fee data"
       : isTopFee
@@ -237,9 +285,13 @@ export async function fetchBranchDetail(branchId: string): Promise<BranchDetailD
         : feeDiff >= 0
           ? `↑ ${feeDiff}% vs school avg`
           : `↓ ${Math.abs(feeDiff)}% vs school avg`,
-    passRate: isTopBranch
-      ? "Highest pass rate"
-      : `↓ ${Math.abs(passDiff)}% below ${bestBranchName}`,
+    passRate: summary.passRate === 0
+      ? "No exam data yet"
+      : onlyBranchWithAhi
+        ? "Only branch with results"
+        : isTopBranch
+          ? "Highest pass rate"
+          : `↓ ${Math.abs(passDiff)}% below ${bestBranchName}`,
     alerts: summary.activeAlerts === 0
       ? "No active risks"
       : summary.activeAlerts === branches.reduce((max, b) => Math.max(max, b.activeAlerts), 0)
@@ -258,7 +310,12 @@ export async function fetchBranchDetail(branchId: string): Promise<BranchDetailD
     { metric: "Fee Coll.",  branch: summary.feeCollection,  avg: schoolAvgFeeCollection },
     { metric: "Pass Rate",  branch: summary.passRate,       avg: schoolAvgPassRate },
     { metric: "Attendance", branch: summary.attendance,     avg: schoolAvgAttendance },
-    { metric: "Growth",     branch: Math.max(0, summary.growthRate), avg: avg(branches.map(b => Math.max(0, b.growthRate))) },
+    /* Growth shown as-is. Previously clamped via Math.max(0, ...) which
+       hid shrinking branches — a -10% growth read as 0% (stable). The
+       school avg also clamped each peer's negative growth to 0 before
+       averaging, masking genuine network decline. Recharts <Bar> handles
+       negative values by drawing below the axis, so the visual is fine. */
+    { metric: "Growth",     branch: summary.growthRate,     avg: avg(branches.map(b => b.growthRate)) },
   ];
 
   const { strengths, improvements } = generateInsights(
@@ -285,10 +342,16 @@ export async function fetchBranchDetail(branchId: string): Promise<BranchDetailD
   }
 
   if (summary.passRate > 0 && summary.passRate < 60) {
-    const failing = Math.round(summary.studentCount * (1 - summary.passRate / 100));
+    /* Use real failedTestCount from results — NOT studentCount × (1 - passRate),
+       which overstates failures when not every enrolled student takes every
+       test. The label "test entries" is more accurate than "students" because
+       a student with 3 failed tests counts 3 times in failedTestCount. */
+    const failing = summary.failedTestCount;
     actionPlan.push({
       task: "Academic Remediation Program",
-      sub: `${failing} student${failing !== 1 ? "s" : ""} below pass threshold — set up targeted tutoring and parent-teacher reviews`,
+      sub: failing > 0
+        ? `${failing} failing test entr${failing !== 1 ? "ies" : "y"} below pass threshold — set up targeted tutoring and parent-teacher reviews`
+        : "Pass rate below 60% — set up targeted tutoring and parent-teacher reviews",
       priority: "High Priority", prColor: "bg-[#ef4444]",
     });
   } else if (summary.passRate > 0 && summary.passRate < schoolAvgPassRate) {

@@ -59,7 +59,11 @@ export default function PrincipalManagement() {
   const [bulkRunning, setBulkRunning]   = useState(false);
   const [bulkDone, setBulkDone]         = useState(false);
   const bulkFileRef                     = useRef<HTMLInputElement>(null);
-  const [branchForm, setBranchForm] = useState({ name: '', location: '', color: '#3b82f6' });
+  /* Branch + invite color default both #1e3a8a (dark navy) — matching Edullent
+     primary brand. Previously the two defaulted to different shades, so an
+     unselected invite preview would tint differently from a freshly-created
+     branch card on the same screen. */
+  const [branchForm, setBranchForm] = useState({ name: '', location: '', color: '#1e3a8a' });
   const [showActionMenu, setShowActionMenu] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   // Edit branch modal
@@ -72,6 +76,26 @@ export default function PrincipalManagement() {
   const [branches, setBranches] = useState<any[]>([]);
   const [principals, setPrincipals] = useState<any[]>([]);
   const [schoolInfo, setSchoolInfo] = useState<any>(null);
+  /* Live-loaded teachers + enrollments — used to compute per-branch student
+     and teacher counts. Branch docs themselves carry `students: 0, teachers: 0`
+     from creation but are NEVER updated when teachers/students are added, so
+     reading branch.teachers shows stale 0 even on a fully-staffed branch.
+     Computing live from the canonical source is the only way to reflect reality. */
+  const [teachers, setTeachers] = useState<any[]>([]);
+  const [enrollments, setEnrollments] = useState<any[]>([]);
+
+  /* Action menu closes on any outside click. Without this it stayed open until
+     the user clicked the same button again — easy to lose track of an open
+     menu when scrolling the principals table. */
+  useEffect(() => {
+    if (!showActionMenu) return;
+    const onMouseDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target?.closest("[data-action-menu]")) setShowActionMenu(null);
+    };
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [showActionMenu]);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -83,25 +107,67 @@ export default function PrincipalManagement() {
     };
     fetchSchool();
 
-    // Sync Branches
+    // Sync Branches — error callback surfaces Firestore rule denials / offline
+    // failures so a blank page in production can be diagnosed from console.
+    // Without it, listener errors silently strand the UI in an empty state.
     const branchesRef = collection(db, "schools", auth.currentUser.uid, "branches");
-    const unsubscribeBranches = onSnapshot(branchesRef, (snapshot) => {
-      const branchList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setBranches(branchList);
-    });
+    const unsubscribeBranches = onSnapshot(
+      branchesRef,
+      (snapshot) => {
+        const branchList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setBranches(branchList);
+      },
+      (err) => {
+        console.error("[PrincipalManagement] branches listener error:", err);
+        toast.error("Could not load branches — check permissions or network.");
+      }
+    );
 
     // Sync Principals (from a top-level collection or subcollection?)
     // Let's use a root 'principals' collection filtered by schoolId for easier cross-portal access
     const principalsRef = collection(db, "principals");
     const q = query(principalsRef, where("schoolId", "==", auth.currentUser.uid));
-    const unsubscribePrincipals = onSnapshot(q, (snapshot) => {
-      const principalList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setPrincipals(principalList);
-    });
+    const unsubscribePrincipals = onSnapshot(
+      q,
+      (snapshot) => {
+        const principalList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setPrincipals(principalList);
+      },
+      (err) => {
+        console.error("[PrincipalManagement] principals listener error:", err);
+        toast.error("Could not load principals — check permissions or network.");
+      }
+    );
+
+    // Sync teachers — needed for live per-branch teacher count on branch cards.
+    const teachersRef = collection(db, "teachers");
+    const tQ = query(teachersRef, where("schoolId", "==", auth.currentUser.uid));
+    const unsubscribeTeachers = onSnapshot(
+      tQ,
+      (snapshot) => {
+        setTeachers(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+      },
+      (err) => console.error("[PrincipalManagement] teachers listener error:", err),
+    );
+
+    // Sync enrollments — needed for live per-branch student count (deduped
+    // by studentId so multi-class students are counted once, per
+    // bug_pattern_enrollment_row_dedup memory rule).
+    const enrollmentsRef = collection(db, "enrollments");
+    const eQ = query(enrollmentsRef, where("schoolId", "==", auth.currentUser.uid));
+    const unsubscribeEnrollments = onSnapshot(
+      eQ,
+      (snapshot) => {
+        setEnrollments(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+      },
+      (err) => console.error("[PrincipalManagement] enrollments listener error:", err),
+    );
 
     return () => {
       unsubscribeBranches();
       unsubscribePrincipals();
+      unsubscribeTeachers();
+      unsubscribeEnrollments();
     };
   }, []);
 
@@ -123,9 +189,10 @@ export default function PrincipalManagement() {
       });
       // Set branchId = docRef.id for consistent canonical resolution across all services
       await updateDoc(docRef, { branchId: docRef.id });
+      addAuditLog("branch_added", `New branch created: ${branchForm.name}`, branchForm.location).catch(() => {});
       toast.success("Branch added successfully!");
       setShowAddBranchModal(false);
-      setBranchForm({ name: '', location: '', color: '#3b82f6' });
+      setBranchForm({ name: '', location: '', color: '#1e3a8a' });
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -225,13 +292,17 @@ export default function PrincipalManagement() {
   /* ── Run bulk invite with per-row status ───────────────────────────── */
   const handleBulkInvite = async () => {
     if (!bulkRows.length || !auth.currentUser) return;
+    /* Capture uid at the START so a long bulk run survives a session expiry
+       mid-loop. Previously each row's `auth.currentUser!.uid` would NPE if
+       the auth state cleared between iterations. */
+    const uid = auth.currentUser.uid;
     setBulkRunning(true);
 
     // Upload file reference to storage
     let fileUrl = "";
     if (bulkFile) {
       try {
-        const fileRef = ref(storage, `bulk-invites/${auth.currentUser.uid}_${Date.now()}_${bulkFile.name}`);
+        const fileRef = ref(storage, `bulk-invites/${uid}_${Date.now()}_${bulkFile.name}`);
         await uploadBytes(fileRef, bulkFile);
         fileUrl = await getDownloadURL(fileRef);
       } catch { /* storage upload optional */ }
@@ -245,15 +316,28 @@ export default function PrincipalManagement() {
       setBulkStatus(prev => ({ ...prev, [i]: "sending" }));
 
       try {
+        /* Branch must exist in this school's `branches` subcollection. Falling
+           back to `toSlug(branch)` would create a principal record with a
+           branchId pointing at a non-existent branch — the invite email goes
+           out, principal logs in, but cross-page joins (TeachersDirectory,
+           Leaderboard etc.) silently lose them. Better to fail the row loudly
+           so Owner can fix the Excel and retry. */
         const branchMatch = branches.find(b => b.name.toLowerCase() === branch.toLowerCase());
+        if (!branchMatch) {
+          console.warn(`[BulkInvite] Skipping ${email}: branch "${branch}" not found in school`);
+          setBulkStatus(prev => ({ ...prev, [i]: "failed" }));
+          failCount++;
+          if (i < bulkRows.length - 1) await sleep(350);
+          continue;
+        }
 
         await addDoc(collection(db, "principals"), {
           name,
           email,
-          branch: branchMatch?.name || branch,
-          branchId: branchMatch?.branchId || toSlug(branch),
+          branch: branchMatch.name,
+          branchId: branchMatch.branchId || branchMatch.id,
           role: "principal",
-          schoolId: auth.currentUser!.uid,
+          schoolId: uid,
           schoolName: schoolInfo?.schoolName || "Our School",
           status: "Invited",
           avatar: name.substring(0, 2).toUpperCase(),
@@ -268,7 +352,7 @@ export default function PrincipalManagement() {
         await sendInvitationEmail({
           to: email,
           name,
-          branch: branchMatch?.name || branch,
+          branch: branchMatch.name,
           schoolName: schoolInfo?.schoolName || "Our School",
         });
 
@@ -286,12 +370,26 @@ export default function PrincipalManagement() {
 
     setBulkRunning(false);
     setBulkDone(true);
-    toast.success(`Done! ${successCount} invited${failCount > 0 ? `, ${failCount} failed` : ""}.`);
+    /* Single audit log entry for the whole bulk run — per-row entries would
+       flood the audit log on a 100-row upload. */
+    if (successCount > 0) {
+      addAuditLog(
+        "principals_bulk_invited",
+        `Bulk invite: ${successCount} principals invited`,
+        failCount > 0 ? `${failCount} rows failed` : "All rows succeeded",
+      ).catch(() => {});
+    }
+    if (failCount > 0) {
+      toast.warning(`${successCount} invited, ${failCount} failed. Check failed rows — branch name may not match.`);
+    } else {
+      toast.success(`Done! ${successCount} invited.`);
+    }
   };
 
   /* ── Retry failed rows ─────────────────────────────────────────────── */
   const handleRetryFailed = async () => {
     if (!auth.currentUser) return;
+    const uid = auth.currentUser.uid;
     setBulkRunning(true);
     setBulkDone(false);
     let retryCount = 0;
@@ -302,13 +400,19 @@ export default function PrincipalManagement() {
       setBulkStatus(prev => ({ ...prev, [i]: "sending" }));
 
       try {
+        /* Same branch-must-exist guard as handleBulkInvite. */
         const branchMatch = branches.find(b => b.name.toLowerCase() === branch.toLowerCase());
+        if (!branchMatch) {
+          setBulkStatus(prev => ({ ...prev, [i]: "failed" }));
+          if (i < bulkRows.length - 1) await sleep(350);
+          continue;
+        }
         await addDoc(collection(db, "principals"), {
           name, email,
-          branch: branchMatch?.name || branch,
-          branchId: branchMatch?.branchId || toSlug(branch),
+          branch: branchMatch.name,
+          branchId: branchMatch.branchId || branchMatch.id,
           role: "principal",
-          schoolId: auth.currentUser!.uid,
+          schoolId: uid,
           schoolName: schoolInfo?.schoolName || "Our School",
           status: "Invited",
           avatar: name.substring(0, 2).toUpperCase(),
@@ -317,7 +421,7 @@ export default function PrincipalManagement() {
           studentsManaged: 0, teachersManaged: 0,
           createdAt: serverTimestamp(),
         });
-        await sendInvitationEmail({ to: email, name, branch: branchMatch?.name || branch, schoolName: schoolInfo?.schoolName || "Our School" });
+        await sendInvitationEmail({ to: email, name, branch: branchMatch.name, schoolName: schoolInfo?.schoolName || "Our School" });
         setBulkStatus(prev => ({ ...prev, [i]: "sent" }));
         retryCount++;
       } catch {
@@ -330,6 +434,13 @@ export default function PrincipalManagement() {
 
     setBulkRunning(false);
     setBulkDone(true);
+    if (retryCount > 0) {
+      addAuditLog(
+        "principals_bulk_retried",
+        `Bulk retry: ${retryCount} principals re-invited`,
+        "",
+      ).catch(() => {});
+    }
     toast.success(`Retry complete! ${retryCount} re-invited.`);
   };
 
@@ -345,7 +456,19 @@ export default function PrincipalManagement() {
   };
 
   const handleDeleteBranch = async (id: string) => {
-    if (!auth.currentUser || !window.confirm("Are you sure you want to delete this branch? All associated data will be removed.")) return;
+    if (!auth.currentUser) return;
+    /* Warn Owner about principals that will be orphaned (branchId pointing
+       to a now-deleted branch). Without this warning the branch silently
+       vanishes and the principal record sits there with a dead reference,
+       still consuming the dashboard slot but unable to be matched on
+       cross-page joins. */
+    const branch = branches.find(b => b.id === id);
+    const orphans = branch ? principalsForBranch(branch) : [];
+    const baseMsg = "Are you sure you want to delete this branch? All associated data will be removed.";
+    const orphanMsg = orphans.length > 0
+      ? `\n\nWARNING: ${orphans.length} principal${orphans.length !== 1 ? "s are" : " is"} assigned to this branch (${orphans.slice(0,3).map(p => p.name).join(", ")}${orphans.length > 3 ? "..." : ""}). They will be left without a branch — please reassign them after deletion.`
+      : "";
+    if (!window.confirm(baseMsg + orphanMsg)) return;
     try {
       await deleteDoc(doc(db, "schools", auth.currentUser.uid, "branches", id));
       toast.success("Branch deleted successfully");
@@ -417,11 +540,49 @@ export default function PrincipalManagement() {
     }
   };
 
+  /* Match a principal to a branch via branchId first, falling back to name.
+     Pure name-match breaks after a branch is renamed — the principal's stored
+     `branch` field becomes stale and the branch shows as unassigned even
+     though the principal is still there. branchId is the durable key. */
+  const principalsForBranch = (b: any) =>
+    principals.filter(p =>
+      (b.branchId && p.branchId === b.branchId) ||
+      (b.id && p.branchId === b.id) ||
+      p.branch === b.name
+    );
+
+  /* Live per-branch counts — branch.teachers / branch.students stored on the
+     branch doc are stale (initialized 0 at creation, never updated when
+     teachers/students are added). Computing from canonical collections every
+     render is correct and cheap at MVP scale. branchId-first match handles
+     branch rename safely. */
+  const teacherCountForBranch = (b: any) => {
+    const bid = b.branchId || b.id;
+    return teachers.filter(t =>
+      (bid && t.branchId === bid) ||
+      (b.name && t.branch === b.name)
+    ).length;
+  };
+
+  const studentCountForBranch = (b: any) => {
+    const bid = b.branchId || b.id;
+    const set = new Set<string>();
+    enrollments.forEach(e => {
+      const matches =
+        (bid && e.branchId === bid) ||
+        (b.name && e.branch === b.name);
+      if (matches && e.studentId) set.add(e.studentId);
+    });
+    return set.size;
+  };
+
   const totalBranches = branches.length;
   const totalPrincipals = principals.length;
   const activePrincipals = principals.filter(p => p.status === 'Active').length;
   const pendingInvites = principals.filter(p => p.status === 'Invited').length;
-  const unassignedBranches = branches.filter(b => !principals.find(p => p.branch === b.name && p.status === 'Active')).length;
+  const unassignedBranches = branches.filter(b =>
+    !principalsForBranch(b).some(p => p.status === 'Active')
+  ).length;
 
   return (
     <>
@@ -551,7 +712,8 @@ export default function PrincipalManagement() {
           {/* Branches Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {filteredBranches.map(branch => {
-              const assignedPrincipal = principals.find(p => p.branch === branch.name && (p.status === 'Active' || p.status === 'Invited'));
+              /* Match by branchId for stale-rename safety; fall back to name only as last resort. */
+              const assignedPrincipal = principalsForBranch(branch).find(p => p.status === 'Active' || p.status === 'Invited');
               const statusConf = getStatusConfig(branch.status);
               return (
                 <div
@@ -583,14 +745,15 @@ export default function PrincipalManagement() {
                       </span>
                     </div>
 
-                    {/* Stats */}
+                    {/* Stats — live counts from canonical collections, NOT
+                        the stale branch.students / branch.teachers fields. */}
                     <div className="grid grid-cols-3 gap-2 md:gap-3 mb-4 md:mb-6">
                       <div className="bg-[#f8fafc] border border-slate-50 p-3 md:p-4 rounded-xl text-center">
-                        <p className="text-base md:text-xl font-black text-[#111827] tracking-tighter">{(branch.students ?? 0).toLocaleString()}</p>
+                        <p className="text-base md:text-xl font-black text-[#111827] tracking-tighter">{studentCountForBranch(branch).toLocaleString()}</p>
                         <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mt-1">Students</p>
                       </div>
                       <div className="bg-[#f8fafc] border border-slate-50 p-3 md:p-4 rounded-xl text-center">
-                        <p className="text-base md:text-xl font-black text-[#111827] tracking-tighter">{branch.teachers ?? 0}</p>
+                        <p className="text-base md:text-xl font-black text-[#111827] tracking-tighter">{teacherCountForBranch(branch)}</p>
                         <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mt-1">Teachers</p>
                       </div>
                       <div className="bg-[#f8fafc] border border-slate-50 p-3 md:p-4 rounded-xl text-center">
@@ -683,7 +846,7 @@ export default function PrincipalManagement() {
                 </div>
                 {/* Principals assigned to this branch */}
                 {(() => {
-                  const branchPrincipals = principals.filter(p => p.branch === manageBranch.name);
+                  const branchPrincipals = principalsForBranch(manageBranch);
                   return branchPrincipals.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-8 gap-2">
                       <AlertTriangle className="w-7 h-7 text-rose-300" />
@@ -866,7 +1029,7 @@ export default function PrincipalManagement() {
                         </td>
                         <td className="py-7 px-10 text-slate-500 font-medium text-[13px]">{p.joinDate}</td>
                         <td className="py-7 px-10">
-                          <div className="relative">
+                          <div className="relative" data-action-menu>
                             <button onClick={(e) => { e.stopPropagation(); setShowActionMenu(showActionMenu === p.id ? null : p.id); }} className="p-2 rounded-xl hover:bg-slate-50 text-slate-400 transition-colors">
                               <MoreVertical className="w-4 h-4" />
                             </button>
@@ -1421,21 +1584,34 @@ export default function PrincipalManagement() {
                 </div>
               </div>
 
-              {selectedPrincipal.status === 'Active' && (
-                <div className="space-y-3 md:space-y-4">
-                  <h4 className="text-[11px] md:text-sm font-bold text-slate-400 uppercase tracking-widest">Branch Overview</h4>
-                  <div className="grid grid-cols-2 gap-3 md:gap-4">
-                    <div className="p-4 md:p-6 rounded-xl md:rounded-2xl border border-slate-100 bg-[#f0fdf4] text-center">
-                      <p className="text-2xl md:text-3xl font-black text-[#111827] tracking-tighter">{selectedPrincipal.studentsManaged.toLocaleString()}</p>
-                      <p className="text-[11px] md:text-xs font-bold text-emerald-600 mt-2">Students Managed</p>
-                    </div>
-                    <div className="p-4 md:p-6 rounded-xl md:rounded-2xl border border-slate-100 bg-[#eff6ff] text-center">
-                      <p className="text-2xl md:text-3xl font-black text-[#111827] tracking-tighter">{selectedPrincipal.teachersManaged}</p>
-                      <p className="text-[11px] md:text-xs font-bold text-blue-600 mt-2">Teachers Managed</p>
+              {selectedPrincipal.status === 'Active' && (() => {
+                /* Same live-count pattern: principal.studentsManaged /
+                   teachersManaged stored on the principal doc are stale (set
+                   to 0 at invite time, never updated). Compute from the
+                   principal's branch's actual rosters. */
+                const principalBranch = branches.find(b =>
+                  (b.branchId && b.branchId === selectedPrincipal.branchId) ||
+                  b.id === selectedPrincipal.branchId ||
+                  b.name === selectedPrincipal.branch
+                );
+                const liveStudents = principalBranch ? studentCountForBranch(principalBranch) : 0;
+                const liveTeachers = principalBranch ? teacherCountForBranch(principalBranch) : 0;
+                return (
+                  <div className="space-y-3 md:space-y-4">
+                    <h4 className="text-[11px] md:text-sm font-bold text-slate-400 uppercase tracking-widest">Branch Overview</h4>
+                    <div className="grid grid-cols-2 gap-3 md:gap-4">
+                      <div className="p-4 md:p-6 rounded-xl md:rounded-2xl border border-slate-100 bg-[#f0fdf4] text-center">
+                        <p className="text-2xl md:text-3xl font-black text-[#111827] tracking-tighter">{liveStudents.toLocaleString()}</p>
+                        <p className="text-[11px] md:text-xs font-bold text-emerald-600 mt-2">Students Managed</p>
+                      </div>
+                      <div className="p-4 md:p-6 rounded-xl md:rounded-2xl border border-slate-100 bg-[#eff6ff] text-center">
+                        <p className="text-2xl md:text-3xl font-black text-[#111827] tracking-tighter">{liveTeachers}</p>
+                        <p className="text-[11px] md:text-xs font-bold text-blue-600 mt-2">Teachers Managed</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               <div className="space-y-3">
                 <h4 className="text-[11px] md:text-sm font-bold text-slate-400 uppercase tracking-widest">Quick Actions</h4>

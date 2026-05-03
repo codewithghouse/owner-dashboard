@@ -61,12 +61,29 @@ export default function TeacherProfile() {
 
     const load = async () => {
       try {
+        // 0. Teacher doc
         const tDoc = await getDoc(doc(db,"teachers",id));
         if (!tDoc.exists()) { setLoading(false); return; }
         const tData = {id:tDoc.id,...tDoc.data() as any};
-        setTeacher(tData);
 
-        // Scores — scoped to this owner's school
+        // 1. Branches subcollection — resolve human-readable branch name. Teacher
+        //    docs typically only store `branchId`; the name lives in branches.
+        //    Without this lookup the Branch row would render "—".
+        const bMap = new Map<string, string>();
+        try {
+          const bSnap = await getDocs(collection(db, "schools", schoolId, "branches"));
+          bSnap.docs.forEach(d => {
+            const data = d.data() as any;
+            const bid = data.branchId || d.id;
+            const bn = data.name || data.branchName || "";
+            if (bid && bn) bMap.set(bid, bn);
+          });
+        } catch { /* ignore */ }
+        const resolvedBranchName =
+          bMap.get(tData.branchId || "") || tData.branchName || tData.branch || "—";
+        setTeacher({ ...tData, branchName: resolvedBranchName });
+
+        // 2. Scores — scoped to this owner's school
         const scSnap = await getDocs(query(
           collection(db,"test_scores"),
           where("schoolId","==",schoolId),
@@ -80,75 +97,167 @@ export default function TeacherProfile() {
         const pass = pcts.length ? Math.round(pcts.filter(v=>v>=60).length/pcts.length*100) : 0;
         setPassRate(pass);
 
-        // Subject breakdown
+        // 3. Subject breakdown
         const subMap = new Map<string,number[]>();
-        scores.forEach(s => { const sub = s.subject||s.subjectName||tData.subject||"General"; const p = getPct(s); if (p>0) { if (!subMap.has(sub)) subMap.set(sub,[]); subMap.get(sub)!.push(p); }});
-        setSubjectData(Array.from(subMap.entries()).map(([n,sc])=>({name:n.slice(0,12),avg:Math.round(sc.reduce((a,b)=>a+b,0)/sc.length)})));
+        scores.forEach(s => {
+          const sub = s.subject||s.subjectName||tData.subject||"General";
+          const p = getPct(s);
+          if (p>0) { if (!subMap.has(sub)) subMap.set(sub,[]); subMap.get(sub)!.push(p); }
+        });
+        setSubjectData(Array.from(subMap.entries()).map(([n,sc])=>({
+          name:n.slice(0,12),
+          avg:Math.round(sc.reduce((a,b)=>a+b,0)/sc.length)
+        })));
 
-        // Timeline
+        // 4. Timeline — year-aware bucket key prevents Dec 2024 merging with Dec 2025
         const now = new Date();
-        const months = Array.from({length:6},(_,i)=>{const d=new Date(now.getFullYear(),now.getMonth()-5+i,1);return MONTHS[d.getMonth()];});
+        const ymKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+        const months = Array.from({length:6},(_,i)=>{
+          const d = new Date(now.getFullYear(), now.getMonth()-5+i, 1);
+          return { key: ymKey(d), label: MONTHS[d.getMonth()] };
+        });
         const byMonth = new Map<string,number[]>();
-        scores.forEach(s => { const ts = toDate(s.timestamp||s.createdAt); const p = getPct(s); if (ts&&p>0) { const mk=MONTHS[ts.getMonth()]; if(!byMonth.has(mk))byMonth.set(mk,[]); byMonth.get(mk)!.push(p); }});
-        setTimeline(months.map(m=>{const sc=byMonth.get(m);if(!sc||!sc.length)return{month:m,score:0,passRate:0};return{month:m,score:Math.round(sc.reduce((a,b)=>a+b,0)/sc.length),passRate:Math.round(sc.filter(v=>v>=60).length/sc.length*100)};}));
+        scores.forEach(s => {
+          const ts = toDate(s.timestamp||s.createdAt);
+          const p = getPct(s);
+          if (ts && p>0) {
+            const mk = ymKey(ts);
+            if (!byMonth.has(mk)) byMonth.set(mk,[]);
+            byMonth.get(mk)!.push(p);
+          }
+        });
+        setTimeline(months.map(m=>{
+          const sc=byMonth.get(m.key);
+          if(!sc||!sc.length) return {month:m.label,score:0,passRate:0};
+          return {
+            month:m.label,
+            score:Math.round(sc.reduce((a,b)=>a+b,0)/sc.length),
+            passRate:Math.round(sc.filter(v=>v>=60).length/sc.length*100),
+          };
+        }));
 
-        // Attendance
-        const attSnap = await getDocs(query(
-          collection(db,"attendance"),
+        // 5. Teacher's OWN attendance — canonical `teacher_attendance` collection.
+        //    The previous read of `attendance` was student rows (each one a student
+        //    the teacher marked) — gave students' attendance % attributed to teacher.
+        const tAttSnap = await getDocs(query(
+          collection(db,"teacher_attendance"),
           where("schoolId","==",schoolId),
           where("teacherId","==",id),
         ));
-        const attDocs = attSnap.docs.map(d=>d.data() as any);
-        const attP = attDocs.filter(d=>(d.status||"").toLowerCase()==="present").length;
-        setAttPct(attDocs.length>0?Math.round((attP/attDocs.length)*100):null);
+        const tAttDocs = tAttSnap.docs.map(d=>d.data() as any);
+        const attP = tAttDocs.filter(d=>{
+          const s=(d.status||"").toLowerCase();
+          return s==="present"||s==="late";
+        }).length;
+        const tAttTotal = tAttDocs.length;
+        const tAttPct = tAttTotal > 0 ? Math.round((attP/tAttTotal)*100) : null;
+        setAttPct(tAttPct);
 
-        // Classes
-        const clSnap = await getDocs(query(
-          collection(db,"classes"),
-          where("schoolId","==",schoolId),
-          where("teacherId","==",id),
-        ));
-        const tClasses = clSnap.docs.map(d=>({id:d.id,...d.data() as any}));
-        setClasses(tClasses);
-        if (tClasses.length>0) {
-          const cIds = tClasses.map(c=>c.id).slice(0,10);
-          const enSnap = await getDocs(query(
-            collection(db,"enrollments"),
+        // 6. Classes — union of (classes.teacherId === id) AND
+        //    (teaching_assignments has this teacher for the class). Subject teachers
+        //    (e.g. Maths assigned to 10A) live ONLY in teaching_assignments and would
+        //    be missed otherwise → "No classes assigned" + students = 0.
+        const tClasses: any[] = [];
+        const seenClassIds = new Set<string>();
+        try {
+          const clSnap = await getDocs(query(
+            collection(db,"classes"),
             where("schoolId","==",schoolId),
-            where("classId","in",cIds),
+            where("teacherId","==",id),
           ));
-          setStudentCount(enSnap.size);
+          clSnap.docs.forEach(d => {
+            seenClassIds.add(d.id);
+            tClasses.push({id:d.id, ...d.data() as any});
+          });
+        } catch { /* ignore */ }
+        const extraClassIds: string[] = [];
+        try {
+          const taSnap = await getDocs(query(
+            collection(db,"teaching_assignments"),
+            where("schoolId","==",schoolId),
+            where("teacherId","==",id),
+          ));
+          taSnap.docs.forEach(d => {
+            const a = d.data() as any;
+            if ((a.status||"active").toLowerCase() !== "active") return;
+            if (a.classId && !seenClassIds.has(a.classId)) extraClassIds.push(a.classId);
+          });
+        } catch { /* ignore */ }
+        if (extraClassIds.length > 0) {
+          /* Resolve extra classes via individual getDoc to avoid `__name__ in` quirks. */
+          const docs = await Promise.all(extraClassIds.map(cid => getDoc(doc(db,"classes",cid))));
+          docs.forEach(d => {
+            if (d.exists() && !seenClassIds.has(d.id)) {
+              seenClassIds.add(d.id);
+              tClasses.push({id:d.id, ...d.data() as any});
+            }
+          });
         }
+        setClasses(tClasses);
 
-        // vs Branch — scope to this owner's school (fixes cross-tenant leak)
+        // 7. Students taught — chunk classIds (Firestore `in` cap is 10), dedup by
+        //    studentId so a student in multiple of teacher's classes counts once
+        //    (per `bug_pattern_enrollment_row_dedup` memory rule).
+        const studentSet = new Set<string>();
+        if (tClasses.length > 0) {
+          const allClassIds = tClasses.map(c=>c.id).filter(Boolean);
+          const enrollChunks: string[][] = [];
+          for (let i=0; i<allClassIds.length; i+=10) enrollChunks.push(allClassIds.slice(i, i+10));
+          for (const chunk of enrollChunks) {
+            try {
+              const enSnap = await getDocs(query(
+                collection(db,"enrollments"),
+                where("schoolId","==",schoolId),
+                where("classId","in",chunk),
+              ));
+              enSnap.docs.forEach(d => {
+                const sid = (d.data() as any).studentId;
+                if (sid) studentSet.add(sid);
+              });
+            } catch { /* ignore */ }
+          }
+        }
+        setStudentCount(studentSet.size);
+
+        // 8. vs Branch — peers' avg score / pass rate / attendance / class count
         if (tData.branchId||tData.branch) {
           const allT = await getDocs(query(
             collection(db,"teachers"),
             where("schoolId","==",schoolId),
           ));
-          const branchTIds = allT.docs.filter(d=>{const bd=d.data() as any;return d.id!==id&&(bd.branchId===tData.branchId||bd.branch===tData.branch);}).map(d=>d.id);
+          const branchTIds = allT.docs.filter(d=>{
+            const bd = d.data() as any;
+            return d.id !== id && (bd.branchId === tData.branchId || bd.branch === tData.branch);
+          }).map(d=>d.id);
+
           const allSc = await getDocs(query(
             collection(db,"test_scores"),
             where("schoolId","==",schoolId),
           ));
-          const bScores:number[]=[];
-          allSc.docs.forEach(d=>{const data=d.data() as any;if(branchTIds.includes(data.teacherId||"")){const p=parseFloat(data.percentage??data.score??"");if(!isNaN(p))bScores.push(p);}});
-          const bAvg=bScores.length?Math.round(bScores.reduce((a,b)=>a+b,0)/bScores.length):avg;
-          const bPass=bScores.length?Math.round(bScores.filter(v=>v>=60).length/bScores.length*100):pass;
+          const bScores: number[] = [];
+          allSc.docs.forEach(d=>{
+            const data = d.data() as any;
+            if (branchTIds.includes(data.teacherId||"")) {
+              const p = parseFloat(data.percentage??data.score??"");
+              if (!isNaN(p)) bScores.push(p);
+            }
+          });
+          const bAvg = bScores.length ? Math.round(bScores.reduce((a,b)=>a+b,0)/bScores.length) : avg;
+          const bPass = bScores.length ? Math.round(bScores.filter(v=>v>=60).length/bScores.length*100) : pass;
 
-          // Real branch attendance average — aggregate attendance for other teachers in same branch
-          const tAttPct = attDocs.length > 0 ? Math.round((attP / attDocs.length) * 100) : 0;
-          let bAtt = tAttPct;
+          // Branch attendance from `teacher_attendance` (peers' OWN attendance), not
+          // from student `attendance` rows.
+          let bAtt = tAttPct ?? 0;
           let bClassCount = tClasses.length;
           if (branchTIds.length > 0) {
-            const attIdChunks: string[][] = [];
-            for (let i = 0; i < branchTIds.length; i += 10) attIdChunks.push(branchTIds.slice(i, i + 10));
+            const idChunks: string[][] = [];
+            for (let i=0; i<branchTIds.length; i+=10) idChunks.push(branchTIds.slice(i, i+10));
             let bPres = 0, bTotal = 0;
             let bClassTotal = 0;
-            for (const chunk of attIdChunks) {
+            for (const chunk of idChunks) {
               const [brAttSnap, brClSnap] = await Promise.all([
                 getDocs(query(
-                  collection(db, "attendance"),
+                  collection(db, "teacher_attendance"),
                   where("schoolId", "==", schoolId),
                   where("teacherId", "in", chunk),
                 )),
@@ -161,18 +270,19 @@ export default function TeacherProfile() {
               brAttSnap.docs.forEach(d => {
                 const data = d.data() as any;
                 bTotal++;
-                if ((data.status || "").toLowerCase() === "present") bPres++;
+                const s = (data.status||"").toLowerCase();
+                if (s==="present"||s==="late") bPres++;
               });
               bClassTotal += brClSnap.size;
             }
-            if (bTotal > 0) bAtt = Math.round((bPres / bTotal) * 100);
+            if (bTotal > 0) bAtt = Math.round((bPres/bTotal)*100);
             bClassCount = Math.round(bClassTotal / branchTIds.length);
           }
 
           setVsBranch([
             {category:"Avg Score",  teacher:avg,            branchAvg:bAvg},
             {category:"Pass Rate",  teacher:pass,           branchAvg:bPass},
-            {category:"Attendance", teacher:tAttPct,        branchAvg:bAtt},
+            {category:"Attendance", teacher:tAttPct ?? 0,   branchAvg:bAtt},
             {category:"Classes",    teacher:tClasses.length,branchAvg:Math.max(1,bClassCount)},
           ]);
         }
@@ -187,6 +297,10 @@ export default function TeacherProfile() {
 
   const initials = (teacher.name||"?").split(" ").map((n:string)=>n[0]).join("").toUpperCase().slice(0,2);
   const hasTimeline = timeline.some(t=>t.score>0);
+  const joinedDate = toDate(teacher.createdAt);
+  const joinedLabel = joinedDate
+    ? joinedDate.toLocaleDateString("en-IN", { month:"short", year:"numeric" })
+    : "—";
 
   return (
     <div style={{minHeight:"100vh",background:T.bg,fontFamily:"'Inter',-apple-system,sans-serif",padding: isMobile ? "12px 12px 40px" : "20px 24px 60px"}}>
@@ -226,9 +340,23 @@ export default function TeacherProfile() {
             <span style={{padding:"4px 12px",borderRadius:20,background:avgScore>=75?T.glBg:avgScore>=50?T.alBg:T.rlBg,color:avgScore>=75?T.grn:avgScore>=50?T.amb:T.red,fontSize:10,fontWeight:600}}>{avgScore>=75?"Excellent":avgScore>=60?"Good":avgScore>=40?"Average":"Needs Work"}</span>
           </div>
           <div style={{width:"100%",marginTop:8}}>
-            {[{l:"Email",v:teacher.email||"—"},{l:"Phone",v:teacher.phone||"—"},{l:"Classes",v:classes.length},{l:"Students",v:studentCount},{l:"Branch",v:teacher.branchName||teacher.branch||"—"}].map(r=>
+            {[
+              {l:"Subject",  v: teacher.subject || "—"},
+              {l:"Email",    v: teacher.email   || "—"},
+              {l:"Phone",    v: teacher.phone   || "—"},
+              {l:"Branch",   v: teacher.branchName || teacher.branch || "—"},
+              {l:"Classes",  v: classes.length},
+              {l:"Students", v: studentCount},
+              {l:"Joined",   v: joinedLabel},
+            ].map(r=>
               <div key={r.l} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid ${T.s2}`,fontSize:11}}>
                 <span style={{color:T.ink3}}>{r.l}</span><span style={{color:T.ink,fontWeight:500,maxWidth:140,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.v}</span>
+              </div>
+            )}
+            {teacher.rating != null && Number(teacher.rating) > 0 && (
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",fontSize:11}}>
+                <span style={{color:T.ink3}}>Rating</span>
+                <StarRow rating={Number(teacher.rating)}/>
               </div>
             )}
           </div>

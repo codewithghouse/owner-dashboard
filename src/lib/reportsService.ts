@@ -9,7 +9,17 @@ import {
   doc, query, where, serverTimestamp, Timestamp,
   orderBy, limit,
 } from "firebase/firestore";
-import { loadCoreSnapshot, invalidateCache } from "./analyticsService";
+import { loadCoreSnapshot, invalidateCache, PASS_THRESHOLD_PERCENT } from "./analyticsService";
+
+/* Helper to scope a root-collection fetch to the current school. EVERY
+   getDocs in this file MUST go through this — without the schoolId filter,
+   Owner sees students/teachers/results/fees from EVERY school in the
+   database (depends on Firestore rules to block, which is too brittle for
+   a privacy-critical surface like Reports). */
+function scopedDocs(collName: string, uid: string) {
+  return getDocs(query(collection(db, collName), where("schoolId", "==", uid)))
+    .catch(() => ({ docs: [] as any[], size: 0 }));
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -224,9 +234,13 @@ export type AnyReportData =
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function genId(): string {
+  /* Collision-resistant report id: year + millis + 4 random digits. Was
+     `Math.random() * 9000` (4 digits) — at high call rate the birthday
+     paradox makes collisions quick (~75 reports for >50% chance). */
   const yr = new Date().getFullYear();
-  const n = Math.floor(Math.random() * 9000) + 1000;
-  return `RPT-${yr}-${n}`;
+  const ts = Date.now().toString(36).slice(-5).toUpperCase();
+  const rand = Math.floor(Math.random() * 9000) + 1000;
+  return `RPT-${yr}-${ts}-${rand}`;
 }
 
 function today(): string {
@@ -247,12 +261,12 @@ export async function fetchReportsDashboard(): Promise<ReportsDashboardData> {
   const uid = auth.currentUser?.uid;
   if (!uid) throw new Error("Not authenticated");
 
-  // Count generated reports, scheduled, downloads, favorites from Firestore
+  // Count generated reports, scheduled, downloads, favorites from Firestore — all scoped
   const [reportsSnap, scheduledSnap, downloadsSnap, favoritesSnap] = await Promise.all([
-    getDocs(collection(db, "reports")).catch(() => ({ docs: [] as any[], size: 0 })),
-    getDocs(collection(db, "scheduled_reports")).catch(() => ({ docs: [] as any[], size: 0 })),
-    getDocs(collection(db, "report_downloads")).catch(() => ({ docs: [] as any[], size: 0 })),
-    getDocs(collection(db, "report_favorites")).catch(() => ({ docs: [] as any[], size: 0 })),
+    scopedDocs("reports",          uid),
+    scopedDocs("scheduled_reports", uid),
+    scopedDocs("report_downloads",  uid),
+    scopedDocs("report_favorites",  uid),
   ]);
 
   // Count recent downloads (last 7 days)
@@ -287,28 +301,15 @@ export async function fetchReportsDashboard(): Promise<ReportsDashboardData> {
       recentDownloads: recentDls,
       favorites: (favoritesSnap.docs as any[]).filter(d => d.data().uid === uid).length,
     },
-    scheduledReports: scheduled.length > 0 ? scheduled : getDefaultScheduled(),
+    /* Honest empty state when nothing is scheduled. Previously
+       getDefaultScheduled() returned 3 fabricated rows ("Weekly Executive
+       Summary", "Monthly Financial Report", "Quarterly Academic Review")
+       with hardcoded recipient counts of 3/5/8 — the Owner saw phantom
+       schedules they never set up, leading to "I already scheduled X" type
+       confusion. Now: empty array so the UI shows its real "No scheduled
+       reports yet" empty state from line 711-713 in ReportsCenter.tsx. */
+    scheduledReports: scheduled,
   };
-}
-
-function getDefaultScheduled(): ScheduledReport[] {
-  const now = new Date();
-  // Next Monday
-  const nextMon = new Date(now);
-  nextMon.setDate(now.getDate() + ((1 + 7 - now.getDay()) % 7 || 7));
-  // Next 1st of month
-  const nextFirst = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  // Next quarter end
-  const qm = Math.ceil((now.getMonth() + 1) / 3) * 3;
-  const nextQ = new Date(now.getFullYear(), qm, 0);
-
-  const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-
-  return [
-    { id: "s1", name: "Weekly Executive Summary", frequency: "Every Monday", nextRun: fmt(nextMon), recipients: 3, status: "Active" },
-    { id: "s2", name: "Monthly Financial Report", frequency: "1st of Month", nextRun: fmt(nextFirst), recipients: 5, status: "Active" },
-    { id: "s3", name: "Quarterly Academic Review", frequency: "Quarterly", nextRun: fmt(nextQ), recipients: 8, status: "Active" },
-  ];
 }
 
 // ── Enrollment Summary ────────────────────────────────────────────────────────
@@ -323,7 +324,7 @@ export async function fetchEnrollmentReport(): Promise<EnrollmentReportData> {
   const totalEnrollment = Array.from(snap.branchStudents.values()).reduce((s, set) => s + set.size, 0);
 
   // Students collection for admission/withdrawal dates
-  const studentsSnap = await getDocs(collection(db, "students")).catch(() => ({ docs: [] as any[] }));
+  const studentsSnap = await scopedDocs("students", uid);
   const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
 
   let newAdmissions = 0;
@@ -367,14 +368,17 @@ export async function fetchEnrollmentReport(): Promise<EnrollmentReportData> {
     });
   }
 
-  // Enrollment trend (yearly approximation)
+  /* Enrollment trend — only show what we actually have data for.
+     Previously this fabricated 4 prior years by shrinking the current count
+     by `1 - (4 - i) * 0.06` per year — pure fiction presented as historical
+     data. Owner makes growth decisions based on a fake curve.
+     Real solution would need a per-year admission_log collection; until that
+     exists we just show the current year alone (chart still renders, with a
+     single point or one bar). */
   const currentYear = new Date().getFullYear();
-  const enrollmentTrend = Array.from({ length: 5 }, (_, i) => {
-    const yr = currentYear - 4 + i;
-    // Approximate past enrollment by shrinking current count
-    const factor = 1 - (4 - i) * 0.06;
-    return { year: String(yr), enrollment: yr === currentYear ? totalEnrollment : Math.round(totalEnrollment * factor) };
-  });
+  const enrollmentTrend = totalEnrollment > 0
+    ? [{ year: String(currentYear), enrollment: totalEnrollment }]
+    : [];
 
   const netGrowth = newAdmissions - withdrawals;
   const growthPct = totalEnrollment > 0 ? ((netGrowth / totalEnrollment) * 100).toFixed(1) : "0";
@@ -428,15 +432,25 @@ export async function fetchAttendanceReport(): Promise<AttendanceReportData> {
     if (sa.total >= 5 && (sa.present / sa.total) < 0.75) chronicAbsent++;
   });
 
-  // Last day approximation  
-  const todayStr = new Date().toLocaleDateString("en-CA");
+  /* Today's attendance — read raw attendance docs and filter by exact date.
+     Previously this used `ym = todayStr.slice(0, 7)` which sliced down to
+     the year-month — so "Present Today" actually counted the WHOLE month's
+     records. Now we fetch attendance scoped to schoolId and filter to the
+     exact YYYY-MM-DD string. */
+  const todayStr = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD
+  const todayAttSnap = await scopedDocs("attendance", uid);
   let presentToday = 0, totalToday = 0;
-  snap.branchMonthAtt.forEach(mMap => {
-    const ym = todayStr.slice(0, 7);
-    const m = mMap.get(ym);
-    if (m) { totalToday += m.total; presentToday += m.present; }
+  (todayAttSnap.docs as any[]).forEach(d => {
+    const a = d.data();
+    let dateStr: string = a.date || a.dateStr || "";
+    if (!dateStr && a.createdAt?.toDate) {
+      try { dateStr = a.createdAt.toDate().toLocaleDateString("en-CA"); } catch { /* skip */ }
+    }
+    if (dateStr !== todayStr) return;
+    totalToday++;
+    if ((a.status ?? "").toString().toLowerCase() === "present") presentToday++;
   });
-  const absentToday = totalToday - presentToday;
+  const absentToday = Math.max(0, totalToday - presentToday);
 
   // Monthly trend
   const monthlyTrend = snap.months.map(m => {
@@ -477,9 +491,9 @@ export async function fetchPerformanceReport(): Promise<PerformanceReportData> {
   const uid = auth.currentUser?.uid;
   if (!uid) throw new Error("Not authenticated");
 
-  const resultsSnap = await getDocs(collection(db, "results")).catch(() => ({ docs: [] as any[] }));
-  const scoresSnap = await getDocs(collection(db, "test_scores")).catch(() => ({ docs: [] as any[] }));
-  const teachersSnap = await getDocs(collection(db, "teachers")).catch(() => ({ docs: [] as any[] }));
+  const resultsSnap = await scopedDocs("results", uid);
+  const scoresSnap = await scopedDocs("test_scores", uid);
+  const teachersSnap = await scopedDocs("teachers", uid);
 
   const teacherMap = new Map<string, string>();
   (teachersSnap.docs as any[]).forEach(d => {
@@ -489,12 +503,16 @@ export async function fetchPerformanceReport(): Promise<PerformanceReportData> {
 
   const scores: number[] = [];
   const subjScores = new Map<string, number[]>();
+  /* Dedup key includes the collection name, NOT just doc.id. Two distinct
+     collections (`results` vs `test_scores`) can technically share an id
+     value — using bare doc.id would silently drop the second occurrence. */
   const seen = new Set<string>();
 
-  const process = (docs: any[]) => {
+  const process = (docs: any[], collKey: string) => {
     docs.forEach(d => {
-      if (seen.has(d.id)) return;
-      seen.add(d.id);
+      const key = `${collKey}/${d.id}`;
+      if (seen.has(key)) return;
+      seen.add(key);
       const r = d.data();
       let pct: number | null = null;
       if (typeof r.percentage === "number" && r.percentage > 0) pct = Math.round(r.percentage);
@@ -518,14 +536,18 @@ export async function fetchPerformanceReport(): Promise<PerformanceReportData> {
     });
   };
 
-  process(resultsSnap.docs as any[]);
-  process(scoresSnap.docs as any[]);
+  process(resultsSnap.docs as any[], "results");
+  process(scoresSnap.docs as any[],  "test_scores");
 
   const n = scores.length || 1;
   const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / n) : 0;
-  const passRate = Math.round(scores.filter(s => s >= 40).length / n * 100);
+  /* Use the canonical PASS_THRESHOLD_PERCENT constant — was hardcoded at 40
+     here, while analyticsService (and the cloud aggregator) uses 50. The
+     drift made the same dataset show different pass rates between this
+     report and BranchesComparison, eroding Owner trust. */
+  const passRate = Math.round(scores.filter(s => s >= PASS_THRESHOLD_PERCENT).length / n * 100);
   const distinctionRate = Math.round(scores.filter(s => s >= 80).length / n * 100);
-  const failRate = Math.round(scores.filter(s => s < 40).length / n * 100);
+  const failRate = Math.round(scores.filter(s => s < PASS_THRESHOLD_PERCENT).length / n * 100);
 
   const subjectScores = Array.from(subjScores.entries())
     .map(([subject, vals]) => ({
@@ -623,8 +645,8 @@ export async function fetchTeacherPerfReport(): Promise<TeacherPerfReportData> {
   invalidateCache(`core:${uid}`);
   const snap = await loadCoreSnapshot(uid);
 
-  const teachersSnap = await getDocs(collection(db, "teachers")).catch(() => ({ docs: [] as any[] }));
-  const resultsSnap = await getDocs(collection(db, "results")).catch(() => ({ docs: [] as any[] }));
+  const teachersSnap = await scopedDocs("teachers", uid);
+  const resultsSnap = await scopedDocs("results", uid);
 
   // Build teacher → scores
   const teacherScores = new Map<string, number[]>();
@@ -720,7 +742,7 @@ export async function fetchRevenueReport(): Promise<RevenueSummaryData> {
   const collectionRate = totalRevenue > 0 ? Math.round((totalCollected / totalRevenue) * 100) : 0;
 
   // Monthly revenue trend from fees
-  const feesSnap = await getDocs(collection(db, "fees")).catch(() => ({ docs: [] as any[] }));
+  const feesSnap = await scopedDocs("fees", uid);
   const monthMap = new Map<string, number>();
   snap.months.forEach(m => monthMap.set(m.key, 0));
 
@@ -739,7 +761,7 @@ export async function fetchRevenueReport(): Promise<RevenueSummaryData> {
     amount: monthMap.get(m.key) || 0,
   }));
 
-  const summary = `Total revenue stands at $${totalRevenue.toLocaleString()} with $${totalCollected.toLocaleString()} collected (${collectionRate}% collection rate). Outstanding amount is $${outstanding.toLocaleString()}.${byBranch.filter(b => b.total > 0).length > 0 ? ` ${byBranch.sort((a, b) => b.collected - a.collected)[0]?.branch} leads in revenue collection.` : ""}`;
+  const summary = `Total revenue stands at ₹${totalRevenue.toLocaleString("en-IN")} with ₹${totalCollected.toLocaleString("en-IN")} collected (${collectionRate}% collection rate). Outstanding amount is ₹${outstanding.toLocaleString("en-IN")}.${byBranch.filter(b => b.total > 0).length > 0 ? ` ${byBranch.sort((a, b) => b.collected - a.collected)[0]?.branch} leads in revenue collection.` : ""}`;
 
   return {
     _type: "revenue",
@@ -783,7 +805,7 @@ export async function fetchFeeCollectionReport(): Promise<FeeCollectionData> {
   });
 
   // Payment modes from fees collection
-  const feesSnap = await getDocs(collection(db, "fees")).catch(() => ({ docs: [] as any[] }));
+  const feesSnap = await scopedDocs("fees", uid);
   const modeMap = new Map<string, number>();
   (feesSnap.docs as any[]).forEach(d => {
     const f = d.data();
@@ -798,7 +820,7 @@ export async function fetchFeeCollectionReport(): Promise<FeeCollectionData> {
     pct: Math.round((count / totalModeCount) * 100),
   })).sort((a, b) => b.count - a.count);
 
-  const summary = `Total fees billed: $${totalBilled.toLocaleString()}. Collected: $${totalPaid.toLocaleString()} (${collectionPct}%). Pending: $${pendingAmount.toLocaleString()}.${byBranch.filter(b => b.pct > 0).length > 0 ? ` ${byBranch.sort((a, b) => b.pct - a.pct)[0]?.branch} has the best collection rate at ${byBranch[0]?.pct}%.` : ""}`;
+  const summary = `Total fees billed: ₹${totalBilled.toLocaleString("en-IN")}. Collected: ₹${totalPaid.toLocaleString("en-IN")} (${collectionPct}%). Pending: ₹${pendingAmount.toLocaleString("en-IN")}.${byBranch.filter(b => b.pct > 0).length > 0 ? ` ${byBranch.sort((a, b) => b.pct - a.pct)[0]?.branch} has the best collection rate at ${byBranch[0]?.pct}%.` : ""}`;
 
   return {
     _type: "fee-collection",
@@ -821,9 +843,9 @@ export async function fetchWorkloadReport(): Promise<WorkloadReportData> {
   if (!uid) throw new Error("Not authenticated");
 
   const [teachersSnap, classesSnap, assignSnap] = await Promise.all([
-    getDocs(collection(db, "teachers")).catch(() => ({ docs: [] as any[] })),
-    getDocs(collection(db, "classes")).catch(() => ({ docs: [] as any[] })),
-    getDocs(collection(db, "teaching_assignments")).catch(() => ({ docs: [] as any[] })),
+    scopedDocs("teachers", uid),
+    scopedDocs("classes", uid),
+    scopedDocs("teaching_assignments", uid),
   ]);
 
   // Map teacherId → { classes, subjects, branch, name }
@@ -895,9 +917,9 @@ export async function fetchFeedbackReport(): Promise<FeedbackReportData> {
   const snap = await loadCoreSnapshot(uid);
 
   const [notesSnap, commSnap, meetingsSnap] = await Promise.all([
-    getDocs(collection(db, "parent_notes")).catch(() => ({ docs: [] as any[] })),
-    getDocs(collection(db, "communications")).catch(() => ({ docs: [] as any[] })),
-    getDocs(collection(db, "meetings")).catch(() => ({ docs: [] as any[] })),
+    scopedDocs("parent_notes", uid),
+    scopedDocs("communications", uid),
+    scopedDocs("meetings", uid),
   ]);
 
   const allItems: { author: string; message: string; date: string; type: string; rating?: number; branchId?: string }[] = [];
@@ -955,9 +977,9 @@ export async function fetchTrainingNeedsReport(): Promise<TrainingNeedsData> {
   if (!uid) throw new Error("Not authenticated");
 
   const [teachersSnap, scoresSnap, resultsSnap] = await Promise.all([
-    getDocs(collection(db, "teachers")).catch(() => ({ docs: [] as any[] })),
-    getDocs(collection(db, "test_scores")).catch(() => ({ docs: [] as any[] })),
-    getDocs(collection(db, "results")).catch(() => ({ docs: [] as any[] })),
+    scopedDocs("teachers", uid),
+    scopedDocs("test_scores", uid),
+    scopedDocs("results", uid),
   ]);
 
   // Build teacher info map
@@ -1035,7 +1057,7 @@ export async function fetchOutstandingReport(): Promise<OutstandingReportData> {
   invalidateCache(`core:${uid}`);
   const snap = await loadCoreSnapshot(uid);
 
-  const feesSnap = await getDocs(collection(db, "fees")).catch(() => ({ docs: [] as any[] }));
+  const feesSnap = await scopedDocs("fees", uid);
   const now = Date.now();
   const DAY = 24 * 60 * 60 * 1000;
 
@@ -1080,7 +1102,7 @@ export async function fetchOutstandingReport(): Promise<OutstandingReportData> {
     .map(b => ({ branch: b.name, ...branchCount.get(b.id)! }))
     .filter(b => b.count > 0);
 
-  const summary = `${totalDefaulters} outstanding fee record${totalDefaulters !== 1 ? "s" : ""} totaling $${amountOutstanding.toLocaleString()}. ${above30} overdue by 30+ days ($${amount30.toLocaleString()}), ${above60} overdue by 60+ days ($${amount60.toLocaleString()}), ${above90} overdue by 90+ days ($${amount90.toLocaleString()}). ${byBranch[0] ? `${byBranch.sort((a, b) => b.amount - a.amount)[0]?.branch} has the highest outstanding amount.` : ""}`;
+  const summary = `${totalDefaulters} outstanding fee record${totalDefaulters !== 1 ? "s" : ""} totaling ₹${amountOutstanding.toLocaleString("en-IN")}. ${above30} overdue by 30+ days (₹${amount30.toLocaleString("en-IN")}), ${above60} overdue by 60+ days (₹${amount60.toLocaleString("en-IN")}), ${above90} overdue by 90+ days (₹${amount90.toLocaleString("en-IN")}). ${byBranch[0] ? `${byBranch.sort((a, b) => b.amount - a.amount)[0]?.branch} has the highest outstanding amount.` : ""}`;
 
   return { _type: "outstanding", id: genId(), generatedOn: today(), totalDefaulters, above30Days: above30, above60Days: above60, above90Days: above90, amountOutstanding, amount30, amount60, amount90, byBranch, summary } as any;
 }
@@ -1095,50 +1117,29 @@ export async function fetchExpenseReport(): Promise<ExpenseReportData> {
   const snap = await loadCoreSnapshot(uid);
 
   // Try expenses collection first, fallback to fee gap analysis
-  const expSnap = await getDocs(collection(db, "expenses")).catch(() => ({ docs: [] as any[] }));
+  const expSnap = await scopedDocs("expenses", uid);
   const monthMap = new Map<string, number>();
   snap.months.forEach(m => monthMap.set(m.key, 0));
   const categoryMap = new Map<string, number>();
 
-  if ((expSnap.docs as any[]).length > 0) {
-    // Real expenses collection exists
-    (expSnap.docs as any[]).forEach(d => {
-      const e = d.data();
-      const amount = Number(e.amount || e.totalAmount || 0);
-      if (amount <= 0) return;
-      const cat = e.category || e.type || e.expenseType || "Other";
-      const normCat = cat.charAt(0).toUpperCase() + cat.slice(1);
-      categoryMap.set(normCat, (categoryMap.get(normCat) || 0) + amount);
+  /* Only use real expense docs. Previously when the `expenses` collection
+     was empty we fabricated a 55/20/15/10% split (Salaries/Ops/Infra/Misc)
+     from fee revenue — pure fiction. The chart looked identical to real
+     data and the Owner couldn't tell. Now: honest empty state. */
+  (expSnap.docs as any[]).forEach(d => {
+    const e = d.data();
+    const amount = Number(e.amount || e.totalAmount || 0);
+    if (amount <= 0) return;
+    const cat = e.category || e.type || e.expenseType || "Other";
+    const normCat = cat.charAt(0).toUpperCase() + cat.slice(1);
+    categoryMap.set(normCat, (categoryMap.get(normCat) || 0) + amount);
 
-      let dateStr = "";
-      if (e.date?.toDate) try { dateStr = e.date.toDate().toLocaleDateString("en-CA"); } catch {}
-      else if (e.createdAt?.toDate) try { dateStr = e.createdAt.toDate().toLocaleDateString("en-CA"); } catch {}
-      const ym = dateStr.slice(0, 7);
-      if (monthMap.has(ym)) monthMap.set(ym, (monthMap.get(ym) || 0) + amount);
-    });
-  } else {
-    // Fallback: derive from fees — uncollected = operational gap
-    const feesSnap = await getDocs(collection(db, "fees")).catch(() => ({ docs: [] as any[] }));
-    let salaryEst = 0, opsEst = 0, infraEst = 0, miscEst = 0;
-    (feesSnap.docs as any[]).forEach(d => {
-      const f = d.data();
-      const total = Number(f.amount || f.totalAmount || 0);
-      salaryEst += total * 0.55;
-      opsEst    += total * 0.20;
-      infraEst  += total * 0.15;
-      miscEst   += total * 0.10;
-      let dateStr = "";
-      if (f.createdAt?.toDate) try { dateStr = f.createdAt.toDate().toLocaleDateString("en-CA"); } catch {}
-      const ym = dateStr.slice(0, 7);
-      if (monthMap.has(ym)) monthMap.set(ym, (monthMap.get(ym) || 0) + total * 0.9);
-    });
-    if (salaryEst > 0) {
-      categoryMap.set("Staff Salaries",    Math.round(salaryEst));
-      categoryMap.set("Operations",        Math.round(opsEst));
-      categoryMap.set("Infrastructure",    Math.round(infraEst));
-      categoryMap.set("Miscellaneous",     Math.round(miscEst));
-    }
-  }
+    let dateStr = "";
+    if (e.date?.toDate) try { dateStr = e.date.toDate().toLocaleDateString("en-CA"); } catch {}
+    else if (e.createdAt?.toDate) try { dateStr = e.createdAt.toDate().toLocaleDateString("en-CA"); } catch {}
+    const ym = dateStr.slice(0, 7);
+    if (monthMap.has(ym)) monthMap.set(ym, (monthMap.get(ym) || 0) + amount);
+  });
 
   const totalExpenses = Array.from(categoryMap.values()).reduce((a, b) => a + b, 0);
   const byCategory = Array.from(categoryMap.entries())
@@ -1152,8 +1153,10 @@ export async function fetchExpenseReport(): Promise<ExpenseReportData> {
   const monthlyTrend = snap.months.map(m => ({ month: m.label, amount: Math.round(monthMap.get(m.key) || 0) }));
   const largestCategory = byCategory[0]?.category || "—";
 
-  const hasRealData = (expSnap.docs as any[]).length > 0;
-  const summary = `${hasRealData ? "Expense analysis" : "Estimated expense breakdown"} totaling $${totalExpenses.toLocaleString()}. ${largestCategory !== "—" ? `${largestCategory} is the largest expense category at ${byCategory[0]?.pct}% of total.` : ""} ${!hasRealData ? "Note: Add an 'expenses' collection in Firestore for exact tracking." : ""}`;
+  const hasRealData = totalExpenses > 0;
+  const summary = hasRealData
+    ? `Expense analysis totaling ₹${totalExpenses.toLocaleString("en-IN")}. ${largestCategory !== "—" ? `${largestCategory} is the largest expense category at ${byCategory[0]?.pct}% of total.` : ""}`
+    : "No expense data recorded yet. Add entries to the `expenses` Firestore collection (with `schoolId`, `amount`, `category`, `date`) to see this report populate.";
 
   return { _type: "expense", id: genId(), generatedOn: today(), totalExpenses, byCategory, monthlyTrend, largestCategory, summary } as any;
 }
@@ -1164,8 +1167,13 @@ export async function logReportDownload(reportType: string, format: string): Pro
   const uid = auth.currentUser?.uid;
   if (!uid) return;
   try {
+    /* schoolId on the write so the scoped read in fetchReportsDashboard can
+       find it. Without this the where("schoolId", "==", uid) filter would
+       silently exclude every download we just logged → "Recent Downloads"
+       always shows 0 even when active. */
     await addDoc(collection(db, "report_downloads"), {
       uid,
+      schoolId: uid,
       reportType,
       format,
       createdAt: serverTimestamp(),
@@ -1186,7 +1194,12 @@ export async function toggleFavorite(reportSlug: string): Promise<boolean> {
     );
     const snap = await getDocs(q2);
     if (snap.empty) {
-      await addDoc(collection(db, "report_favorites"), { uid, reportSlug, createdAt: serverTimestamp() });
+      await addDoc(collection(db, "report_favorites"), {
+        uid,
+        schoolId: uid, // mirror — keeps the scoped dashboard read consistent
+        reportSlug,
+        createdAt: serverTimestamp(),
+      });
       return true;
     } else {
       await deleteDoc(doc(db, "report_favorites", snap.docs[0].id));
@@ -1223,5 +1236,11 @@ export const REPORT_CATEGORIES = {
 };
 
 export function getReportSlug(label: string): string {
-  return label.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  return label
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")    // collapse repeated dashes ("at-risk---students" → "at-risk-students")
+    .replace(/^-|-$/g, ""); // strip leading/trailing dashes
 }

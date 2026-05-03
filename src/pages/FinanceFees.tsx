@@ -46,6 +46,55 @@ function calcDefaultRisk(daysOverdue: number, prevLateCount: number, totalDue: n
   return             { score, level: "Low",    color: "text-green-600", bg: "bg-green-50" };
 }
 
+/**
+ * Normalise a class label so the same conceptual class matches across
+ * data sources written by different humans. Excel-uploaded fee structures
+ * use friendly labels ("Nursery", "Class 1", "Class 10"); teacher-written
+ * enrollments use whatever the writer typed ("Grade 1", "1st", "1", "I").
+ * Without normalisation the className lookup at fee_structure × enrollment
+ * cross-join silently misses every match.
+ *
+ * Strategy: lowercase, strip "class "/"grade "/leading "g", collapse
+ * whitespace. Roman numerals up to XII handled. Returns "" if nothing
+ * useful can be extracted.
+ */
+function normalizeClassLabel(raw: string): string {
+  if (!raw) return "";
+  // Lowercase + collapse whitespace + strip the optional "class"/"grade"/
+  // "std" prefix. We KEEP everything after the digit/section so streams
+  // like "Class 11 Science" and "Class 11 Commerce" stay distinct keys
+  // ("class 11 science" vs "class 11 commerce") instead of collapsing to
+  // a single "class 11" — that earlier bug merged Science + Commerce
+  // sheets into one card.
+  let s = String(raw).trim().toLowerCase().replace(/\s+/g, " ");
+  if (!s) return "";
+  s = s.replace(/^(class|grade|gr|standard|std)\s+/, "");
+
+  // "10b" → digit 10, suffix "b". "10 science" → digit 10, rest "science".
+  // "10a science" → digit 10, suffix "a", rest "science".
+  const numMatch = s.match(/^(\d{1,2})([a-z]*)\s*(.*)$/);
+  if (numMatch) {
+    const num    = numMatch[1];
+    const suffix = numMatch[2];                       // section letter directly attached
+    const rest   = numMatch[3].trim();                // stream / further qualifier
+    const tail   = [suffix, rest].filter(Boolean).join(" ").trim();
+    return tail ? `class ${num} ${tail}` : `class ${num}`;
+  }
+
+  // Roman numerals I-XII (with optional trailing words preserved).
+  const roman: Record<string, string> = {
+    i: "1", ii: "2", iii: "3", iv: "4", v: "5", vi: "6", vii: "7",
+    viii: "8", ix: "9", x: "10", xi: "11", xii: "12",
+  };
+  const firstTok = s.split(/\s+/)[0];
+  if (roman[firstTok]) {
+    const tail = s.replace(new RegExp(`^${firstTok}\\s*`), "").trim();
+    return tail ? `class ${roman[firstTok]} ${tail}` : `class ${roman[firstTok]}`;
+  }
+
+  return s; // "nursery", "lkg", "ukg", "pre-k" — match by literal string
+}
+
 /* ── types ──────────────────────────────────────────────── */
 interface StudentFeeRow {
   className: string; rollNo: string; studentName: string;
@@ -55,10 +104,58 @@ interface StudentFeeRow {
 interface FeeStructureDoc {
   id: string; schoolId: string; branchId: string; branchName?: string;
   mode?: "class" | "student"; termTypes: string[];
-  rows: { className: string; amounts: Record<string, number> }[];
+  // Class-level rows. `paid` / `pending` are optional aggregates (when
+  // Principal's class-summary upload included those columns alongside
+  // term rates) — used by /finance Path B to show real collection
+  // numbers without per-student data.
+  rows: { className: string; amounts: Record<string, number>; paid?: number; pending?: number }[];
   studentRows?: StudentFeeRow[];
   academicYear?: string; isActive: boolean;
 }
+
+// Per-class roll-up shown in the "Class Fee Breakdown" grid. One row per
+// (branch, class) pairing, derived from fee_structure rates × enrollments
+// × defaulter list. Drives both the visualisation AND the click-to-filter
+// interaction on the defaulter list below the grid.
+type ClassBreakdownRow = {
+  branchId: string;
+  branchName: string;
+  className: string;             // display name (from Excel upload)
+  classKey:  string;             // normalised key for filter matching
+  expectedPerStudent: number;    // sum of all term amounts for this class
+  enrolledCount: number;
+  pendingCount: number;
+  paidCount: number;
+  totalExpected: number;
+  outstanding: number;
+  collectionRate: number;        // 0-100
+  // Source mode — drives card rendering.
+  //   "student"        → Path A (multi-sheet upload, enrolled/pending counts are student counts)
+  //   "class-aggregate"→ Path B with class-row Paid/Pending columns (totals only, no head count)
+  //   "rate-only"      → Path B mirror (no Paid/Pending uploaded yet — show rate, hint to add)
+  mode: "student" | "class-aggregate" | "rate-only";
+};
+
+// Full student row from `fee_structure.studentRows` — includes BOTH paid
+// and pending students so the "Class Roster" view can show the entire
+// class breakdown when a class card is clicked. Defaulter list (above)
+// still filters to pending-only; this is the complete roster.
+type ClassStudent = {
+  sid: string;
+  branchId: string;
+  branchName: string;
+  className: string;
+  classKey: string;
+  rollNo: string;
+  name: string;
+  expectedTotal: number;
+  paid: number;
+  pending: number;
+  discount: number;
+  parentPhone?: string;
+  parentName?: string;
+  status: "Paid" | "Partial" | "Pending";
+};
 
 type Defaulter = {
   sid: string;
@@ -72,7 +169,11 @@ type Defaulter = {
   prevLateCount: number;
   risk: ReturnType<typeof calcDefaultRisk>;
   feePlan: string;
-  source: "fees" | "fee_structure";
+  // "fees"               — derived from individual `fees` payment records
+  // "fee_structure"      — derived from `fee_structure.studentRows` (per-student upload)
+  // "fee_structure_class"— derived from `fee_structure.rows` × enrollments cross-join
+  //                        (Principal uploaded class-level template only; no per-student rows)
+  source: "fees" | "fee_structure" | "fee_structure_class";
   parentPhone?: string;
   parentName?: string;
 };
@@ -85,11 +186,16 @@ export default function FinanceFees() {
   const [loading,   setLoading]   = useState(true);
   const [search,    setSearch]    = useState("");
   const [branchFilter, setBranchFilter] = useState<string>("All");
+  // Click-to-filter from the Class Fee Breakdown grid. Stores the
+  // normalised class key so "10B" / "Class 10" / "Grade 10" all match.
+  const [selectedClassKey, setSelectedClassKey] = useState<string>("All");
 
   // Raw data
-  const [allDefaulters, setAllDefaulters] = useState<Defaulter[]>([]);
-  const [allFees,       setAllFees]       = useState<any[]>([]);
-  const [branchNames,   setBranchNames]   = useState<string[]>([]);
+  const [allDefaulters,      setAllDefaulters]      = useState<Defaulter[]>([]);
+  const [allFees,            setAllFees]            = useState<any[]>([]);
+  const [branchNames,        setBranchNames]        = useState<string[]>([]);
+  const [allClassBreakdown,  setAllClassBreakdown]  = useState<ClassBreakdownRow[]>([]);
+  const [allClassStudents,   setAllClassStudents]   = useState<ClassStudent[]>([]);
 
   // Predictive recovery
   const [feePredictions, setFeePredictions] = useState<FeePrediction[]>([]);
@@ -103,18 +209,47 @@ export default function FinanceFees() {
 
     const fetchAll = async () => {
       try {
-        /* 1. Branches (scoped under this owner) */
-        const bMap = new Map<string, string>();
+        /* 1. Branches (scoped under this owner).
+              `bMap` is name-keyed for the existing UI dropdown.
+              `branchAlias` is the canonical-resolution map: every ID/slug/
+              name a branch could possibly be referenced by points back to
+              the same canonical branch ID. Different writers use different
+              keys (Principal writes `userData.branchId`, Teacher writes
+              their own ID, doc id might be a slug…) so a strict equality
+              join fails silently. The alias map is built once here and
+              reused everywhere we need to match a stored branchId
+              against this owner's branches. */
+        const bMap = new Map<string, string>();          // canonicalBranchId → branchName
+        const branchAlias = new Map<string, string>();   // any-id → canonical branchId
+        const branchNameById = new Map<string, string>();// canonicalId → branchName
         const bSnap = await getDocs(collection(db, "schools", uid, "branches"));
         bSnap.docs.forEach(d => {
           const data = d.data() as any;
-          const bid  = data.branchId || d.id;
-          const bn   = data.name || data.branchName || "";
-          if (bid && bn) bMap.set(bid, bn);
+          const canonical = (data.branchId || d.id) as string;
+          const name = (data.name || data.branchName || "") as string;
+          if (canonical && name) bMap.set(canonical, name);
+          branchNameById.set(canonical, name || canonical);
+          // Every identifier we might encounter resolves to canonical.
+          [d.id, data.branchId, data.schoolId, data.uid, name, data.branchName]
+            .filter(Boolean)
+            .forEach((v: string) => branchAlias.set(v, canonical));
         });
-        setBranchNames([...bMap.values()].sort());
+        const resolveCanonicalBranch = (rawId?: string, rawName?: string): string => {
+          if (rawId && branchAlias.has(rawId))     return branchAlias.get(rawId)!;
+          if (rawName && branchAlias.has(rawName)) return branchAlias.get(rawName)!;
+          return rawId || "";
+        };
+        setBranchNames([...new Set(branchNameById.values())].filter(Boolean).sort());
 
-        /* 2. Fees collection (individual payment records) + fee_structure (uploaded plans) */
+        /* 2. Single source of truth for the Finance view — `fee_structure`.
+              Whatever Principal uploaded (and what the Owner /fee-structure
+              page already displays) feeds this page directly. We also
+              fetch the legacy `fees` collection so individual transaction
+              records (when used) still flow through, but it's NOT required
+              — `fee_structure.studentRows` carries the truthful paid /
+              pending per student. The earlier enrollment cross-join was
+              over-engineered noise that introduced mismatches between
+              what Owner saw on the two pages. */
         const [feesSnap, fsSnap] = await Promise.all([
           getDocs(query(collection(db, "fees"),          where("schoolId", "==", uid))),
           getDocs(query(collection(db, "fee_structure"), where("schoolId", "==", uid), where("isActive", "==", true))),
@@ -122,20 +257,22 @@ export default function FinanceFees() {
 
         const fees = feesSnap.docs.map(d => {
           const data = d.data() as any;
+          const canonical = resolveCanonicalBranch(data.branchId, data.branchName);
           return {
             id: d.id,
             ...data,
-            branchName: data.branchName || bMap.get(data.branchId) || "Unknown",
+            branchName: data.branchName || bMap.get(canonical) || branchNameById.get(canonical) || "Unknown",
           };
         });
         setAllFees(fees);
 
         const structures: FeeStructureDoc[] = fsSnap.docs.map(d => {
           const data = d.data() as any;
+          const canonical = resolveCanonicalBranch(data.branchId, data.branchName);
           return {
             id: d.id,
             ...data,
-            branchName: data.branchName || bMap.get(data.branchId) || "Unknown",
+            branchName: data.branchName || bMap.get(canonical) || branchNameById.get(canonical) || "Unknown",
           };
         });
 
@@ -191,18 +328,56 @@ export default function FinanceFees() {
           });
         });
 
-        /* 4. Build defaulters from `fee_structure.studentRows` (new upload flow) */
+        /* 4. Build defaulters from `fee_structure.studentRows` (per-student upload).
+              ALSO populate `studentRoster` — every student from these uploads,
+              including fully-paid ones, so the Class Roster section can
+              display the complete class on click (paid + pending). */
+        const studentRoster: ClassStudent[] = [];
         structures.forEach(s => {
           if (!s.studentRows || s.studentRows.length === 0) return;
+          const canonicalBranch = resolveCanonicalBranch(s.branchId, s.branchName);
+          const branchName = bMap.get(canonicalBranch) || branchNameById.get(canonicalBranch) || s.branchName || "Unknown";
           s.studentRows.forEach(st => {
-            if (st.pending <= 0) return;
+            const paid    = Number(st.paid) || 0;
+            const pending = Number(st.pending) || 0;
+            // Expected = paid + pending. Earlier we summed every term
+            // column in the Excel sheet (Q1+Q2+Q3+Q4+Half-Yearly+Annual+
+            // Monthly) which over-counted by 3-4× since real schools use
+            // ONE term plan per student. The Principal already tracks
+            // paid + pending against the actual plan, so that's the
+            // truthful expected. Fall back to summed amounts only when
+            // neither paid nor pending is set (legacy uploads).
+            const trustExpected = paid + pending;
+            const fallbackExpected = Object.values(st.amounts || {}).reduce((a, b) => a + (Number(b) || 0), 0);
+            const expectedTotal = trustExpected > 0 ? trustExpected : fallbackExpected;
+            const status: ClassStudent["status"] =
+              pending <= 0 && paid > 0 ? "Paid" :
+              paid > 0                 ? "Partial" :
+                                         "Pending";
+            studentRoster.push({
+              sid:           `${s.id}:${st.rollNo || st.studentName}`,
+              branchId:      canonicalBranch,
+              branchName,
+              className:     st.className,
+              classKey:      normalizeClassLabel(st.className),
+              rollNo:        st.rollNo || "",
+              name:          st.studentName,
+              expectedTotal,
+              paid,
+              pending,
+              discount:      Number(st.discount) || 0,
+              parentPhone:   st.parentPhone,
+              parentName:    st.parentName,
+              status,
+            });
+            if (st.pending <= 0) return;     // paid → no defaulter row
             const risk = calcDefaultRisk(0 /* no explicit overdue days yet */, 0, st.pending);
             defaulterList.push({
               sid:      `fs:${s.id}:${st.rollNo || st.studentName}`,
               name:     st.studentName,
               grade:    st.className,
-              branch:   s.branchName || "Unknown",
-              branchId: s.branchId,
+              branch:   branchName,
+              branchId: canonicalBranch,
               dueAmt:   st.pending,
               paidAmt:  st.paid,
               daysOverdue: 0,
@@ -215,9 +390,217 @@ export default function FinanceFees() {
             });
           });
         });
+        // Sort roster by class number then roll, so within a class students appear in roll order.
+        studentRoster.sort((a, b) => {
+          const an = parseInt(a.classKey.match(/\d+/)?.[0] || "0");
+          const bn = parseInt(b.classKey.match(/\d+/)?.[0] || "0");
+          if (an !== bn) return an - bn;
+          if (a.classKey !== b.classKey) return a.classKey.localeCompare(b.classKey);
+          return (a.rollNo || a.name).localeCompare(b.rollNo || b.name);
+        });
+        setAllClassStudents(studentRoster);
+
+        // (Earlier here we cross-joined class-level fee_structure.rows ×
+        // `enrollments` to synthesise defaulters when a Principal upload
+        // only contained class rates. That created mismatches between the
+        // /fee-structure page and this page — same source, different
+        // numbers, very confusing. Per the new flow: fee_structure.studentRows
+        // is the SINGLE source of truth, and class-only uploads simply
+        // don't produce a finance view until per-student detail is added.
+        // Cross-join removed.)
 
         defaulterList.sort((a, b) => b.risk.score - a.risk.score || b.dueAmt - a.dueAmt);
         setAllDefaulters(defaulterList);
+
+        /* 6. Build per-class breakdown — one row per (branch, class) so the
+              UI mirrors the /fee-structure page directly. Single source
+              of truth = studentRows on each fee_structure doc. */
+        const classRowsByKey = new Map<string, ClassBreakdownRow>();
+        structures.forEach(s => {
+          if (!s.studentRows || s.studentRows.length === 0) return;
+          const canonicalBranch = resolveCanonicalBranch(s.branchId, s.branchName);
+          if (!canonicalBranch) return;
+          const branchName = bMap.get(canonicalBranch) || branchNameById.get(canonicalBranch) || s.branchName || "Unknown";
+
+          const byClass = new Map<string, { displayClassName: string; students: typeof s.studentRows }>();
+          s.studentRows.forEach(st => {
+            const k = normalizeClassLabel(st.className);
+            if (!k) return;
+            const entry = byClass.get(k);
+            if (!entry) byClass.set(k, { displayClassName: st.className, students: [st] });
+            else entry.students.push(st);
+          });
+
+          byClass.forEach((entry, classKey) => {
+            const enrolled = entry.students.length;
+            const paidCount    = entry.students.filter(st => (Number(st.pending) || 0) <= 0 && (Number(st.paid) || 0) > 0).length;
+            const pendingCount = entry.students.filter(st => (Number(st.pending) || 0) > 0).length;
+            // Trust Principal's tracked paid + pending per student over
+            // summing all term columns (which would over-count since real
+            // schools use ONE term plan per student, not all of them).
+            const totalCollected = entry.students.reduce((a, st) => a + (Number(st.paid)    || 0), 0);
+            const outstanding    = entry.students.reduce((a, st) => a + (Number(st.pending) || 0), 0);
+            const totalExpected = totalCollected + outstanding > 0
+              ? totalCollected + outstanding
+              : entry.students.reduce(
+                  (a, st) => a + Object.values(st.amounts || {}).reduce((b, v) => b + (Number(v) || 0), 0),
+                  0,
+                );
+            const expectedPerStudent = enrolled > 0 ? Math.round(totalExpected / enrolled) : 0;
+            const collectionRate = totalExpected > 0 ? Math.round((totalCollected / totalExpected) * 100) : 0;
+            const mapKey = `${canonicalBranch}:${classKey}`;
+            const existing = classRowsByKey.get(mapKey);
+            // Multiple active student-level uploads for the same class
+            // would collide here — keep the one with more students (richer
+            // data), then fall back to the higher expected total.
+            if (!existing
+                || enrolled > existing.enrolledCount
+                || (enrolled === existing.enrolledCount && totalExpected > existing.totalExpected)) {
+              classRowsByKey.set(mapKey, {
+                branchId:           canonicalBranch,
+                branchName,
+                className:          entry.displayClassName,
+                classKey,
+                expectedPerStudent,
+                enrolledCount:      enrolled,
+                pendingCount,
+                paidCount,
+                totalExpected,
+                outstanding,
+                collectionRate,
+                mode:               "student",
+              });
+            }
+          });
+        });
+
+        // PATH B (mirror) — class-level uploads. Direct mirror of
+        // `fee_structure.rows`. When the Principal's Excel also carries
+        // class-aggregate Paid + Pending columns alongside term rates,
+        // we use those as the real collection numbers — same source
+        // shown on /fee-structure, with the financial overlay added.
+        // When Paid/Pending are absent, the card stays in "rate only"
+        // mode with a hint to add per-student detail.
+        structures.forEach(s => {
+          if (s.studentRows && s.studentRows.length > 0) return;     // covered by Path A
+          if (!s.rows || s.rows.length === 0) return;
+          const canonicalBranch = resolveCanonicalBranch(s.branchId, s.branchName);
+          if (!canonicalBranch) return;
+          const branchName = bMap.get(canonicalBranch) || branchNameById.get(canonicalBranch) || s.branchName || "Unknown";
+
+          s.rows.forEach(row => {
+            const classKey = normalizeClassLabel(row.className);
+            if (!classKey) return;
+            const ratePerStudent = Object.values(row.amounts || {})
+              .reduce((a, b) => a + (Number(b) || 0), 0);
+
+            const classPaid    = Number(row.paid)    || 0;
+            const classPending = Number(row.pending) || 0;
+            const hasClassAggregates = classPaid > 0 || classPending > 0;
+
+            // When class-aggregate Paid + Pending are present, that's the
+            // actual collection truth (Principal already aggregated their
+            // student-level books into the class row). Use those.
+            // Otherwise fall back to "rate only" mirror — show the per-
+            // class fee plan but no collection breakdown.
+            const totalExpected = hasClassAggregates
+              ? classPaid + classPending
+              : ratePerStudent;
+            if (totalExpected <= 0) return;
+
+            const mapKey = `${canonicalBranch}:${classKey}`;
+            if (classRowsByKey.has(mapKey)) return; // Path A wins (richer)
+
+            const collectionRate = hasClassAggregates && totalExpected > 0
+              ? Math.round((classPaid / totalExpected) * 100)
+              : 0;
+
+            classRowsByKey.set(mapKey, {
+              branchId:           canonicalBranch,
+              branchName,
+              className:          row.className,
+              classKey,
+              expectedPerStudent: ratePerStudent,
+              enrolledCount:      hasClassAggregates ? 1 : 0,
+              pendingCount:       classPending > 0 ? 1 : 0,
+              paidCount:          classPaid    > 0 ? 1 : 0,
+              totalExpected,
+              outstanding:        classPending,
+              collectionRate,
+              mode:               hasClassAggregates ? "class-aggregate" : "rate-only",
+            });
+          });
+        });
+
+        const classRows: ClassBreakdownRow[] = [...classRowsByKey.values()];
+
+        // ─────────────────────────────────────────────────────────────
+        // DIAGNOSTIC — fires after all aggregations are built. Prints a
+        // tight structured summary so the integrator can see exactly
+        // where data dropped off (Firestore read, parser, or render).
+        // Placed AFTER classRowsByKey is fully populated — earlier this
+        // sat above the declaration and crashed with a TDZ ReferenceError.
+        // ─────────────────────────────────────────────────────────────
+        const studentLevelStructures = structures.filter(s => s.studentRows && s.studentRows.length > 0);
+        const classLevelStructures   = structures.filter(s => !s.studentRows || s.studentRows.length === 0);
+        const totalStudentRows       = studentLevelStructures.reduce((a, s) => a + (s.studentRows?.length || 0), 0);
+        const totalPaidFromRows      = studentLevelStructures.reduce(
+          (a, s) => a + (s.studentRows?.reduce((b, st) => b + (Number(st.paid) || 0), 0) || 0),
+          0,
+        );
+        const totalPendingFromRows   = studentLevelStructures.reduce(
+          (a, s) => a + (s.studentRows?.reduce((b, st) => b + (Number(st.pending) || 0), 0) || 0),
+          0,
+        );
+
+        console.info(
+          "[FinanceFees] data summary",
+          {
+            branches:                  bSnap.docs.length,
+            fee_structure_docs:        structures.length,
+            "  student_level":         studentLevelStructures.length,
+            "  class_level":           classLevelStructures.length,
+            student_rows_total:        totalStudentRows,
+            "  paid_total":            totalPaidFromRows,
+            "  pending_total":         totalPendingFromRows,
+            fees_collection_docs:      feesSnap.docs.length,
+            defaulters_built:          defaulterList.length,
+            "  from_fees":             defaulterList.filter(d => d.source === "fees").length,
+            "  from_studentRows":      defaulterList.filter(d => d.source === "fee_structure").length,
+            class_breakdown_rows:      classRowsByKey.size,
+            roster_total_students:     studentRoster.length,
+          },
+        );
+
+        if (structures.length === 0) {
+          console.warn(
+            "[FinanceFees] No fee_structure docs loaded for this owner. " +
+            "Verify Principal Dashboard has uploaded a fee structure with isActive: true and schoolId matching the Owner's UID."
+          );
+        } else if (studentLevelStructures.length > 0 && totalPaidFromRows === 0 && totalPendingFromRows === 0) {
+          const sample = studentLevelStructures[0]?.studentRows?.[0];
+          console.warn(
+            "[FinanceFees] %d student row(s) loaded but Paid + Pending totals are both 0. " +
+            "Excel column headers may not match expected aliases (Paid / Pending / paid / pending / collected / due / outstanding). " +
+            "Sample row: %o",
+            totalStudentRows, sample,
+          );
+        } else if (classLevelStructures.length > 0 && studentLevelStructures.length === 0) {
+          console.warn(
+            "[FinanceFees] Only class-level fee_structure uploads exist. " +
+            "Add per-student rows (Student Name + Paid + Pending columns) for the Finance view to show paid/pending breakdown."
+          );
+        }
+        // Sort: branch name, then numeric grade (1, 2, … 12), then label.
+        classRows.sort((a, b) => {
+          const bn = a.branchName.localeCompare(b.branchName);
+          if (bn !== 0) return bn;
+          const an = parseInt(a.classKey.match(/\d+/)?.[0] || "0");
+          const bbn = parseInt(b.classKey.match(/\d+/)?.[0] || "0");
+          if (an !== bbn) return an - bbn;
+          return a.className.localeCompare(b.className);
+        });
+        setAllClassBreakdown(classRows);
       } catch (e) {
         console.error("FinanceFees fetch error:", e);
       }
@@ -253,23 +636,60 @@ export default function FinanceFees() {
   };
 
   /* ── apply branch filter ──────────────────────────────── */
-  const defaulters = useMemo(
-    () => branchFilter === "All" ? allDefaulters : allDefaulters.filter(d => d.branch === branchFilter),
-    [allDefaulters, branchFilter],
-  );
+  const defaulters = useMemo(() => {
+    let list = branchFilter === "All" ? allDefaulters : allDefaulters.filter(d => d.branch === branchFilter);
+    if (selectedClassKey !== "All") {
+      list = list.filter(d => normalizeClassLabel(d.grade) === selectedClassKey);
+    }
+    return list;
+  }, [allDefaulters, branchFilter, selectedClassKey]);
+
   const feesFiltered = useMemo(
     () => branchFilter === "All" ? allFees : allFees.filter(f => f.branchName === branchFilter),
     [allFees, branchFilter],
   );
 
+  // Class breakdown, scoped by branch — matches the defaulter-list scope.
+  const classBreakdown = useMemo(
+    () => branchFilter === "All"
+      ? allClassBreakdown
+      : allClassBreakdown.filter(c => c.branchName === branchFilter),
+    [allClassBreakdown, branchFilter],
+  );
+
+  // Class roster — surfaces ALL students of the selected class (paid +
+  // pending) when a class card is clicked. Sourced from
+  // fee_structure.studentRows; available only when the Principal upload
+  // included per-student detail (multi-sheet Excel).
+  const classRoster = useMemo(() => {
+    if (selectedClassKey === "All") return [];
+    let list = allClassStudents.filter(s => s.classKey === selectedClassKey);
+    if (branchFilter !== "All") list = list.filter(s => s.branchName === branchFilter);
+    return list;
+  }, [allClassStudents, selectedClassKey, branchFilter]);
+
+  // Reset class filter when branch changes — otherwise an old class
+  // selection may filter to zero defaulters in the new branch.
+  useEffect(() => { setSelectedClassKey("All"); }, [branchFilter]);
+
+  // Branch-scoped student roster (from fee_structure.studentRows).
+  // Source of truth for paid amounts — covers BOTH fully-paid students
+  // (who never appear in the defaulter list) and partially-paid students
+  // (who do, but their `paid` portion would otherwise be undercounted).
+  const studentsScoped = useMemo(
+    () => branchFilter === "All" ? allClassStudents : allClassStudents.filter(s => s.branchName === branchFilter),
+    [allClassStudents, branchFilter],
+  );
+
   /* ── stats (derived from filtered data) ───────────────── */
   const stats = useMemo(() => {
     const paidFees = feesFiltered.filter(f => (f.status || "").toLowerCase() === "paid");
-    const collectedAmt = paidFees.reduce((a, f) => a + (parseFloat(f.amount ?? f.totalAmount ?? "0") || 0), 0);
-    /* Also include paid from fee_structure defaulters' own paid amounts */
-    const structurePaid = defaulters
-      .filter(d => d.source === "fee_structure")
-      .reduce((a, d) => a + d.paidAmt, 0);
+    const feesPaidAmt = paidFees.reduce((a, f) => a + (parseFloat(f.amount ?? f.totalAmount ?? "0") || 0), 0);
+    // Sum of `paid` across every student in the in-scope studentRows.
+    // Earlier we only added the `paidAmt` of partial defaulters, which
+    // missed every fully-paid student entirely (they aren't defaulters).
+    // Now Aarav-style fully-paid students contribute too.
+    const studentRowsPaid = studentsScoped.reduce((a, s) => a + s.paid, 0);
     const outstanding = defaulters.reduce((a, d) => a + d.dueAmt, 0);
     const critical = defaulters.filter(d => d.daysOverdue > 60).length;
     return {
@@ -277,10 +697,10 @@ export default function FinanceFees() {
       critical,
       pending:     defaulters.length,
       collected:   paidFees.length,
-      collectedAmt: Math.round(collectedAmt + structurePaid),
+      collectedAmt: Math.round(feesPaidAmt + studentRowsPaid),
       outstanding:  Math.round(outstanding),
     };
-  }, [defaulters, feesFiltered]);
+  }, [defaulters, feesFiltered, studentsScoped]);
 
   /* ── history (6-month collection vs pending) ──────────────────────────────
         Linked to feeHistoryService.bucketFeeHistory — same shape & math the
@@ -294,24 +714,40 @@ export default function FinanceFees() {
   /* ── branch revenue (always all branches, regardless of filter) ── */
   const branchRevenue = useMemo(() => {
     const map = new Map<string, { collected: number; pending: number }>();
+    // 1. Paid amounts from `fees` collection (transactional records).
     allFees.filter(f => (f.status || "").toLowerCase() === "paid").forEach(f => {
       const b = f.branchName || "Unknown";
       if (!map.has(b)) map.set(b, { collected: 0, pending: 0 });
       map.get(b)!.collected += parseFloat(f.amount ?? f.totalAmount ?? "0") || 0;
     });
+    // 2. Paid amounts from fee_structure.studentRows — single source of
+    //    truth for student-level uploads. Earlier we only added defaulter
+    //    paidAmt (so Aarav-style fully-paid students were invisible) and
+    //    only for source==="fee_structure" (not fee_structure_class).
+    allClassStudents.forEach(s => {
+      if (!map.has(s.branchName)) map.set(s.branchName, { collected: 0, pending: 0 });
+      const m = map.get(s.branchName)!;
+      m.collected += s.paid;
+      m.pending   += s.pending;
+    });
+    // 3. Pending from defaulters that AREN'T already captured above
+    //    (i.e. those derived from `fees` collection or class-level
+    //    cross-join — the studentRows path is fully covered by step 2).
     allDefaulters.forEach(d => {
+      if (d.source === "fee_structure") return; // already in step 2
       if (!map.has(d.branch)) map.set(d.branch, { collected: 0, pending: 0 });
       const m = map.get(d.branch)!;
       m.pending += d.dueAmt;
-      if (d.source === "fee_structure") m.collected += d.paidAmt;
     });
+    // Store FULL ₹ amounts. Chart axes still divide by 1000 at render
+    // time for compactness; summary cards show full Indian-format amounts.
     return [...map.entries()].map(([name, v]) => ({
       name,
-      collected: Math.round(v.collected / 1000),
-      pending:   Math.round(v.pending / 1000),
-      total:     Math.round((v.collected + v.pending) / 1000),
+      collected: Math.round(v.collected),
+      pending:   Math.round(v.pending),
+      total:     Math.round(v.collected + v.pending),
     })).sort((a, b) => b.total - a.total);
-  }, [allFees, allDefaulters]);
+  }, [allFees, allDefaulters, allClassStudents]);
 
   // Load fee predictions when that tab is selected
   useEffect(() => {
@@ -381,10 +817,10 @@ export default function FinanceFees() {
         <DarkHero
           icon={IndianRupee}
           eyebrow="Fee Intelligence"
-          title={`₹${(stats.collectedAmt/1000).toFixed(1)}K`}
+          title={`₹${stats.collectedAmt.toLocaleString("en-IN")}`}
           subtitle={`Collected across ${branchNames.length} branches · ${stats.total} defaulter${stats.total!==1?"s":""} pending`}
           stats={[
-            { label:"Outstanding", value:`₹${(stats.outstanding/1000).toFixed(1)}K` },
+            { label:"Outstanding", value:`₹${stats.outstanding.toLocaleString("en-IN")}` },
             { label:"Critical", value:stats.critical.toString() },
             { label:"Defaulters", value:stats.total.toString() },
           ]}
@@ -421,8 +857,8 @@ export default function FinanceFees() {
       <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: isMobile ? 10 : 16 }}>
         <StatTile label="Total Defaulters" value={loading ? "—" : stats.total.toString()} sub="Pending fees" grad={stats.total > 0 ? GRAD_RED : GRAD_GOLD} icon={XCircle} onClick={() => navigate("/fee-structure")} />
         <StatTile label="Critical (>60d)"  value={loading ? "—" : stats.critical.toString()} sub="Urgent attention" grad={stats.critical > 0 ? GRAD_RED : GRAD_GOLD} icon={ShieldAlert} onClick={() => navigate("/fee-structure")} />
-        <StatTile label="Fee Collected"    value={loading ? "—" : `₹${(stats.collectedAmt/1000).toFixed(1)}K`} sub="Healthy inflow" grad={GRAD_GREEN} icon={IndianRupee} onClick={() => navigate("/fee-structure")} />
-        <StatTile label="Outstanding"      value={loading ? "—" : `₹${(stats.outstanding/1000).toFixed(1)}K`} sub="To be recovered" grad={GRAD_GOLD} icon={TrendingDown} onClick={() => navigate("/fee-structure")} />
+        <StatTile label="Fee Collected"    value={loading ? "—" : `₹${stats.collectedAmt.toLocaleString("en-IN")}`} sub="Healthy inflow"   grad={GRAD_GREEN} icon={IndianRupee}   onClick={() => navigate("/fee-structure")} />
+        <StatTile label="Outstanding"      value={loading ? "—" : `₹${stats.outstanding.toLocaleString("en-IN")}`} sub="To be recovered" grad={GRAD_GOLD}  icon={TrendingDown}  onClick={() => navigate("/fee-structure")} />
       </div>
 
       {/* ── Charts row: Branch-wise Revenue + Monthly Collection Trend ── */}
@@ -552,17 +988,17 @@ export default function FinanceFees() {
                 <Building2 className="w-4 h-4 text-[#1e3a8a]" /> Branch-wise Finance Snapshot
               </h3>
               <p className="text-[11px] md:text-xs text-slate-400 font-medium mt-0.5">
-                {branchRevenue.length} branch{branchRevenue.length !== 1 ? "es" : ""} · ₹ in thousands · tap a branch to filter below
+                {branchRevenue.length} branch{branchRevenue.length !== 1 ? "es" : ""} · tap a branch to filter below
               </p>
             </div>
             <div className="grid grid-cols-3 gap-2 lg:min-w-[420px]">
               <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2">
                 <p className="text-[9px] font-black text-emerald-700 uppercase tracking-widest">Collected</p>
-                <p className="text-base md:text-lg font-extrabold text-emerald-700">₹ {totCollected}K</p>
+                <p className="text-base md:text-lg font-extrabold text-emerald-700">₹{totCollected.toLocaleString("en-IN")}</p>
               </div>
               <div className="rounded-xl border border-red-100 bg-red-50/60 px-3 py-2">
                 <p className="text-[9px] font-black text-red-600 uppercase tracking-widest">Pending</p>
-                <p className="text-base md:text-lg font-extrabold text-red-600">₹ {totPending}K</p>
+                <p className="text-base md:text-lg font-extrabold text-red-600">₹{totPending.toLocaleString("en-IN")}</p>
               </div>
               <div className={`rounded-xl border px-3 py-2 ${
                 rateColor === "emerald" ? "border-emerald-100 bg-emerald-50/60" :
@@ -588,7 +1024,7 @@ export default function FinanceFees() {
                 <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-white text-[10px] font-black">★</div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[9px] font-black text-emerald-700 uppercase tracking-widest">Top Collector</p>
-                  <p className="text-xs font-extrabold text-[#1e294b] truncate">{topBranch.name} · ₹ {topBranch.collected}K</p>
+                  <p className="text-xs font-extrabold text-[#1e294b] truncate">{topBranch.name} · ₹{topBranch.collected.toLocaleString("en-IN")}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-gradient-to-r from-red-50 to-white border border-red-100">
@@ -618,10 +1054,10 @@ export default function FinanceFees() {
               <BarChart data={branchRevenue} margin={{ top: 5, right: 10, left: -10, bottom: 0 }} barCategoryGap="35%">
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#64748b", fontSize: 11, fontWeight: 600 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(v) => `₹${v}K`} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(v) => v >= 1000 ? `₹${Math.round(v/1000)}K` : `₹${v}`} />
                 <Tooltip
                   contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
-                  formatter={(v: any, name: string) => [`₹ ${v}K`, name]}
+                  formatter={(v: any, name: string) => [`₹${Number(v).toLocaleString("en-IN")}`, name]}
                   cursor={{ fill: "rgba(30, 58, 138, 0.04)" }}
                 />
                 <Bar dataKey="collected" name="Collected" fill="#22c55e" radius={[6, 6, 0, 0]} maxBarSize={60} />
@@ -677,11 +1113,11 @@ export default function FinanceFees() {
                   <div className="grid grid-cols-2 gap-3 mb-3">
                     <div>
                       <p className="text-[9px] font-black text-emerald-600 uppercase tracking-wider">Collected</p>
-                      <p className="text-sm font-extrabold text-emerald-700">₹ {b.collected}K</p>
+                      <p className="text-sm font-extrabold text-emerald-700">₹{b.collected.toLocaleString("en-IN")}</p>
                     </div>
                     <div>
                       <p className="text-[9px] font-black text-red-500 uppercase tracking-wider">Pending</p>
-                      <p className="text-sm font-extrabold text-red-600">₹ {b.pending}K</p>
+                      <p className="text-sm font-extrabold text-red-600">₹{b.pending.toLocaleString("en-IN")}</p>
                     </div>
                   </div>
 
@@ -689,7 +1125,7 @@ export default function FinanceFees() {
                   <div className="space-y-1">
                     <div className="flex items-center justify-between text-[9px] font-bold">
                       <span className="text-slate-400 uppercase tracking-widest">Collection</span>
-                      <span className={rateTone}>{rate}% of ₹{total}K</span>
+                      <span className={rateTone}>{rate}% of ₹{total.toLocaleString("en-IN")}</span>
                     </div>
                     <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
                       <div
@@ -709,6 +1145,295 @@ export default function FinanceFees() {
       {/* ── DEFAULTERS TAB ─────────────────────────────────────────────────── */}
       {activeTab === "Defaulters" && (
         <div className="space-y-4 md:space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+          {/* ── Class Fee Breakdown grid — mirrors the FeeStructureOverview
+                table while adding live collection status. Click a class card
+                to filter the defaulter list below to that class only. */}
+          {!loading && classBreakdown.length > 0 && (
+            <div className="bg-white rounded-2xl md:rounded-3xl border border-slate-100 shadow-sm p-4 md:p-5">
+              <div className="flex items-center justify-between flex-wrap gap-2 mb-3 md:mb-4">
+                <div>
+                  <h3 className="text-sm md:text-base font-extrabold text-[#1e294b] tracking-tight">
+                    Class Fee Breakdown
+                  </h3>
+                  <p className="text-[10px] md:text-[11px] font-semibold text-slate-400 mt-0.5">
+                    {classBreakdown.length} {classBreakdown.length === 1 ? "class" : "classes"}
+                    {branchFilter === "All" ? " · across all branches" : ` · in ${branchFilter}`}
+                    {" · click a card to drill into defaulters"}
+                  </p>
+                </div>
+                {selectedClassKey !== "All" && (
+                  <button
+                    onClick={() => setSelectedClassKey("All")}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-widest hover:bg-slate-100 transition"
+                  >
+                    Clear class filter
+                  </button>
+                )}
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {classBreakdown.map(c => {
+                  const isActive = selectedClassKey === c.classKey;
+                  const rate = c.collectionRate;
+                  // Solid gradient ramp for collection-rate bar — vivid, not pastel.
+                  const barColor =
+                    rate >= 90 ? "bg-emerald-500" :
+                    rate >= 70 ? "bg-blue-500" :
+                    rate >= 40 ? "bg-amber-500" :
+                                 "bg-rose-500";
+                  const tone =
+                    rate >= 90 ? "text-emerald-600" :
+                    rate >= 70 ? "text-blue-600" :
+                    rate >= 40 ? "text-amber-600" :
+                                 "text-rose-600";
+                  // 3 render modes:
+                  //   "student"        → student-level upload, full breakdown + drillable
+                  //   "class-aggregate"→ class-level upload with Paid/Pending columns,
+                  //                       show ₹ totals (no head count)
+                  //   "rate-only"      → class rates only, muted card with hint
+                  const cardClickable = c.mode === "student";
+                  return (
+                    <button
+                      key={`${c.branchId}:${c.classKey}`}
+                      onClick={() => cardClickable
+                        ? setSelectedClassKey(prev => prev === c.classKey ? "All" : c.classKey)
+                        : null
+                      }
+                      disabled={!cardClickable}
+                      className={`text-left rounded-2xl border p-4 transition ${
+                        c.mode === "rate-only"
+                          ? "border-slate-100 bg-slate-50/40 cursor-default"
+                          : isActive
+                            ? "border-blue-500 bg-blue-50/60 shadow-md"
+                            : `border-slate-100 bg-white ${cardClickable ? "hover:border-blue-200 hover:shadow-sm cursor-pointer" : "cursor-default"}`
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-extrabold text-[#1e294b] truncate">{c.className}</p>
+                          {branchFilter === "All" && (
+                            <p className="text-[10px] font-semibold text-slate-400 truncate">{c.branchName}</p>
+                          )}
+                        </div>
+                        {c.mode === "rate-only" ? (
+                          <span className="text-[9px] font-extrabold shrink-0 px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 uppercase tracking-widest">
+                            Rate only
+                          </span>
+                        ) : (
+                          <div className={`text-[10px] font-extrabold shrink-0 ${tone}`}>{rate}%</div>
+                        )}
+                      </div>
+
+                      {c.mode === "rate-only" && (
+                        <>
+                          <div className="mb-2">
+                            <p className="text-[8px] font-extrabold text-slate-400 uppercase tracking-widest">Total fee plan</p>
+                            <p className="text-[15px] font-extrabold text-[#1e294b] mt-0.5">
+                              ₹{c.expectedPerStudent.toLocaleString("en-IN")}
+                            </p>
+                          </div>
+                          <p className="text-[10px] font-medium text-slate-400 leading-snug">
+                            Per-student tracking not enabled. Upload an Excel with
+                            <span className="font-bold text-slate-500"> Student Name + Paid + Pending </span>
+                            columns to see paid / pending breakdown here.
+                          </p>
+                        </>
+                      )}
+
+                      {c.mode === "class-aggregate" && (
+                        <>
+                          <div className="grid grid-cols-2 gap-2 mb-2.5">
+                            <div>
+                              <p className="text-[8px] font-extrabold text-emerald-600 uppercase tracking-widest">Paid</p>
+                              <p className="text-[13px] font-extrabold text-emerald-700 mt-0.5">
+                                ₹{(c.totalExpected - c.outstanding).toLocaleString("en-IN")}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[8px] font-extrabold text-rose-500 uppercase tracking-widest">Pending</p>
+                              <p className={`text-[13px] font-extrabold mt-0.5 ${c.outstanding > 0 ? "text-rose-700" : "text-emerald-700"}`}>
+                                ₹{c.outstanding.toLocaleString("en-IN")}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-[9px] font-bold">
+                              <span className="text-slate-400 uppercase tracking-widest">Collected</span>
+                              <span className={tone}>
+                                ₹{Math.max(0, c.totalExpected - c.outstanding).toLocaleString("en-IN")} of ₹{c.totalExpected.toLocaleString("en-IN")}
+                              </span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                              <div
+                                className={`h-full ${barColor} rounded-full transition-all duration-500`}
+                                style={{ width: `${rate}%` }}
+                              />
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {c.mode === "student" && (
+                        <>
+                          <div className="grid grid-cols-3 gap-2 mb-2.5">
+                            <div>
+                              <p className="text-[8px] font-extrabold text-slate-400 uppercase tracking-widest">Per student</p>
+                              <p className="text-[12px] font-extrabold text-[#1e294b] mt-0.5">
+                                ₹{c.expectedPerStudent.toLocaleString("en-IN")}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[8px] font-extrabold text-slate-400 uppercase tracking-widest">Enrolled</p>
+                              <p className="text-[12px] font-extrabold text-[#1e294b] mt-0.5">{c.enrolledCount}</p>
+                            </div>
+                            <div>
+                              <p className="text-[8px] font-extrabold text-slate-400 uppercase tracking-widest">Pending</p>
+                              <p className={`text-[12px] font-extrabold mt-0.5 ${c.pendingCount > 0 ? "text-rose-600" : "text-emerald-600"}`}>
+                                {c.pendingCount}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-[9px] font-bold">
+                              <span className="text-slate-400 uppercase tracking-widest">Collected</span>
+                              <span className={tone}>
+                                ₹{Math.max(0, c.totalExpected - c.outstanding).toLocaleString("en-IN")} of ₹{c.totalExpected.toLocaleString("en-IN")}
+                              </span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                              <div
+                                className={`h-full ${barColor} rounded-full transition-all duration-500`}
+                                style={{ width: `${rate}%` }}
+                              />
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── Class Roster — when a class card is clicked, show every
+                student in that class (paid + pending) along with their
+                fee status. Sourced from fee_structure.studentRows so it
+                only renders for per-student uploads (multi-sheet Excel). */}
+          {!loading && selectedClassKey !== "All" && classRoster.length > 0 && (() => {
+            const selectedRow = classBreakdown.find(c => c.classKey === selectedClassKey);
+            const totalExpected = classRoster.reduce((a, s) => a + s.expectedTotal, 0);
+            const totalPaid     = classRoster.reduce((a, s) => a + s.paid, 0);
+            const totalPending  = classRoster.reduce((a, s) => a + s.pending, 0);
+            return (
+              <div className="bg-white rounded-2xl md:rounded-3xl border border-blue-100 shadow-sm overflow-hidden animate-in slide-in-from-top-2 duration-300">
+                <div className="flex items-center justify-between gap-3 flex-wrap p-4 md:p-5 bg-gradient-to-r from-blue-50/50 to-transparent border-b border-blue-100">
+                  <div className="min-w-0">
+                    <h3 className="text-sm md:text-base font-extrabold text-[#1e294b] tracking-tight">
+                      {selectedRow?.className ?? selectedClassKey} · Student Roster
+                    </h3>
+                    <p className="text-[10px] md:text-[11px] font-semibold text-slate-500 mt-0.5">
+                      {classRoster.length} student{classRoster.length === 1 ? "" : "s"}
+                      {selectedRow && ` · ${selectedRow.branchName}`}
+                      {" · ₹"}{totalPaid.toLocaleString("en-IN")} paid · ₹{totalPending.toLocaleString("en-IN")} pending of ₹{totalExpected.toLocaleString("en-IN")} expected
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSelectedClassKey("All")}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-widest hover:bg-slate-50 transition shrink-0"
+                  >
+                    Close
+                  </button>
+                </div>
+                {isMobile ? (
+                  <div className="flex flex-col gap-2 p-3">
+                    {classRoster.map(s => {
+                      const tone =
+                        s.status === "Paid"    ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                        s.status === "Partial" ? "bg-amber-50 text-amber-700 border-amber-200" :
+                                                 "bg-rose-50 text-rose-700 border-rose-200";
+                      return (
+                        <div key={s.sid} className="rounded-xl border border-slate-100 bg-white p-3">
+                          <div className="flex items-center gap-2.5 mb-2.5">
+                            <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-[11px] font-black text-slate-500 shrink-0">
+                              {s.name.substring(0, 2).toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[13px] font-extrabold text-[#1e294b] truncate">{s.name}</p>
+                              <p className="text-[10px] font-semibold text-slate-400 truncate">
+                                {s.rollNo ? `Roll ${s.rollNo} · ` : ""}{s.parentName || "—"}
+                              </p>
+                            </div>
+                            <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-black border shrink-0 ${tone}`}>
+                              {s.status}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <div>
+                              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Expected</p>
+                              <p className="text-[12px] font-extrabold text-[#1e294b]">₹{s.expectedTotal.toLocaleString("en-IN")}</p>
+                            </div>
+                            <div>
+                              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Paid</p>
+                              <p className="text-[12px] font-extrabold text-emerald-700">₹{s.paid.toLocaleString("en-IN")}</p>
+                            </div>
+                            <div>
+                              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Pending</p>
+                              <p className={`text-[12px] font-extrabold ${s.pending > 0 ? "text-rose-700" : "text-emerald-700"}`}>
+                                ₹{s.pending.toLocaleString("en-IN")}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="bg-slate-50/50 border-b border-slate-100">
+                          {["Roll", "Student", "Parent", "Expected", "Paid", "Pending", "Status"].map(h => (
+                            <th key={h} className="px-4 py-2.5 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {classRoster.map(s => {
+                          const tone =
+                            s.status === "Paid"    ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                            s.status === "Partial" ? "bg-amber-50 text-amber-700 border-amber-200" :
+                                                     "bg-rose-50 text-rose-700 border-rose-200";
+                          return (
+                            <tr key={s.sid} className="border-b border-slate-50 hover:bg-slate-50/60 transition">
+                              <td className="px-4 py-3 text-[12px] font-bold text-slate-500">{s.rollNo || "—"}</td>
+                              <td className="px-4 py-3">
+                                <p className="text-[13px] font-extrabold text-[#1e294b]">{s.name}</p>
+                              </td>
+                              <td className="px-4 py-3 text-[11px] font-semibold text-slate-500">
+                                {s.parentName || "—"}
+                                {s.parentPhone ? <span className="block text-[10px] text-slate-400">{s.parentPhone}</span> : null}
+                              </td>
+                              <td className="px-4 py-3 text-[12px] font-extrabold text-[#1e294b]">₹{s.expectedTotal.toLocaleString("en-IN")}</td>
+                              <td className="px-4 py-3 text-[12px] font-extrabold text-emerald-700">₹{s.paid.toLocaleString("en-IN")}</td>
+                              <td className={`px-4 py-3 text-[12px] font-extrabold ${s.pending > 0 ? "text-rose-700" : "text-emerald-700"}`}>
+                                ₹{s.pending.toLocaleString("en-IN")}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black border ${tone}`}>
+                                  {s.status}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           <div className="flex items-center gap-3">
             <div className="relative flex-1 md:max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -716,6 +1441,11 @@ export default function FinanceFees() {
                 placeholder="Search by name or grade..."
                 className="pl-10 h-10 bg-white border-slate-100 rounded-xl text-xs font-semibold" />
             </div>
+            {selectedClassKey !== "All" && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-100 text-[10px] font-bold text-blue-600 uppercase tracking-widest">
+                Filtered: {classBreakdown.find(c => c.classKey === selectedClassKey)?.className ?? selectedClassKey}
+              </span>
+            )}
           </div>
 
           <div className="bg-white rounded-2xl md:rounded-3xl border border-slate-100 shadow-sm overflow-hidden">

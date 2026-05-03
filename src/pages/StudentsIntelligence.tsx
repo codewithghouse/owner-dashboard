@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { db, auth } from "@/lib/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import {
-  Users, Search, Plus, Filter, TrendingUp,
+  Users, Search, Filter, TrendingUp,
   X, Loader2,
   GraduationCap, Award, Percent, AlertTriangle, ArrowUpRight, ArrowDownRight,
   BarChart3, Activity, Sparkles, Mail
@@ -12,12 +13,32 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area, LineChart, Line
 } from "recharts";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useBreakpoint } from "@/hooks/useBreakpoint";
 import { tilt3D, tilt3DStyle } from "@/lib/use3DTilt";
 import { GRAD_ACCENTS } from "@/lib/dashboardTokens";
 
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const GRADE_COLORS = ["#1e3a8a","#2563eb","#3b82f6","#60a5fa","#93c5fd","#bfdbfe"];
+
+/* Year-aware month key — bucketing by month NAME alone collapses May 2024
+ * and May 2025 into the same cell, which silently corrupts every "last 6
+ * months" trend once an owner has >12 months of data. Use this everywhere
+ * we group by month. */
+const monthKey = (d: Date): number => d.getFullYear() * 12 + d.getMonth();
+
+/* Module-level cache for per-student detail. Power-users browse 50+ students
+ * in a session; without this every "View" click costs 4 Firestore reads
+ * (test_scores ×2 + attendance ×2). Keyed by `${ownerUid}:${sid}` so a
+ * second owner signing in from the same tab can't read the first owner's
+ * cache. 5-min TTL matches the cloud aggregator's freshness window. */
+type DetailCacheEntry = {
+  trend: { month: string; score: number; attendance: number }[];
+  att30: number | null;
+  attDelta: number | null;
+  scoreDelta: number | null;
+};
+const DETAIL_CACHE_TTL_MS = 5 * 60 * 1000;
+const detailCache = new Map<string, { data: DetailCacheEntry; ts: number }>();
 
 /* normalise "6" / "Class 6" / "Grade 6" / "VI" → "Grade 6" */
 function normalizeGrade(raw: string): string {
@@ -35,11 +56,60 @@ function normalizeGrade(raw: string): string {
   return s;
 }
 
-/* ── risk helpers ─────────────────────────────────── */
-function getRisk(score: number): { label: string; color: string; bg: string } {
-  if (score >= 75) return { label: "Low",    color: "text-green-600",  bg: "bg-green-50"  };
-  if (score >= 50) return { label: "Medium", color: "text-amber-600",  bg: "bg-amber-50"  };
-  return              { label: "High",   color: "text-red-600",    bg: "bg-red-50"    };
+/* ── risk helpers ───────────────────────────────────
+ * Single source of truth for the score-tier visual treatment. The same
+ * tier renders in 3 places (mobile card, desktop table row, detail panel
+ * header) — keep all hex/gradient values here so a colour change is one
+ * line, not three.
+ *
+ * 4 tiers: Untested (no data) → Low (≥75) → Medium (50–74) → High (<50).
+ * The Untested tier is critical — without it, a student with no
+ * test_scores docs gets `avgScore = 0` and falls into "High Risk" (red
+ * avatar + red badge), which is misleading. They're not at-risk; they
+ * just haven't been tested yet.
+ *
+ * Tier thresholds match `atRisk` (score>0 && score<50) and
+ * `highPerformers` (score>=85) used elsewhere; "Medium" and "Low" line
+ * up with the pass threshold (50) and the platform's high-performer
+ * cutoff.
+ */
+type RiskTier = {
+  label:    "Untested" | "Low" | "Medium" | "High";
+  fg:       string;  // foreground hex (badge text)
+  bg:       string;  // badge background tint (rgba)
+  gradient: string;  // avatar circle gradient
+};
+const RISK_UNKNOWN: RiskTier = {
+  label:    "Untested",
+  fg:       "#5070B0",  // T3 — slate, intentionally neutral
+  bg:       "rgba(80,112,176,.10)",
+  gradient: "linear-gradient(135deg,#94A3B8 0%,#64748B 100%)",
+};
+const RISK_LOW: RiskTier = {
+  label:    "Low",
+  fg:       "#00C853",
+  bg:       "rgba(0,200,83,.1)",
+  gradient: "linear-gradient(135deg,#10B981 0%,#059669 100%)",
+};
+const RISK_MED: RiskTier = {
+  label:    "Medium",
+  fg:       "#FFAA00",
+  bg:       "rgba(255,170,0,.1)",
+  gradient: "linear-gradient(135deg,#F59E0B 0%,#D97706 100%)",
+};
+const RISK_HIGH: RiskTier = {
+  label:    "High",
+  fg:       "#FF3355",
+  bg:       "rgba(255,51,85,.1)",
+  gradient: "linear-gradient(135deg,#FF3355 0%,#DC2626 100%)",
+};
+function getRisk(score: number): RiskTier {
+  // No-data check FIRST — distinguish untested from actual zero. Without
+  // this gate, every untested student is wrongly painted red.
+  if (!score || score <= 0) return RISK_UNKNOWN;
+  if (score >= 75)          return RISK_LOW;
+  if (score >= 50)          return RISK_MED;
+  return RISK_HIGH;
 }
 
 function getInitials(name: string) {
@@ -50,10 +120,12 @@ const PAGE_SIZE = 10;
 
 export default function StudentsIntelligence() {
   const navigate = useNavigate();
-  const isMobile = useIsMobile();
+  const isMobile = useBreakpoint() === "mobile";
   /* ── raw data ───────────────────────────────────── */
   const [students,   setStudents]   = useState<any[]>([]);
-  const [schools,    setSchools]    = useState<Map<string,string>>(new Map());
+  // branchId → branchName, sourced from the schools/{ownerUid}/branches
+  // subcollection. Drives the branch dropdowns + table/heatmap labels.
+  const [branches,   setBranches]   = useState<Map<string,string>>(new Map());
   // heatRaw: branchName → grade → {p, t}
   const [heatRaw,    setHeatRaw]    = useState<Map<string, Map<string,{p:number;t:number}>>>(new Map());
   const [loading,    setLoading]    = useState(true);
@@ -62,8 +134,31 @@ export default function StudentsIntelligence() {
   const [search,      setSearch]      = useState("");
   const [page,        setPage]        = useState(1);
   const [selected,    setSelected]    = useState<any | null>(null);
-  const [heatBranch,  setHeatBranch]  = useState("All");
-  const [tableBranch, setTableBranch] = useState("All");
+  // Single page-level branch filter — drives EVERY card, chart, table row,
+  // heatmap row, AI summary, hero subtitle. Replaces the earlier per-card
+  // dropdowns that let one card show all-branch data while the table next
+  // to it showed a single branch (confusing).
+  const [pageBranch,   setPageBranch]   = useState<string>("All");
+  // Secondary filters surfaced via the Filter popover. scoreFilter mirrors
+  // the stat-card drill-throughs ("At Risk" card → scoreFilter="atRisk").
+  // gradeFilter is set when the user clicks a slice of the Grade
+  // Distribution pie.
+  type ScoreFilter = "all" | "atRisk" | "medium" | "high";
+  const [scoreFilter,  setScoreFilter]  = useState<ScoreFilter>("all");
+  const [gradeFilter,  setGradeFilter]  = useState<string | null>(null);
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false);
+  // Filter button bounding rect — captured on open so the portal-rendered
+  // popover can anchor under the button on desktop. We portal the popover
+  // out of the table card because that card has a tilt3D transform; CSS
+  // `position: fixed` is broken inside any transformed ancestor (it gets
+  // re-anchored to the transformed element rather than the viewport).
+  const filterBtnRef = useRef<HTMLButtonElement | null>(null);
+  const [filterAnchor, setFilterAnchor] = useState<{ top: number; right: number } | null>(null);
+  const openFilterMenu = () => {
+    const r = filterBtnRef.current?.getBoundingClientRect();
+    if (r) setFilterAnchor({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) });
+    setFilterMenuOpen(true);
+  };
 
   /* ── per-student detail data ─────────────────────── */
   const [detailLoading, setDetailLoading] = useState(false);
@@ -71,15 +166,21 @@ export default function StudentsIntelligence() {
   const [attDelta,      setAttDelta]      = useState<number | null>(null);   // % diff last30 vs prev30
   const [scoreDelta,    setScoreDelta]    = useState<number | null>(null);   // pts diff last 2 exams
   const [att30,         setAtt30]         = useState<number | null>(null);   // last-30-day att %
+  // Tracks the latest selected student id. If the user clicks A → B → C
+  // quickly, A's slow response can land after C and overwrite the panel
+  // with stale data; the detail effect drops any response whose sid no
+  // longer matches this ref.
+  const lastDetailSidRef = useRef<string | null>(null);
 
   /* ── fetch everything ───────────────────────────── */
   useEffect(() => {
     const go = async () => {
       try {
-        /* 1. branches subcollection: schools/{ownerUid}/branches */
         const ownerUid = auth.currentUser?.uid;
         if (!ownerUid) { setLoading(false); return; }
 
+        // Branches first — needed to build branchMap before resolving
+        // attendance/enrollment branch labels in the parallel pass below.
         const branchMap = new Map<string, string>(); // branchId → branchName
         const branchSnap = await getDocs(
           collection(db, "schools", ownerUid, "branches")
@@ -90,21 +191,39 @@ export default function StudentsIntelligence() {
           const bid   = data.branchId || d.id;
           if (bname && bid) branchMap.set(bid, bname);
         });
-        // schoolMap: fallback using this owner's own school doc only (no cross-tenant reads)
-        const schoolMap = new Map<string, string>(); // schoolId → branchName (fallback)
-        setSchools(branchMap); // store branchId→name for dropdown
+        setBranches(branchMap);
 
-        /* 2. enrollments — scoped to this school */
-        const enrollSnap = await getDocs(
-          query(collection(db, "enrollments"), where("schoolId", "==", ownerUid))
-        );
+        // Bound attendance to last 12 months — heatmap reflects the current
+        // pattern, not all-time history. attendance.date is a "YYYY-MM-DD"
+        // string so a string ">=" comparison works as a date bound and lets
+        // Firestore use the (schoolId, date) index. Cuts a 200K+-doc scan
+        // to typically 30K-60K on busy schools.
+        const oneYearAgo = new Date();
+        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        const attCutoff = `${oneYearAgo.getFullYear()}-${String(oneYearAgo.getMonth() + 1).padStart(2, "0")}-01`;
+
+        // Parallel fetch — 4 reads dispatch concurrently. Initial load
+        // latency drops from sum(latencies) to max(latencies) (~4× faster
+        // on cold cache). swallow() keeps a single failed collection from
+        // blanking the whole page.
+        const swallow = (label: string) => (err: unknown) => {
+          console.warn(`[StudentsIntelligence] ${label} fetch failed:`, err);
+          return { docs: [] as any[] } as any;
+        };
+        const [enrollSnap, scoresSnap, attSnap, discSnap] = await Promise.all([
+          getDocs(query(collection(db, "enrollments"), where("schoolId", "==", ownerUid))).catch(swallow("enrollments")),
+          getDocs(query(collection(db, "test_scores"), where("schoolId", "==", ownerUid))).catch(swallow("test_scores")),
+          getDocs(query(
+            collection(db, "attendance"),
+            where("schoolId", "==", ownerUid),
+            where("date", ">=", attCutoff),
+          )).catch(swallow("attendance")),
+          getDocs(query(collection(db, "discipline"), where("schoolId", "==", ownerUid))).catch(swallow("discipline")),
+        ]);
+
         const enrollments = enrollSnap.docs.map(d => ({ _eid: d.id, ...d.data() as any }));
 
-        /* 3. test_scores: studentId → avg score — scoped */
-        const scoresSnap = await getDocs(
-          query(collection(db, "test_scores"), where("schoolId", "==", ownerUid))
-        );
-        const scoreMap   = new Map<string, number[]>();
+        const scoreMap = new Map<string, number[]>();
         scoresSnap.docs.forEach(d => {
           const data = d.data() as any;
           const key  = data.studentId || data.studentEmail || "";
@@ -115,21 +234,18 @@ export default function StudentsIntelligence() {
           }
         });
 
-        /* 4. attendance records — scoped */
-        const attSnap  = await getDocs(
-          query(collection(db, "attendance"), where("schoolId", "==", ownerUid))
-        );
-
-        /* build student→grade and student→schoolId lookup from enrollments */
+        /* student→grade and student→branchId lookup from enrollments.
+         * stuBranchMap stores branchId ONLY — branchMap is keyed by
+         * branchId, so storing schoolId here would never resolve. Missing
+         * branchIds are auto-backfilled by the enforceBranchId_* cloud
+         * trigger within ~1-2s (memory: branchid_inference_lag). */
         const stuGradeMap  = new Map<string,string>();
-        const stuSchoolMap = new Map<string,string>();
+        const stuBranchMap = new Map<string,string>();
         enrollments.forEach(e => {
           const sid = e.studentId || e.studentEmail || e._eid;
           const g   = normalizeGrade(e.grade || e.class || e.className || "");
-          if (g)           stuGradeMap.set(sid, g);
-          // store branchId for heatmap grouping
-          if (e.branchId)  stuSchoolMap.set(sid, e.branchId);
-          else if (e.schoolId) stuSchoolMap.set(sid, e.schoolId);
+          if (g)          stuGradeMap.set(sid, g);
+          if (e.branchId) stuBranchMap.set(sid, e.branchId);
         });
 
         /* studentId → { present, total } for per-student attendance % */
@@ -137,21 +253,19 @@ export default function StudentsIntelligence() {
         /* branchName → grade → { present, total } for heatmap */
         const heatMap  = new Map<string, Map<string,{p:number;t:number}>>();
 
-        attSnap.docs.forEach(d => {
+        attSnap.docs.forEach((d: any) => {
           const data    = d.data() as any;
           const sid     = data.studentId || data.studentEmail || "";
           if (!sid) return;
 
-          /* per-student map */
           if (!attMap.has(sid)) attMap.set(sid, {p:0,t:0});
           const cur = attMap.get(sid)!;
           cur.t++;
           const isPresent = (data.status||"").toLowerCase() === "present";
           if (isPresent) cur.p++;
 
-          /* heatmap map — resolve branchId → branchName */
-          const bid    = data.branchId || stuSchoolMap.get(sid) || "";
-          const branch = branchMap.get(bid) || schoolMap.get(bid) || schoolMap.get(data.schoolId || "") || data.schoolName || "";
+          const bid    = data.branchId || stuBranchMap.get(sid) || "";
+          const branch = branchMap.get(bid) || data.schoolName || "";
           const grade  = normalizeGrade(data.grade || data.class || stuGradeMap.get(sid) || "");
           if (!branch || !grade) return;
 
@@ -165,18 +279,27 @@ export default function StudentsIntelligence() {
 
         setHeatRaw(heatMap);
 
-        /* 5. discipline: studentId → count — scoped */
-        const discSnap = await getDocs(
-          query(collection(db, "discipline"), where("schoolId", "==", ownerUid))
-        );
-        const discMap  = new Map<string,number>();
-        discSnap.docs.forEach(d => {
+        const discMap = new Map<string,number>();
+        discSnap.docs.forEach((d: any) => {
           const key = (d.data() as any).studentId || (d.data() as any).studentEmail || "";
           if (key) discMap.set(key, (discMap.get(key)||0)+1);
         });
 
-        /* 6. enrich enrollment rows */
-        const enriched = enrollments.map(e => {
+        /* enrich enrollment rows + dedup by studentId.
+         *
+         * `enrollments` is one doc per (student, class) pair, so a student
+         * enrolled in 3 classes produces 3 rows. Dedup by studentId so the
+         * table shows each student exactly once. We pick the MOST RECENT
+         * enrollment as canonical (latest createdAt wins) — fresh class
+         * assignments overwrite older ones in the visible row, and the
+         * `classCount` field tracks the multi-class case for future UI.
+         *
+         * Score / attendance / incidents are already per-student
+         * aggregates (the upstream maps key by studentId), so collapsing
+         * rows doesn't lose any data — only stops the visual duplication.
+         */
+        const enrichedMap = new Map<string, any>();
+        enrollments.forEach(e => {
           const sid    = e.studentId || e.studentEmail || e._eid;
           const scores = scoreMap.get(sid) || [];
           const avgScore = scores.length
@@ -185,21 +308,40 @@ export default function StudentsIntelligence() {
           const att    = attMap.get(sid);
           const attPct = att && att.t > 0 ? Math.round((att.p/att.t)*100) : 0;
           const incidents = discMap.get(sid) || 0;
+          const ts =
+            e.createdAt?.toMillis?.() ??
+            (typeof e.createdAt?.seconds === "number" ? e.createdAt.seconds * 1000 : 0);
 
-          return {
+          const row = {
             id:          sid,
             _eid:        e._eid,
             name:        e.studentName || e.name || "Unknown",
             grade:       normalizeGrade(e.grade || e.class || e.className || "") || "—",
             schoolId:    e.schoolId || "",
-            branch:      branchMap.get(e.branchId) || branchMap.get(e.schoolId) || schoolMap.get(e.schoolId) || e.schoolName || "—",
+            branch:      branchMap.get(e.branchId) || e.schoolName || "—",
             score:       avgScore,
             attendance:  attPct,
             incidents,
             createdAt:   e.createdAt,
+            _ts:         ts,
+            classCount:  1,
           };
+
+          const existing = enrichedMap.get(sid);
+          if (!existing) {
+            enrichedMap.set(sid, row);
+          } else {
+            // Multi-class student — bump the count, keep most-recent enrollment as canonical.
+            existing.classCount += 1;
+            if (ts > (existing._ts ?? 0)) {
+              // Replace canonical fields with the fresher enrollment.
+              const preservedCount = existing.classCount;
+              enrichedMap.set(sid, { ...row, classCount: preservedCount });
+            }
+          }
         });
 
+        const enriched = [...enrichedMap.values()];
         enriched.sort((a,b)=>(a.name||"").localeCompare(b.name||""));
         setStudents(enriched);
       } catch(e) {
@@ -210,53 +352,74 @@ export default function StudentsIntelligence() {
     go();
   }, []);
 
-  /* ── derived stats ──────────────────────────────── */
-  const totalEnrollment = students.length;
+  /* ── branch-scoped student set ───────────────────────
+   * Single source of truth for "students currently in scope". Every top
+   * card, hero stat, chart, AI summary derives from this — selecting a
+   * branch in the page-head dropdown filters the entire page coherently
+   * (no more "card shows X but table shows Y" confusion). */
+  const branchScopedStudents = useMemo(
+    () => pageBranch === "All" ? students : students.filter(s => s.branch === pageBranch),
+    [students, pageBranch],
+  );
+
+  /* ── derived stats (all branch-scoped) ─────────── */
+  const totalEnrollment = branchScopedStudents.length;
 
   const avgAttendance = useMemo(() => {
-    const list = students.filter(s=>s.attendance>0);
+    const list = branchScopedStudents.filter(s=>s.attendance>0);
     return list.length ? Math.round(list.reduce((s,x)=>s+x.attendance,0)/list.length*10)/10 : 0;
-  }, [students]);
+  }, [branchScopedStudents]);
 
-  const atRisk = useMemo(() => students.filter(s=>s.score>0 && s.score<50).length, [students]);
+  const atRisk = useMemo(
+    () => branchScopedStudents.filter(s=>s.score>0 && s.score<50).length,
+    [branchScopedStudents],
+  );
 
-  const highPerformers = useMemo(() => students.filter(s=>s.score>=85).length, [students]);
+  const highPerformers = useMemo(
+    () => branchScopedStudents.filter(s=>s.score>=85).length,
+    [branchScopedStudents],
+  );
 
   /* New enrollments this term — students with createdAt in last 4 months */
   const newThisTerm = useMemo(() => {
     const cutoff = Date.now() - (120 * 24 * 60 * 60 * 1000);
-    return students.filter(s => {
+    return branchScopedStudents.filter(s => {
       const d = s.createdAt?.toDate?.();
       return d && d.getTime() >= cutoff;
     }).length;
-  }, [students]);
+  }, [branchScopedStudents]);
 
-  /* ── grade distribution for pie ─────────────────── */
+  /* ── grade distribution for pie (branch-scoped) ── */
   const gradeDistData = useMemo(() => {
     const map: Record<string,number> = {};
-    students.forEach(s => { map[s.grade] = (map[s.grade]||0)+1; });
+    branchScopedStudents.forEach(s => { map[s.grade] = (map[s.grade]||0)+1; });
     return Object.entries(map)
       .sort((a,b)=>b[1]-a[1])
       .slice(0,6)
       .map(([name,value],i)=>({ name, value, fill: GRADE_COLORS[i]||"#94a3b8" }));
-  }, [students]);
+  }, [branchScopedStudents]);
 
-  /* ── enrollment trend (last 6 months) ───────────── */
+  /* ── enrollment trend (last 6 months, year-aware, branch-scoped) ─ */
   const enrollTrend = useMemo(() => {
-    const monthMap: Record<string,number> = {};
-    students.forEach(s => {
+    const counts = new Map<number, number>();
+    branchScopedStudents.forEach(s => {
       const d = s.createdAt?.toDate?.();
-      if (d) { const k = MONTH_NAMES[d.getMonth()]; monthMap[k]=(monthMap[k]||0)+1; }
+      if (!d) return;
+      const k = monthKey(d);
+      counts.set(k, (counts.get(k) ?? 0) + 1);
     });
-    const now  = new Date();
-    return Array.from({length:6},(_,i)=>{
-      const d = new Date(now.getFullYear(), now.getMonth()-5+i, 1);
-      const m = MONTH_NAMES[d.getMonth()];
-      return { month:m, value: monthMap[m]||0 };
+    const nowKey = monthKey(new Date());
+    return Array.from({ length: 6 }, (_, i) => {
+      const k = nowKey - 5 + i;
+      const monthIdx = ((k % 12) + 12) % 12;
+      return { month: MONTH_NAMES[monthIdx], value: counts.get(k) ?? 0 };
     });
-  }, [students]);
+  }, [branchScopedStudents]);
 
-  /* ── performance by branch ──────────────────────── */
+  /* ── performance by branch ─────────────────────────
+   * Cross-branch comparison chart — intentionally uses ALL students even
+   * when a branch filter is active, so the user can see how the selected
+   * branch compares to its peers. */
   const perfByBranch = useMemo(() => {
     const map: Record<string,number[]> = {};
     students.forEach(s => {
@@ -266,20 +429,21 @@ export default function StudentsIntelligence() {
     });
     return Object.entries(map).map(([branch,scores])=>({
       branch: branch.length > 8 ? branch.split(" ")[0] : branch,
+      fullBranch: branch,
       value: Math.round(scores.reduce((a,b)=>a+b,0)/scores.length),
     }));
   }, [students]);
 
   /* ── branch list for dropdowns — from branches subcollection ── */
   const branchList = useMemo(() =>
-    ["All", ...[...schools.values()].filter(Boolean).sort()],
-  [schools]); // schools state now holds branchId→branchName from subcollection
+    ["All", ...[...branches.values()].filter(Boolean).sort()],
+  [branches]);
 
-  /* ── attendance heatmap — built from raw attendance records ── */
+  /* ── attendance heatmap — branch-scoped via pageBranch ── */
   const heatmapGrades = useMemo(() => {
     const gradeSet = new Set<string>();
-    if (heatBranch !== "All") {
-      heatRaw.get(heatBranch)?.forEach((_, g) => gradeSet.add(g));
+    if (pageBranch !== "All") {
+      heatRaw.get(pageBranch)?.forEach((_, g) => gradeSet.add(g));
     } else {
       heatRaw.forEach(gm => gm.forEach((_, g) => gradeSet.add(g)));
     }
@@ -288,13 +452,13 @@ export default function StudentsIntelligence() {
       const nb = parseInt(b.match(/\d+/)?.[0] || "0");
       return na - nb;
     });
-  }, [heatRaw, heatBranch]);
+  }, [heatRaw, pageBranch]);
 
   const heatmapData = useMemo(() => {
     const rows: { branch: string; cells: number[] }[] = [];
     const source: [string, Map<string, { p: number; t: number }>][] =
-      heatBranch !== "All"
-        ? heatRaw.has(heatBranch) ? [[heatBranch, heatRaw.get(heatBranch)!]] : []
+      pageBranch !== "All"
+        ? heatRaw.has(pageBranch) ? [[pageBranch, heatRaw.get(pageBranch)!]] : []
         : [...heatRaw.entries()];
     source.forEach(([branch, gradeMap]) => {
       rows.push({
@@ -306,18 +470,44 @@ export default function StudentsIntelligence() {
       });
     });
     return rows;
-  }, [heatRaw, heatmapGrades, heatBranch]);
+  }, [heatRaw, heatmapGrades, pageBranch]);
 
-  /* ── filtered & paginated ───────────────────────── */
-  const filtered = useMemo(() =>
-    students.filter(s =>
-      (s.name || "").toLowerCase().includes(search.toLowerCase()) &&
-      (tableBranch === "All" || s.branch === tableBranch)
-    ),
-  [students, search, tableBranch]);
+  /* ── filtered & paginated ─────────────────────────
+   * Table starts from `branchScopedStudents` (page-level branch filter)
+   * then layers on search + secondary filters (score-tier from stat-card
+   * drill-throughs, grade from pie-slice clicks). Each filter is
+   * independent so the user can stack them.
+   */
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return branchScopedStudents.filter(s => {
+      if (q && !(s.name || "").toLowerCase().includes(q)) return false;
+      if (gradeFilter && s.grade !== gradeFilter) return false;
+      if (scoreFilter === "atRisk" && !(s.score > 0 && s.score < 50)) return false;
+      if (scoreFilter === "medium" && !(s.score >= 50 && s.score < 75)) return false;
+      if (scoreFilter === "high"   && !(s.score >= 85)) return false;
+      return true;
+    });
+  }, [branchScopedStudents, search, gradeFilter, scoreFilter]);
+
+  /* Reset pagination whenever an upstream filter changes — otherwise the
+   * user can land on page 4 of an empty filtered list. */
+  useEffect(() => { setPage(1); }, [pageBranch, scoreFilter, gradeFilter, search]);
+
+  /* Convenience flag — anything beyond default scope is "active" */
+  const filtersActive = pageBranch !== "All" || scoreFilter !== "all" || gradeFilter !== null;
+  const clearAllFilters = () => {
+    setPageBranch("All");
+    setScoreFilter("all");
+    setGradeFilter(null);
+    setSearch("");
+  };
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageStudents = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
+  const pageStudents = useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page],
+  );
 
   /* group by first letter */
   const grouped = useMemo(() => {
@@ -333,26 +523,49 @@ export default function StudentsIntelligence() {
   /* ── fetch real per-student detail when selection changes ── */
   useEffect(() => {
     if (!selected) return;
+
+    const sid = selected.id; // studentId or studentEmail
+    const ownerUid = auth.currentUser?.uid;
+    if (!ownerUid) return;
+
+    lastDetailSidRef.current = sid;
+    const cacheKey = `${ownerUid}:${sid}`;
+
+    // Cache hit → paint immediately, no spinner flash, no Firestore reads.
+    const cached = detailCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < DETAIL_CACHE_TTL_MS) {
+      setDetailTrend(cached.data.trend);
+      setAtt30(cached.data.att30);
+      setAttDelta(cached.data.attDelta);
+      setScoreDelta(cached.data.scoreDelta);
+      setDetailLoading(false);
+      return;
+    }
+
     setDetailLoading(true);
     setDetailTrend([]);
     setAttDelta(null);
     setScoreDelta(null);
     setAtt30(null);
 
-    const sid = selected.id; // studentId or studentEmail
-
     const fetchDetail = async () => {
+      // schoolId scope is mandatory: studentId / studentEmail can collide
+      // across tenants, so without this filter the query would surface
+      // another school's data. Aligns with the platform-wide security
+      // hardening sweep (memory: security_hardening_apr18).
       try {
         const now      = new Date();
         const ms30     = 30 * 24 * 60 * 60 * 1000;
         const cut30    = new Date(now.getTime() - ms30);
         const cut60    = new Date(now.getTime() - ms30 * 2);
 
-        /* ── 1. test_scores for this student ── */
+        /* ── 1. test_scores for this student (schoolId-scoped) ── */
         const [byId, byEmail] = await Promise.all([
           getDocs(query(collection(db, "test_scores"),
+            where("schoolId", "==", ownerUid),
             where("studentId", "==", sid))),
           getDocs(query(collection(db, "test_scores"),
+            where("schoolId", "==", ownerUid),
             where("studentEmail", "==", sid))),
         ]);
         // deduplicate by doc id
@@ -364,35 +577,36 @@ export default function StudentsIntelligence() {
         // sort ascending by timestamp (field name is "timestamp" in test_scores)
         scoreDocs.sort((a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
 
-        /* last-2-exam delta */
+        /* last-2-exam delta — computed as a local; state set in the
+         * race-guarded apply block at the end of this fetch. */
         const pcts = scoreDocs
           .map(d => parseFloat(d.percentage ?? d.score ?? ""))
           .filter(n => !isNaN(n));
-        if (pcts.length >= 2) {
-          setScoreDelta(Math.round(pcts[pcts.length - 1] - pcts[pcts.length - 2]));
-        } else {
-          setScoreDelta(null);
-        }
+        const localScoreDelta = pcts.length >= 2
+          ? Math.round(pcts[pcts.length - 1] - pcts[pcts.length - 2])
+          : null;
 
-        /* month-wise average score — last 6 months */
-        const scoreByMonth = new Map<string, number[]>();
+        /* month-wise average score — last 6 months (year-aware key) */
+        const scoreByMonth = new Map<number, number[]>();
         scoreDocs.forEach(d => {
           // date field is "timestamp" (Firestore Timestamp)
           const date = d.timestamp?.toDate?.();
           if (!date) return;
-          const key = MONTH_NAMES[date.getMonth()];
+          const k = monthKey(date);
           const pct = parseFloat(d.percentage ?? d.score ?? "");
           if (!isNaN(pct)) {
-            if (!scoreByMonth.has(key)) scoreByMonth.set(key, []);
-            scoreByMonth.get(key)!.push(pct);
+            if (!scoreByMonth.has(k)) scoreByMonth.set(k, []);
+            scoreByMonth.get(k)!.push(pct);
           }
         });
 
-        /* ── 2. attendance for this student ── */
+        /* ── 2. attendance for this student (schoolId-scoped) ── */
         const [attById, attByEmail] = await Promise.all([
           getDocs(query(collection(db, "attendance"),
+            where("schoolId", "==", ownerUid),
             where("studentId", "==", sid))),
           getDocs(query(collection(db, "attendance"),
+            where("schoolId", "==", ownerUid),
             where("studentEmail", "==", sid))),
         ]);
         // deduplicate
@@ -402,9 +616,9 @@ export default function StudentsIntelligence() {
           if (!seenAtt.has(d.id)) { seenAtt.add(d.id); attDocs.push(d.data() as any); }
         });
 
-        /* last-30-day vs prev-30-day attendance % */
+        /* last-30-day vs prev-30-day attendance % + year-aware monthly bucket */
         let l30p = 0, l30t = 0, p30p = 0, p30t = 0;
-        const attByMonth = new Map<string, { p: number; t: number }>();
+        const attByMonth = new Map<number, { p: number; t: number }>();
 
         attDocs.forEach(d => {
           // "date" is stored as "YYYY-MM-DD" string; "timestamp" is Firestore Timestamp
@@ -420,37 +634,59 @@ export default function StudentsIntelligence() {
             if (date >= cut30)       { l30t++; if (isPresent) l30p++; }
             else if (date >= cut60)  { p30t++; if (isPresent) p30p++; }
 
-            const key = MONTH_NAMES[date.getMonth()];
-            if (!attByMonth.has(key)) attByMonth.set(key, { p: 0, t: 0 });
-            const m = attByMonth.get(key)!;
+            const k = monthKey(date);
+            if (!attByMonth.has(k)) attByMonth.set(k, { p: 0, t: 0 });
+            const m = attByMonth.get(k)!;
             m.t++;
             if (isPresent) m.p++;
           }
         });
 
-        const last30Pct  = l30t > 0 ? Math.round((l30p / l30t) * 100) : null;
-        const prev30Pct  = p30t > 0 ? Math.round((p30p / p30t) * 100) : null;
-        setAtt30(last30Pct);
-        setAttDelta(last30Pct !== null && prev30Pct !== null
-          ? last30Pct - prev30Pct : null);
+        const localAtt30   = l30t > 0 ? Math.round((l30p / l30t) * 100) : null;
+        const localPrev30  = p30t > 0 ? Math.round((p30p / p30t) * 100) : null;
+        const localAttDelta = localAtt30 !== null && localPrev30 !== null
+          ? localAtt30 - localPrev30 : null;
 
-        /* ── 3. build trend: last 6 months ── */
-        const trend = Array.from({ length: 6 }, (_, i) => {
-          const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
-          const m = MONTH_NAMES[d.getMonth()];
-          const sc = scoreByMonth.get(m);
-          const at = attByMonth.get(m);
+        /* ── 3. build trend: last 6 months (year-aware) ── */
+        const nowKey = monthKey(now);
+        const localTrend = Array.from({ length: 6 }, (_, i) => {
+          const k = nowKey - 5 + i;
+          const monthIdx = ((k % 12) + 12) % 12;
+          const sc = scoreByMonth.get(k);
+          const at = attByMonth.get(k);
           return {
-            month:      m,
+            month:      MONTH_NAMES[monthIdx],
             score:      sc ? Math.round(sc.reduce((a, b) => a + b, 0) / sc.length) : 0,
             attendance: at && at.t > 0 ? Math.round((at.p / at.t) * 100) : 0,
           };
         });
-        setDetailTrend(trend);
+
+        // Race guard — if the user picked a different student mid-fetch,
+        // drop this response so it can't overwrite the panel with stale data.
+        if (lastDetailSidRef.current !== sid) return;
+
+        setScoreDelta(localScoreDelta);
+        setAtt30(localAtt30);
+        setAttDelta(localAttDelta);
+        setDetailTrend(localTrend);
+
+        // Cache for the rest of the session — repeat clicks on the same
+        // student within 5 min skip the 4 Firestore reads entirely.
+        detailCache.set(cacheKey, {
+          data: {
+            trend:      localTrend,
+            att30:      localAtt30,
+            attDelta:   localAttDelta,
+            scoreDelta: localScoreDelta,
+          },
+          ts: Date.now(),
+        });
       } catch (e) {
         console.error(e);
       }
-      setDetailLoading(false);
+      // Only the latest fetch should clear the spinner; otherwise an old
+      // fetch could flicker the loading state off mid-flight for a newer one.
+      if (lastDetailSidRef.current === sid) setDetailLoading(false);
     };
 
     fetchDetail();
@@ -512,24 +748,50 @@ export default function StudentsIntelligence() {
               Students Intelligence
             </h1>
             <p style={{ fontSize: isMobile ? 12 : 14, color:T3, fontWeight:500, margin:"4px 0 0 0", letterSpacing:0 }}>
-              Enrollment, performance &amp; behavior analytics
+              {pageBranch === "All"
+                ? "Enrollment, performance & behavior analytics"
+                : `Viewing ${pageBranch} · enrollment, performance & behavior`}
             </p>
           </div>
         </div>
-        <button
-          onClick={()=>navigate("/students")}
-          className="stu-btn"
-          style={{
-            display:"inline-flex", alignItems:"center", justifyContent:"center", gap: isMobile ? 6 : 8,
-            padding: isMobile ? "9px 14px" : "11px 18px", borderRadius: isMobile ? 12 : 14,
-            background:GRAD_PRIMARY, color:"#fff",
-            fontSize: isMobile ? 11 : 12, fontWeight:700, letterSpacing:"0.06em", textTransform:"uppercase",
-            border:"none", cursor:"pointer", boxShadow:SHADOW_BTN, fontFamily:"inherit",
-            width: isMobile ? "100%" : "auto",
-          }}
-        >
-          <Plus size={isMobile ? 14 : 16} strokeWidth={2.4}/> Add Student
-        </button>
+        {/* Page-level branch selector — drives every card, chart, table row.
+            Visually anchored top-right so the user can re-scope the entire
+            page without scrolling. Clear-filters chip appears only when
+            something beyond the default scope is active. */}
+        <div style={{ display:"flex", alignItems:"center", gap: 8, flexWrap:"wrap", width: isMobile ? "100%" : "auto" }}>
+          {filtersActive && (
+            <button
+              onClick={clearAllFilters}
+              className="stu-btn"
+              style={{
+                display:"inline-flex", alignItems:"center", justifyContent:"center", gap:6,
+                padding: isMobile ? "9px 12px" : "10px 14px", borderRadius:12,
+                background:"#fff", border:"0.5px solid rgba(0,85,255,.18)",
+                fontSize:11, fontWeight:700, color:T3, cursor:"pointer", fontFamily:"inherit",
+                letterSpacing:"0.06em", textTransform:"uppercase",
+              }}
+            >
+              <X size={13}/> Clear
+            </button>
+          )}
+          <select
+            value={pageBranch}
+            onChange={e => setPageBranch(e.target.value)}
+            aria-label="Filter page by branch"
+            style={{
+              padding: isMobile ? "9px 12px" : "11px 16px", borderRadius:12,
+              background: pageBranch === "All" ? "#fff" : GRAD_PRIMARY,
+              color: pageBranch === "All" ? T1 : "#fff",
+              border: pageBranch === "All" ? "0.5px solid rgba(0,85,255,.18)" : "none",
+              fontSize: isMobile ? 11 : 12, fontWeight:800, letterSpacing:"0.06em",
+              outline:"none", fontFamily:"inherit",
+              boxShadow: pageBranch === "All" ? SHADOW_SM : SHADOW_BTN,
+              cursor:"pointer", flex: isMobile ? 1 : undefined,
+            }}
+          >
+            {branchList.map(b=><option key={b} value={b} style={{ color: T1 }}>{b==="All"?"All Branches":b}</option>)}
+          </select>
+        </div>
       </div>
 
       {loading ? (
@@ -538,16 +800,18 @@ export default function StudentsIntelligence() {
         </div>
       ) : (
         <>
-          {/* ── Dark Hero Banner ───────────────────────── */}
+          {/* ── Dark Hero Banner ─────────────────────────
+               Click anywhere on the dark area resets to the all-branches
+               view. Inner stat tiles handle their own drill-through. */}
           <div
             {...tilt3D}
-            onClick={()=>navigate("/students")}
+            onClick={clearAllFilters}
             role="button" tabIndex={0}
             style={{
               background:GRAD_HERO, borderRadius: isMobile ? 18 : 24, padding: isMobile ? "18px 18px" : "24px 28px", color:"#fff",
               marginBottom: isMobile ? 16 : 24, position:"relative", overflow:"hidden",
               boxShadow:"0 14px 40px rgba(0,8,60,.32), 0 0 0 .5px rgba(255,255,255,.12)",
-              cursor:"pointer",
+              cursor: filtersActive ? "pointer" : "default",
               ...tilt3DStyle,
             }}
           >
@@ -565,44 +829,95 @@ export default function StudentsIntelligence() {
                     {totalEnrollment.toLocaleString()}
                   </h2>
                   <p style={{ fontSize: isMobile ? 11 : 13, color:"rgba(255,255,255,.72)", fontWeight:500, margin:"8px 0 0 0" }}>
-                    Total scholars across {branchList.length-1} branches · {newThisTerm > 0 ? `+${newThisTerm} new this term` : "steady enrollment"}
+                    {pageBranch === "All"
+                      ? `Total scholars across ${branchList.length-1} branch${branchList.length-1 === 1 ? "" : "es"}`
+                      : `Total scholars in ${pageBranch}`}
+                    {newThisTerm > 0 ? ` · +${newThisTerm} new this term` : " · steady enrollment"}
                   </p>
                 </div>
               </div>
+              {/* Hero stat tiles — drill-through filter actions, no nav.
+                  Clicking "At Risk" filters the page to at-risk students;
+                  click again to clear (toggle behaviour). */}
               <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : "repeat(3, minmax(120px,1fr))", gap: isMobile ? 8 : 10, width: isMobile ? "100%" : "auto" }}>
-                {[
-                  { label:"Avg Attendance", value:avgAttendance > 0 ? `${avgAttendance}%` : "—", route:"/students" },
-                  { label:"At Risk",        value:atRisk.toString(), route:"/risks" },
-                  { label:"High Performers",value:highPerformers.toString(), route:"/students" },
-                ].map(s=>(
+                {([
+                  {
+                    label: "Avg Attendance",
+                    value: avgAttendance > 0 ? `${avgAttendance}%` : "—",
+                    activeKey: null as ScoreFilter | null,
+                  },
+                  {
+                    label: "At Risk",
+                    value: atRisk.toString(),
+                    activeKey: "atRisk" as ScoreFilter,
+                  },
+                  {
+                    label: "High Performers",
+                    value: highPerformers.toString(),
+                    activeKey: "high" as ScoreFilter,
+                  },
+                ]).map(s => {
+                  const isActive = s.activeKey !== null && scoreFilter === s.activeKey;
+                  return (
                   <div
                     key={s.label}
-                    onClick={(e)=>{ e.stopPropagation(); navigate(s.route); }}
+                    onClick={(e)=>{
+                      e.stopPropagation();
+                      if (s.activeKey) {
+                        // Toggle: re-clicking the active tile clears the filter.
+                        setScoreFilter(scoreFilter === s.activeKey ? "all" : s.activeKey);
+                      } else {
+                        // Avg Attendance has no filter — scroll to heatmap instead.
+                        document.getElementById("attendance-heatmap")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }
+                    }}
                     role="button" tabIndex={0}
-                    style={{ background:"rgba(255,255,255,.10)", borderRadius: isMobile ? 12 : 14, padding: isMobile ? "10px 10px" : "12px 14px", border:"0.5px solid rgba(255,255,255,.14)", cursor:"pointer" }}
+                    style={{
+                      background: isActive ? "rgba(255,255,255,.22)" : "rgba(255,255,255,.10)",
+                      borderRadius: isMobile ? 12 : 14, padding: isMobile ? "10px 10px" : "12px 14px",
+                      border: isActive ? "0.5px solid rgba(255,255,255,.5)" : "0.5px solid rgba(255,255,255,.14)",
+                      cursor:"pointer",
+                    }}
                   >
                     <p style={{ fontSize: isMobile ? 8 : 9, fontWeight:700, color:"rgba(255,255,255,.65)", letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 6px 0" }}>{s.label}</p>
                     <p style={{ fontSize: isMobile ? 16 : 20, fontWeight:800, color:"#fff", margin:0, letterSpacing:"-0.4px" }}>{s.value}</p>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
 
-          {/* ── Bright Stat Grid ─────────────────────── */}
+          {/* ── Bright Stat Grid (drill-through, branch-scoped) ─
+               Each card filters/scopes the page in-place instead of
+               navigating away. Total Enrollment → resets filters.
+               Avg Attendance → scrolls to heatmap. At-Risk → score<50.
+               High Performers → score>=85. Re-clicking the active card
+               toggles the filter off. */}
           <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: isMobile ? 10 : 16, marginBottom: isMobile ? 16 : 24, perspective:"1200px" }}>
-            {[
-              { label:"Total Enrollment", value:totalEnrollment.toLocaleString(), sub:newThisTerm > 0 ? `+${newThisTerm} this term` : "Steady", grad:GRAD_BLUE, icon:Users, delta:newThisTerm > 0 ? "up" : null, route:"/students" },
-              { label:"Avg Attendance", value:avgAttendance > 0 ? `${avgAttendance}%` : "—", sub:`Across ${totalEnrollment} students`, grad:GRAD_GREEN, icon:Percent, delta:null, route:"/students" },
-              { label:"At-Risk Students", value:atRisk.toString(), sub:`${totalEnrollment>0?((atRisk/totalEnrollment)*100).toFixed(1):0}% of total`, grad:atRisk > 0 ? GRAD_RED : GRAD_GOLD, icon:AlertTriangle, delta:atRisk > 0 ? "down" : null, route:"/risks" },
-              { label:"High Performers", value:highPerformers.toString(), sub:`${totalEnrollment>0?((highPerformers/totalEnrollment)*100).toFixed(1):0}% of total`, grad:GRAD_VIOLET, icon:Award, delta:"up", route:"/students" },
-            ].map(s=>{
+            {([
+              { label:"Total Enrollment",  value:totalEnrollment.toLocaleString(),                                                            sub:newThisTerm > 0 ? `+${newThisTerm} this term` : "Steady",                                            grad:GRAD_BLUE,                              icon:Users,         delta:newThisTerm > 0 ? "up" : null,  action:"reset"  as const, activeKey:null },
+              { label:"Avg Attendance",    value:avgAttendance > 0 ? `${avgAttendance}%` : "—",                                                sub:`Across ${totalEnrollment} students`,                                                                  grad:GRAD_GREEN,                             icon:Percent,       delta:null,                            action:"scroll" as const, activeKey:null },
+              { label:"At-Risk Students",  value:atRisk.toString(),                                                                            sub:`${totalEnrollment>0?((atRisk/totalEnrollment)*100).toFixed(1):0}% of total`,                          grad:atRisk > 0 ? GRAD_RED : GRAD_GOLD,      icon:AlertTriangle, delta:atRisk > 0 ? "down" : null,      action:"score"  as const, activeKey:"atRisk" as ScoreFilter },
+              { label:"High Performers",   value:highPerformers.toString(),                                                                    sub:`${totalEnrollment>0?((highPerformers/totalEnrollment)*100).toFixed(1):0}% of total`,                  grad:GRAD_VIOLET,                            icon:Award,         delta:"up",                            action:"score"  as const, activeKey:"high"   as ScoreFilter },
+            ]).map(s=>{
               const Icon = s.icon;
               const accent = GRAD_ACCENTS[s.grad] || "#4F46E5";
+              const isActive = s.activeKey !== null && scoreFilter === s.activeKey;
+              const handleClick = () => {
+                if (s.action === "score" && s.activeKey) {
+                  // Toggle the score filter — re-click clears it.
+                  setScoreFilter(scoreFilter === s.activeKey ? "all" : s.activeKey);
+                } else if (s.action === "scroll") {
+                  document.getElementById("attendance-heatmap")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                } else if (s.action === "reset") {
+                  clearAllFilters();
+                }
+              };
               return (
                 <div
                   key={s.label}
-                  onClick={()=>navigate(s.route)}
+                  onClick={handleClick}
                   role="button"
                   tabIndex={0}
                   {...tilt3D}
@@ -610,6 +925,8 @@ export default function StudentsIntelligence() {
                     background:s.grad, borderRadius: isMobile ? 16 : 22, padding: isMobile ? "14px 14px" : "20px 22px",
                     cursor:"pointer", position:"relative", overflow:"hidden",
                     boxShadow:"0 4px 8px rgba(0,85,255,.12), 0 12px 24px rgba(0,85,255,.16), 0 28px 56px rgba(0,85,255,.18)",
+                    outline: isActive ? `2px solid ${accent}` : "none",
+                    outlineOffset: isActive ? -2 : 0,
                     ...tilt3DStyle,
                   }}
                 >
@@ -637,22 +954,21 @@ export default function StudentsIntelligence() {
           {/* ── Charts Row (3-col) ───────────────────── */}
           <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: isMobile ? 12 : 16, marginBottom: isMobile ? 16 : 24, perspective:"1200px" }}>
 
-            {/* Grade Distribution */}
+            {/* Grade Distribution — click a slice to filter the table to that grade */}
             <div
               {...tilt3D}
-              onClick={()=>navigate("/students")}
-              role="button" tabIndex={0}
               style={{
                 background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px 14px" : "22px 22px 18px",
                 boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
-                cursor:"pointer",
                 ...tilt3DStyle,
               }}
             >
               <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
                 <div>
                   <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Grade Distribution</h3>
-                  <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Scholars by grade</p>
+                  <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>
+                    {gradeFilter ? `Filtering: ${gradeFilter} · click again to clear` : "Scholars by grade · click to filter"}
+                  </p>
                 </div>
                 <div style={{ width:32, height:32, borderRadius:10, background:"rgba(0,85,255,.08)", display:"flex", alignItems:"center", justifyContent:"center" }}>
                   <BarChart3 size={16} color={B1} strokeWidth={2.3}/>
@@ -665,6 +981,13 @@ export default function StudentsIntelligence() {
                       data={gradeDistData.length ? gradeDistData : [{name:"No Data",value:1,fill:"#e2e8f0"}]}
                       cx="50%" cy="50%" outerRadius={isMobile ? 62 : 78} innerRadius={isMobile ? 30 : 38}
                       dataKey="value" stroke="#fff" strokeWidth={2} paddingAngle={3}
+                      onClick={(slice: any) => {
+                        const name = slice?.name;
+                        if (!name || name === "No Data") return;
+                        // Toggle: clicking the active slice clears the filter.
+                        setGradeFilter(prev => prev === name ? null : name);
+                      }}
+                      cursor={gradeDistData.length ? "pointer" : "default"}
                       label={({name,midAngle,cx,cy,outerRadius:or})=>{
                         const R=Math.PI/180;
                         const x=cx+(or+18)*Math.cos(-midAngle*R);
@@ -672,7 +995,13 @@ export default function StudentsIntelligence() {
                         return <text x={x} y={y} fill={T3} fontSize={10} fontWeight="700" textAnchor={x>cx?"start":"end"} dominantBaseline="central">{name}</text>;
                       }}
                     >
-                      {(gradeDistData.length?gradeDistData:[{fill:"#e2e8f0"}]).map((e:any,i:number)=><Cell key={i} fill={e.fill}/>)}
+                      {(gradeDistData.length?gradeDistData:[{fill:"#e2e8f0"}]).map((e:any,i:number)=>(
+                        <Cell
+                          key={i}
+                          fill={e.fill}
+                          opacity={gradeFilter === null || gradeFilter === e.name ? 1 : 0.32}
+                        />
+                      ))}
                     </Pie>
                     <Tooltip contentStyle={{ borderRadius:12, border:"none", boxShadow:SHADOW_LG, fontSize:11, fontWeight:700 }}/>
                   </PieChart>
@@ -680,15 +1009,12 @@ export default function StudentsIntelligence() {
               </div>
             </div>
 
-            {/* Enrollment Trend */}
+            {/* Enrollment Trend — driven by branch-scoped students */}
             <div
               {...tilt3D}
-              onClick={()=>navigate("/students")}
-              role="button" tabIndex={0}
               style={{
                 background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px 14px" : "22px 22px 18px",
                 boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
-                cursor:"pointer",
                 ...tilt3DStyle,
               }}
             >
@@ -721,22 +1047,21 @@ export default function StudentsIntelligence() {
               </div>
             </div>
 
-            {/* Performance by Branch */}
+            {/* Performance by Branch — click a bar to scope the page to that branch */}
             <div
               {...tilt3D}
-              onClick={()=>navigate("/branches")}
-              role="button" tabIndex={0}
               style={{
                 background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px 14px" : "22px 22px 18px",
                 boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
-                cursor:"pointer",
                 ...tilt3DStyle,
               }}
             >
               <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
                 <div>
                   <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Performance by Branch</h3>
-                  <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Avg scores</p>
+                  <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>
+                    Avg scores · click bar to focus
+                  </p>
                 </div>
                 <div style={{ width:32, height:32, borderRadius:10, background:"rgba(0,200,83,.1)", display:"flex", alignItems:"center", justifyContent:"center" }}>
                   <Activity size={16} color={GREEN} strokeWidth={2.3}/>
@@ -745,7 +1070,7 @@ export default function StudentsIntelligence() {
               <div style={{ height:220 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
-                    data={perfByBranch.length ? perfByBranch : [{branch:"No Data",value:0}]}
+                    data={perfByBranch.length ? perfByBranch : [{branch:"No Data",fullBranch:"",value:0}]}
                     layout="vertical"
                     margin={{left:0,right:40,top:5,bottom:5}}
                   >
@@ -755,10 +1080,23 @@ export default function StudentsIntelligence() {
                     <YAxis dataKey="branch" type="category" axisLine={false} tickLine={false}
                       tick={{fill:T3,fontSize:11,fontWeight:700}} width={60}/>
                     <Tooltip contentStyle={{ borderRadius:12, border:"none", boxShadow:SHADOW_LG, fontSize:11, fontWeight:700 }} cursor={{fill:"rgba(0,85,255,.04)"}}/>
-                    <Bar dataKey="value" radius={[0,6,6,0]} barSize={22}
-                      label={{position:"right",fill:T3,fontSize:11,fontWeight:700,formatter:(v:any)=>`${v}%`}}>
+                    <Bar
+                      dataKey="value" radius={[0,6,6,0]} barSize={22}
+                      onClick={(bar: any) => {
+                        const fullBranch = bar?.fullBranch;
+                        if (!fullBranch || fullBranch === "") return;
+                        // Toggle: clicking the active branch's bar clears the filter.
+                        setPageBranch(prev => prev === fullBranch ? "All" : fullBranch);
+                      }}
+                      cursor={perfByBranch.length ? "pointer" : "default"}
+                      label={{position:"right",fill:T3,fontSize:11,fontWeight:700,formatter:(v:any)=>`${v}%`}}
+                    >
                       {perfByBranch.map((e,i)=>(
-                        <Cell key={i} fill={e.value>=80?GREEN:e.value>=60?GOLD:RED}/>
+                        <Cell
+                          key={i}
+                          fill={e.value>=80?GREEN:e.value>=60?GOLD:RED}
+                          opacity={pageBranch === "All" || pageBranch === e.fullBranch ? 1 : 0.35}
+                        />
                       ))}
                     </Bar>
                   </BarChart>
@@ -767,16 +1105,18 @@ export default function StudentsIntelligence() {
             </div>
           </div>
 
-          {/* ── Attendance Heatmap ───────────────────── */}
+          {/* ── Attendance Heatmap ─────────────────────
+               Driven by the page-level branchscope filter; per-card
+               dropdown removed in favour of the single page-head
+               selector. Anchor id used by the "Avg Attendance" stat
+               card's scroll-to action. */}
           <div
+            id="attendance-heatmap"
             {...tilt3D}
-            onClick={()=>navigate("/students")}
-            role="button" tabIndex={0}
             style={{
               background:"#fff", borderRadius: isMobile ? 16 : 22, padding: isMobile ? "16px 14px" : "22px 24px",
               boxShadow:SHADOW_SM, border:"0.5px solid rgba(0,85,255,.08)",
               marginBottom: isMobile ? 16 : 24, perspective:"1200px",
-              cursor:"pointer",
               ...tilt3DStyle,
             }}
           >
@@ -787,22 +1127,12 @@ export default function StudentsIntelligence() {
                 </div>
                 <div>
                   <h3 style={{ fontSize:15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Attendance Heatmap</h3>
-                  <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Branch × grade</p>
+                  <p style={{ fontSize:10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>
+                    {pageBranch === "All" ? "Branch × grade" : `${pageBranch} × grade`}
+                  </p>
                 </div>
               </div>
               <div style={{ display:"flex", alignItems:"center", gap:14, flexWrap:"wrap" }}>
-                <select
-                  value={heatBranch}
-                  onChange={e=>setHeatBranch(e.target.value)}
-                  onClick={e=>e.stopPropagation()}
-                  style={{
-                    padding:"7px 12px", borderRadius:10, border:"0.5px solid rgba(0,85,255,.18)",
-                    background:"#F5F9FF", fontSize:11, fontWeight:700, color:T3,
-                    letterSpacing:"0.04em", outline:"none", fontFamily:"inherit",
-                  }}
-                >
-                  {branchList.map(b=><option key={b} value={b}>{b==="All"?"All Branches":b}</option>)}
-                </select>
                 <div style={{ display:"flex", alignItems:"center", gap:12 }}>
                   {[[GREEN,"95%+"],[GOLD,"85-94%"],[RED,"<85%"]].map(([c,l])=>(
                     <div key={l as string} style={{ display:"flex", alignItems:"center", gap:5 }}>
@@ -878,29 +1208,153 @@ export default function StudentsIntelligence() {
                   }}
                 />
               </div>
-              <select
-                value={tableBranch}
-                onChange={e=>{setTableBranch(e.target.value);setPage(1);}}
-                style={{
-                  padding: isMobile ? "9px 10px" : "10px 14px", borderRadius:12, border:"0.5px solid rgba(0,85,255,.14)",
-                  background:"#F5F9FF", fontSize:12, fontWeight:700, color:T3,
-                  outline:"none", fontFamily:"inherit", minWidth: isMobile ? 0 : 140,
-                  flex: isMobile ? 1 : undefined,
-                }}
-              >
-                {branchList.map(b=><option key={b} value={b}>{b==="All"?"All Branches":b}</option>)}
-              </select>
+              {/* Filter button toggles a small popover with two secondary
+                  filters: risk tier (mirrors the stat-card drill-throughs)
+                  and grade (mirrors the pie-chart slice click). Branch
+                  filtering lives in the page-head selector — we don't
+                  duplicate it here to avoid two sources of truth. */}
               <button
+                ref={filterBtnRef}
+                onClick={() => filterMenuOpen ? setFilterMenuOpen(false) : openFilterMenu()}
                 className="stu-btn"
+                aria-expanded={filterMenuOpen}
                 style={{
                   display:"inline-flex", alignItems:"center", justifyContent:"center", gap:6,
                   padding: isMobile ? "9px 12px" : "10px 14px", borderRadius:12,
-                  background:"#F5F9FF", border:"0.5px solid rgba(0,85,255,.14)",
-                  fontSize:12, fontWeight:700, color:T3, cursor:"pointer", fontFamily:"inherit",
+                  background: filtersActive ? GRAD_PRIMARY : "#F5F9FF",
+                  color: filtersActive ? "#fff" : T3,
+                  border: filtersActive ? "none" : "0.5px solid rgba(0,85,255,.14)",
+                  fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"inherit",
                 }}
               >
                 <Filter size={13}/> {isMobile ? "" : "Filters"}
+                {filtersActive && (
+                  <span style={{
+                    display:"inline-flex", alignItems:"center", justifyContent:"center",
+                    minWidth:18, height:18, padding:"0 5px", borderRadius:9,
+                    background:"#fff", color:B1, fontSize:10, fontWeight:800,
+                  }}>
+                    {[
+                      pageBranch !== "All" ? 1 : 0,
+                      scoreFilter !== "all" ? 1 : 0,
+                      gradeFilter !== null ? 1 : 0,
+                    ].reduce((a,b)=>a+b, 0)}
+                  </span>
+                )}
               </button>
+              {/* Popover is portalled to <body> to escape the table card's
+                  tilt3D transform — `position: fixed` is unreliable inside
+                  any transformed ancestor. Anchor coordinates are captured
+                  at open time so desktop can place it under the button. */}
+              {filterMenuOpen && createPortal(
+                <>
+                  <div
+                    onClick={() => setFilterMenuOpen(false)}
+                    style={{
+                      position:"fixed", inset:0, zIndex:1040,
+                      background: isMobile ? "rgba(0,16,64,.32)" : "transparent",
+                    }}
+                  />
+                  <div
+                    role="menu"
+                    style={isMobile ? {
+                      position:"fixed", left:14, right:14, bottom:16, zIndex:1041,
+                      maxWidth:360, marginInline:"auto",
+                      background:"#fff", borderRadius:18, padding:"16px 16px 12px",
+                      border:"0.5px solid rgba(0,85,255,.14)",
+                      boxShadow:"0 -10px 40px rgba(0,8,60,.20), 0 0 0 .5px rgba(0,85,255,.10)",
+                      display:"flex", flexDirection:"column", gap:14,
+                    } : {
+                      position:"fixed",
+                      top: filterAnchor?.top ?? 80,
+                      right: filterAnchor?.right ?? 32,
+                      zIndex:1041,
+                      width:280,
+                      background:"#fff", borderRadius:14, padding:"14px 14px 10px",
+                      border:"0.5px solid rgba(0,85,255,.14)", boxShadow:SHADOW_LG,
+                      display:"flex", flexDirection:"column", gap:14,
+                    }}
+                  >
+                      <div>
+                        <p style={{ fontSize:9, fontWeight:800, color:T4, letterSpacing:"0.14em", textTransform:"uppercase", margin:"0 0 8px 0" }}>Risk Tier</p>
+                        <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                          {([
+                            { k: "all"    as ScoreFilter, label: "All",            tint: T3 },
+                            { k: "atRisk" as ScoreFilter, label: "At Risk (<50)",  tint: RED },
+                            { k: "medium" as ScoreFilter, label: "Medium (50-74)", tint: GOLD },
+                            { k: "high"   as ScoreFilter, label: "High (≥85)",     tint: GREEN },
+                          ]).map(p => {
+                            const active = scoreFilter === p.k;
+                            return (
+                              <button
+                                key={p.k}
+                                onClick={() => setScoreFilter(p.k)}
+                                style={{
+                                  padding:"6px 11px", borderRadius:9,
+                                  border: active ? "none" : `0.5px solid ${p.tint}33`,
+                                  background: active ? p.tint : `${p.tint}10`,
+                                  color: active ? "#fff" : p.tint,
+                                  fontSize:11, fontWeight:800, letterSpacing:"0.04em",
+                                  cursor:"pointer", fontFamily:"inherit",
+                                }}
+                              >
+                                {p.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div>
+                        <p style={{ fontSize:9, fontWeight:800, color:T4, letterSpacing:"0.14em", textTransform:"uppercase", margin:"0 0 8px 0" }}>Grade</p>
+                        <select
+                          value={gradeFilter ?? ""}
+                          onChange={e => setGradeFilter(e.target.value || null)}
+                          style={{
+                            width:"100%", padding:"8px 10px", borderRadius:10,
+                            border:"0.5px solid rgba(0,85,255,.18)", background:"#F5F9FF",
+                            fontSize:12, fontWeight:700, color:T3,
+                            outline:"none", fontFamily:"inherit",
+                          }}
+                        >
+                          <option value="">All grades</option>
+                          {[...new Set(branchScopedStudents.map(s => s.grade).filter(g => g && g !== "—"))]
+                            .sort((a,b) => {
+                              const na = parseInt(a.match(/\d+/)?.[0] || "0");
+                              const nb = parseInt(b.match(/\d+/)?.[0] || "0");
+                              return na - nb;
+                            })
+                            .map(g => <option key={g} value={g}>{g}</option>)}
+                        </select>
+                      </div>
+
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", borderTop:"0.5px solid rgba(0,85,255,.08)", paddingTop:10 }}>
+                        <button
+                          onClick={() => { clearAllFilters(); setFilterMenuOpen(false); }}
+                          style={{
+                            padding:"6px 10px", borderRadius:8, border:"none",
+                            background:"transparent", color:T3,
+                            fontSize:11, fontWeight:700, cursor:"pointer", fontFamily:"inherit",
+                          }}
+                        >
+                          Clear all
+                        </button>
+                        <button
+                          onClick={() => setFilterMenuOpen(false)}
+                          style={{
+                            padding:"7px 14px", borderRadius:9, border:"none",
+                            background:GRAD_PRIMARY, color:"#fff",
+                            fontSize:11, fontWeight:800, letterSpacing:"0.06em", textTransform:"uppercase",
+                            cursor:"pointer", fontFamily:"inherit",
+                          }}
+                        >
+                          Done
+                        </button>
+                      </div>
+                    </div>
+                  </>,
+                  document.body
+                )}
             </div>
 
             {isMobile ? (
@@ -912,9 +1366,6 @@ export default function StudentsIntelligence() {
                     </div>
                     {rows.map(s=>{
                       const risk = getRisk(s.score);
-                      const riskBg = s.score>=75 ? "rgba(0,200,83,.1)" : s.score>=50 ? "rgba(255,170,0,.1)" : "rgba(255,51,85,.1)";
-                      const riskColor = s.score>=75 ? GREEN : s.score>=50 ? GOLD : RED;
-                      const avatarBg = s.score>=75 ? "linear-gradient(135deg,#10B981 0%,#059669 100%)" : s.score>=50 ? "linear-gradient(135deg,#F59E0B 0%,#D97706 100%)" : "linear-gradient(135deg,#FF3355 0%,#DC2626 100%)";
                       const isSelected = selected?._eid===s._eid;
                       return (
                         <div key={s._eid}
@@ -930,7 +1381,7 @@ export default function StudentsIntelligence() {
                         >
                           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                             <div style={{
-                              width:38, height:38, borderRadius:"50%", background:avatarBg,
+                              width:38, height:38, borderRadius:"50%", background:risk.gradient,
                               display:"flex", alignItems:"center", justifyContent:"center",
                               color:"#fff", fontSize:12, fontWeight:800, flexShrink:0,
                               boxShadow:"0 4px 10px rgba(0,85,255,.18)",
@@ -943,7 +1394,7 @@ export default function StudentsIntelligence() {
                             </div>
                             <span style={{
                               fontSize:9, fontWeight:800, letterSpacing:"0.12em", textTransform:"uppercase",
-                              padding:"3px 8px", borderRadius:6, background:riskBg, color:riskColor, flexShrink:0,
+                              padding:"3px 8px", borderRadius:6, background:risk.bg, color:risk.fg, flexShrink:0,
                             }}>{risk.label}</span>
                           </div>
                           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto", gap:10, alignItems:"center" }}>
@@ -1002,9 +1453,6 @@ export default function StudentsIntelligence() {
                       </tr>
                       {rows.map(s=>{
                         const risk = getRisk(s.score);
-                        const riskBg = s.score>=75 ? "rgba(0,200,83,.1)" : s.score>=50 ? "rgba(255,170,0,.1)" : "rgba(255,51,85,.1)";
-                        const riskColor = s.score>=75 ? GREEN : s.score>=50 ? GOLD : RED;
-                        const avatarBg = s.score>=75 ? "linear-gradient(135deg,#10B981 0%,#059669 100%)" : s.score>=50 ? "linear-gradient(135deg,#F59E0B 0%,#D97706 100%)" : "linear-gradient(135deg,#FF3355 0%,#DC2626 100%)";
                         const isSelected = selected?._eid===s._eid;
                         return (
                           <tr key={s._eid}
@@ -1019,7 +1467,7 @@ export default function StudentsIntelligence() {
                             <td style={{ padding:"12px 18px" }}>
                               <div style={{ display:"flex", alignItems:"center", gap:12 }}>
                                 <div style={{
-                                  width:36, height:36, borderRadius:"50%", background:avatarBg,
+                                  width:36, height:36, borderRadius:"50%", background:risk.gradient,
                                   display:"flex", alignItems:"center", justifyContent:"center",
                                   color:"#fff", fontSize:11, fontWeight:800,
                                   boxShadow:"0 4px 10px rgba(0,85,255,.18)", flexShrink:0,
@@ -1040,7 +1488,7 @@ export default function StudentsIntelligence() {
                                 <span style={{ fontSize:13, fontWeight:800, color:T1 }}>{s.score>0?`${s.score}%`:"—"}</span>
                                 <span style={{
                                   fontSize:9, fontWeight:800, letterSpacing:"0.14em", textTransform:"uppercase",
-                                  padding:"2px 7px", borderRadius:6, background:riskBg, color:riskColor,
+                                  padding:"2px 7px", borderRadius:6, background:risk.bg, color:risk.fg,
                                   alignSelf:"flex-start",
                                 }}>{risk.label}</span>
                               </div>
@@ -1122,7 +1570,6 @@ export default function StudentsIntelligence() {
           {selected && (()=>{
             const risk = getRisk(selected.score);
             const isCritical = selected.score > 0 && selected.score < 50;
-            const headerGrad = selected.score>=75 ? "linear-gradient(135deg,#10B981 0%,#059669 100%)" : selected.score>=50 ? "linear-gradient(135deg,#F59E0B 0%,#D97706 100%)" : "linear-gradient(135deg,#FF3355 0%,#DC2626 100%)";
             return (
               <div
                 {...tilt3D}
@@ -1140,7 +1587,7 @@ export default function StudentsIntelligence() {
                 <div style={{ padding: isMobile ? "16px 14px" : "22px 26px", borderBottom:"0.5px solid rgba(0,85,255,.08)", display:"flex", justifyContent:"space-between", alignItems: isMobile ? "flex-start" : "center", gap: isMobile ? 10 : 16, flexWrap:"wrap" }}>
                   <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 14, minWidth:0, flex: isMobile ? "1 1 100%" : undefined }}>
                     <div style={{
-                      width: isMobile ? 44 : 54, height: isMobile ? 44 : 54, borderRadius: isMobile ? 13 : 16, background:headerGrad,
+                      width: isMobile ? 44 : 54, height: isMobile ? 44 : 54, borderRadius: isMobile ? 13 : 16, background:risk.gradient,
                       display:"flex", alignItems:"center", justifyContent:"center",
                       color:"#fff", fontSize: isMobile ? 14 : 16, fontWeight:800, flexShrink:0,
                       boxShadow:"0 8px 20px rgba(0,85,255,.22)",
@@ -1157,9 +1604,9 @@ export default function StudentsIntelligence() {
                   <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 6 : 8, flexWrap:"wrap", width: isMobile ? "100%" : "auto" }}>
                     <span style={{
                       fontSize: isMobile ? 9 : 10, fontWeight:800, padding:"6px 12px", borderRadius:10,
-                      background:headerGrad, color:"#fff", letterSpacing:"0.12em", textTransform:"uppercase",
+                      background:risk.gradient, color:"#fff", letterSpacing:"0.12em", textTransform:"uppercase",
                       boxShadow:"0 4px 10px rgba(0,85,255,.18)",
-                    }}>{risk.label} Risk</span>
+                    }}>{risk.label === "Untested" ? "Untested" : `${risk.label} Risk`}</span>
                     <button
                       onClick={(e)=>e.stopPropagation()}
                       className="stu-btn"

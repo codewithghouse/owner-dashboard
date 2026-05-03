@@ -5,6 +5,10 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { tilt3D, tilt3DStyle } from "@/lib/use3DTilt";
+import { toast } from "sonner";
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 
 // ── Tokens ───────────────────────────────────────────────────────────────────
 const T = {
@@ -19,37 +23,101 @@ const toDate = (v: any): Date | null => { if (!v) return null; if (v?.toDate) re
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 const timeAgo = (v: any) => { const d = toDate(v); if (!d) return ""; const s = (Date.now() - d.getTime()) / 1000; if (s < 60) return "just now"; if (s < 3600) return `${Math.floor(s / 60)}m ago`; if (s < 86400) return `${Math.floor(s / 3600)}h ago`; return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase(); };
 
-// ── Card with Dashboard-vibe hover (lift + blue halo, no rotation) ───────────
-const Card = ({ children, title, action, style }: { children: React.ReactNode; title?: string; action?: React.ReactNode; style?: React.CSSProperties }) => {
-  const [hovered, setHovered] = useState(false);
+/* Dashboard 4-card vibe — pastel grad + solid icon badge top-left + faded
+   decorative icon bottom-right + tilt3D. Same visual language used across
+   Dashboard.tsx and BranchesComparison cards so the whole Owner experience
+   feels like one product, not several.
 
+   `staticTilt` is read from the StudentProfile component scope (closure on
+   exporting state) — when exporting, tilt3D handlers + style are skipped so
+   html2canvas captures a clean upright snapshot. */
+const Card = ({
+  children,
+  title,
+  action,
+  icon: IconCmp,
+  accent = "#3B5BDB",
+  style,
+  staticTilt = false,
+}: {
+  children: React.ReactNode;
+  title?: string;
+  action?: React.ReactNode;
+  icon?: any;             // Lucide icon component (optional — when set, badge appears)
+  accent?: string;        // Hex color driving pastel bg + badge tint (default brand blue)
+  style?: React.CSSProperties;
+  staticTilt?: boolean;   // when true, skip tilt3D handlers/transform (export-friendly)
+}) => {
   return (
     <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      {...(staticTilt ? {} : tilt3D)}
       style={{
-        background: T.white,
-        border: `1px solid ${hovered ? "rgba(59,91,219,0.25)" : T.bdr}`,
+        /* Branded color tinted at ~12% over near-white (matches BranchesComparison
+           card recipe). `${accent}1F` = hex alpha 0x1F (~12%). */
+        background: `linear-gradient(135deg, #FAFCFF 0%, #F5F9FF 55%, ${accent}1F 100%)`,
+        border: `0.5px solid ${accent}33`,
         borderRadius: 16,
-        overflow: "hidden",
-        transform: hovered ? "translate3d(0,-7px,0) scale(1.02)" : "translate3d(0,0,0) scale(1)",
-        transition: "transform 0.22s cubic-bezier(0.2,0.8,0.2,1), box-shadow 0.22s ease, border-color 0.3s",
-        boxShadow: hovered
-          ? "0 8px 16px rgba(0,85,255,0.20), 0 24px 40px rgba(0,85,255,0.24), 0 40px 80px rgba(0,85,255,0.26)"
-          : "0 4px 8px rgba(0,85,255,0.12), 0 12px 24px rgba(0,85,255,0.16), 0 28px 56px rgba(0,85,255,0.18)",
-        willChange: "transform",
-        backfaceVisibility: "hidden",
+        boxShadow: "0 4px 8px rgba(0,85,255,0.10), 0 12px 24px rgba(0,85,255,0.12), 0 28px 56px rgba(0,85,255,0.14)",
         position: "relative",
+        overflow: "hidden",
+        willChange: "transform",
+        ...(staticTilt ? {} : tilt3DStyle),
         ...style,
       }}
     >
+      {/* Decorative faded icon — bottom-right (Dashboard pattern) */}
+      {IconCmp && (
+        <div style={{
+          position: "absolute",
+          bottom: 14,
+          right: 18,
+          color: accent,
+          opacity: 0.10,
+          pointerEvents: "none",
+          lineHeight: 0,
+          zIndex: 1,
+        }}>
+          <IconCmp size={64} strokeWidth={1.8} />
+        </div>
+      )}
+
       {title && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: `1px solid ${T.s2}`, position: "relative", zIndex: 2 }}>
-          <span style={{ fontSize: 14, fontWeight: 600, color: T.ink }}>{title}</span>
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "14px 18px",
+          borderBottom: `1px solid rgba(255,255,255,0.5)`,
+          position: "relative",
+          zIndex: 2,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+            {IconCmp && (
+              <div style={{
+                width: 30,
+                height: 30,
+                borderRadius: 9,
+                background: accent,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: `0 4px 10px ${accent}44`,
+                flexShrink: 0,
+              }}>
+                <IconCmp size={15} color="#FFFFFF" strokeWidth={2.5} />
+              </div>
+            )}
+            <span style={{
+              fontSize: 14,
+              fontWeight: 700,
+              color: T.ink,
+              letterSpacing: "-0.2px",
+            }}>{title}</span>
+          </div>
           {action || null}
         </div>
       )}
-      <div style={{ padding: "16px 20px", position: "relative", zIndex: 2 }}>{children}</div>
+      <div style={{ padding: "16px 18px", position: "relative", zIndex: 2 }}>{children}</div>
     </div>
   );
 };
@@ -62,7 +130,21 @@ const DetailLink = () => <span style={{ fontSize: 11, color: T.blue, fontWeight:
 const StudentProfile = () => {
   const { id: studentId } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const isMobile = useIsMobile();
+  const realIsMobile = useIsMobile();
+  /* `forceMobile` lets the export flow render the page in mobile layout
+     (single-column, smaller paddings, narrower hero) regardless of the
+     Owner's actual viewport. This way a desktop Owner clicking Export still
+     gets a portrait, mobile-styled PDF — easier to read on phone, cleaner
+     2-page layout. We OR it with the live media-query result so a real
+     mobile user behaves the same. */
+  const [forceMobile, setForceMobile] = useState(false);
+  const isMobile = forceMobile || realIsMobile;
+  /* Disable tilt3D during export — the transform causes html2canvas to
+     capture a tilted snapshot or skew text rendering. */
+  const [exporting, setExporting] = useState(false);
+  /* Container we hand to html2canvas. Wraps the entire profile body so the
+     snapshot includes hero + every card + status bar. */
+  const exportRef = useRef<HTMLDivElement>(null);
 
   const [loading, setLoading] = useState(true);
   const [student, setStudent] = useState<any>(null);
@@ -74,6 +156,14 @@ const StudentProfile = () => {
   const [parentNotes, setParentNotes] = useState<any[]>([]);
   const [interventions, setInterventions] = useState<any[]>([]);
   const [calMonth, setCalMonth] = useState(new Date());
+  /* Live clock for the bottom status bar. Was rendering Date.now() once at
+     mount and never updating — visually a static timestamp pretending to be
+     a clock. 1-second tick is fine on a profile page. */
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   // ── Fetch — owner's schoolId == their uid ─────────────────────────────────
   useEffect(() => {
@@ -179,28 +269,56 @@ const StudentProfile = () => {
         )).catch(() => null) : Promise.resolve(null as any);
         const merge = (a: any, b: any) => { const l: any[] = []; if (a) a.docs.forEach((d: any) => l.push({ id: d.id, ...d.data() })); if (b) b.docs.forEach((d: any) => { if (!l.find(x => x.id === d.id)) l.push({ id: d.id, ...d.data() }); }); return l; };
 
-        const [aI, aE, sI, sE, rI, rE, subI, subE, inc, pn, iv] = await Promise.all([
-          byId("attendance"), byEmail("attendance"),
-          byId("test_scores"), byEmail("test_scores"),
-          byId("results"), byEmail("results"),
-          byId("submissions"), byEmail("submissions"),
-          byId("incidents"), byId("parent_notes"), byId("interventions"),
+        /* Extend dual-query (byId + byEmail) to incidents / parent_notes /
+           interventions per `dual_query_pattern_studentid_email` memory rule.
+           Some Teacher Dashboard writers key by studentEmail; without merging
+           both keys, those records would be invisible in this view. */
+        const [aI, aE, sI, sE, rI, rE, subI, subE, incI, incE, pnI, pnE, ivI, ivE] = await Promise.all([
+          byId("attendance"),    byEmail("attendance"),
+          byId("test_scores"),   byEmail("test_scores"),
+          byId("results"),       byEmail("results"),
+          byId("submissions"),   byEmail("submissions"),
+          byId("incidents"),     byEmail("incidents"),
+          byId("parent_notes"),  byEmail("parent_notes"),
+          byId("interventions"), byEmail("interventions"),
         ]);
         setAttendance(merge(aI, aE));
         setTestScores([...merge(sI, sE), ...merge(rI, rE)]);
         setSubmissions(merge(subI, subE));
-        setIncidents(inc?.docs.map((d: any) => ({ id: d.id, ...d.data() })) || []);
-        setParentNotes(pn?.docs.map((d: any) => ({ id: d.id, ...d.data() })) || []);
-        setInterventions(iv?.docs.map((d: any) => ({ id: d.id, ...d.data() })) || []);
+        setIncidents(merge(incI, incE));
+        setParentNotes(merge(pnI, pnE));
+        setInterventions(merge(ivI, ivE));
 
-        const classId = sd.classId || merge(await byId("enrollments"), await byEmail("enrollments"))[0]?.classId;
-        if (classId) {
-          const asSnap = await getDocs(query(
-            collection(db, "assignments"),
-            where("schoolId", "==", schoolId),
-            where("classId", "==", classId),
-          )).catch(() => null);
-          if (asSnap) setAssignments(asSnap.docs.map((d: any) => ({ id: d.id, ...d.data() })));
+        /* Multi-class assignment lookup. A student in 3 classes (e.g. Maths
+           + Science + English under different subject teachers) has 3 distinct
+           classId entries in `enrollments`. Querying assignments for ONE
+           classId silently dropped the other two subjects — student appeared
+           to have fewer assignments than they actually did.
+           Now: collect every classId from enrollments + the student doc,
+           chunk into groups of 10 (Firestore `in` cap), merge results, dedup
+           by assignment id. */
+        const enrollmentRows = merge(await byId("enrollments"), await byEmail("enrollments"));
+        const allClassIds = Array.from(new Set([
+          ...(sd.classId ? [sd.classId] : []),
+          ...enrollmentRows.map((e: any) => e.classId).filter(Boolean),
+        ]));
+        if (allClassIds.length > 0) {
+          const chunks: string[][] = [];
+          for (let i = 0; i < allClassIds.length; i += 10) chunks.push(allClassIds.slice(i, i + 10));
+          const assignmentMap = new Map<string, any>();
+          for (const chunk of chunks) {
+            try {
+              const snap = await getDocs(query(
+                collection(db, "assignments"),
+                where("schoolId", "==", schoolId),
+                where("classId", "in", chunk),
+              ));
+              snap.docs.forEach((d: any) => {
+                if (!assignmentMap.has(d.id)) assignmentMap.set(d.id, { id: d.id, ...d.data() });
+              });
+            } catch { /* ignore chunk failure, others may still succeed */ }
+          }
+          setAssignments(Array.from(assignmentMap.values()));
         }
       } catch (e) { console.error("StudentProfile fetch error:", e); }
       finally { setLoading(false); }
@@ -230,12 +348,21 @@ const StudentProfile = () => {
     });
     Object.keys(subScores).forEach(k => { subScores[k] = Math.round(subScores[k] / subCounts[k]); });
 
+    /* Trend window: filter `n > 0` to match the averaging logic below.
+       Without this filter, a 0% score (often a "no-data, default to 0"
+       artifact) drags the trend toward "down" — student showing real growth
+       gets falsely flagged as declining. Per `bug_pattern_score_zero_no_data`
+       memory rule, no-data points must not contribute to inferences. */
     const sorted = [...testScores].sort((a, b) => (toDate(b.timestamp || b.createdAt)?.getTime() || 0) - (toDate(a.timestamp || a.createdAt)?.getTime() || 0));
-    const r3 = sorted.slice(0, 3).map(t => Number(t.percentage ?? t.score ?? 0)).filter(n => !isNaN(n));
-    const p3 = sorted.slice(3, 6).map(t => Number(t.percentage ?? t.score ?? 0)).filter(n => !isNaN(n));
+    const r3 = sorted.slice(0, 3).map(t => Number(t.percentage ?? t.score ?? 0)).filter(n => !isNaN(n) && n > 0);
+    const p3 = sorted.slice(3, 6).map(t => Number(t.percentage ?? t.score ?? 0)).filter(n => !isNaN(n) && n > 0);
     const rAvg = r3.length ? r3.reduce((a, b) => a + b, 0) / r3.length : 0;
     const pAvg = p3.length ? p3.reduce((a, b) => a + b, 0) / p3.length : 0;
-    const trend: "up" | "down" | "flat" = rAvg - pAvg >= 5 ? "up" : pAvg - rAvg >= 5 ? "down" : "flat";
+    /* Trend only meaningful when both windows have data — otherwise show flat. */
+    const trend: "up" | "down" | "flat" =
+      r3.length === 0 || p3.length === 0 ? "flat" :
+      rAvg - pAvg >= 5 ? "up" :
+      pAvg - rAvg >= 5 ? "down" : "flat";
 
     const now = new Date();
     const monthly = Array.from({ length: 6 }, (_, i) => {
@@ -257,31 +384,126 @@ const StudentProfile = () => {
     return { tot, pres, late, abs, attRate, avg, subScores, trend, monthly, subCount, asgCount, completion, days };
   }, [attendance, testScores, submissions, assignments]);
 
-  const overallRisk = Math.round((Math.max(0, 100 - m.attRate) + Math.max(0, 100 - m.avg) + Math.max(0, 100 - m.completion) + Math.min(100, incidents.length * 25)) / 4);
+  /* Risk score — only count dimensions that actually have data. Previously
+     a brand-new student with 100% attendance but no tests/assignments yet
+     scored ~50 → "ELEVATED" risk because m.avg=0 and m.completion=0 fed
+     full 100% penalties. Per `bug_pattern_score_zero_no_data` memory rule,
+     no-data should not become "high risk". */
+  const overallRisk = useMemo(() => {
+    const dims: number[] = [];
+    if (m.tot > 0)         dims.push(Math.max(0, 100 - m.attRate));      // attendance
+    if (testScores.length) dims.push(Math.max(0, 100 - m.avg));          // academic
+    if (m.asgCount > 0)    dims.push(Math.max(0, 100 - m.completion));   // submission
+    /* Behavioural always counts — 0 incidents is meaningful "good" data,
+       not absence of data. */
+    dims.push(Math.min(100, incidents.length * 25));
+    return dims.length > 0 ? Math.round(dims.reduce((a, b) => a + b, 0) / dims.length) : 0;
+  }, [m, testScores.length, incidents.length]);
   const riskLevel = overallRisk < 20 ? "STABLE" : overallRisk < 45 ? "MONITOR" : overallRisk < 70 ? "ELEVATED" : "CRITICAL";
   const riskColor = overallRisk < 20 ? T.grn : overallRisk < 45 ? T.amb : T.red;
 
-  const subEntries = Object.entries(m.subScores);
+  /* Sort subjects by score descending so "Subject Mastery" actually shows
+     mastery ranking. Was using `Object.entries` insertion order, which means
+     "first 5 subjects encountered" — alphabetical or arbitrary, not best-to-worst. */
+  const subEntries = Object.entries(m.subScores).sort((a, b) => b[1] - a[1]);
   const radarData = subEntries.map(([sub, sc]) => ({ subject: sub.slice(0, 10), score: sc, fullMark: 100 }));
 
   const calYear = calMonth.getFullYear();
   const calMon = calMonth.getMonth();
   const firstDay = new Date(calYear, calMon, 1).getDay();
   const daysInMonth = new Date(calYear, calMon + 1, 0).getDate();
+  /* Local-date matcher (YYYY-MM-DD in user's timezone). `toISOString()`
+     returns UTC, so for IST users a record at 11pm IST shifted to next-day
+     UTC and showed up on the wrong calendar cell. `toLocaleDateString("en-CA")`
+     produces local YYYY-MM-DD — matches the format MarkAttendance writers use. */
+  const localDateStr = (d: Date) => d.toLocaleDateString("en-CA");
   const calDays = Array.from({ length: 42 }, (_, i) => {
     const dayNum = i - firstDay + 1;
     if (dayNum < 1 || dayNum > daysInMonth) return null;
     const d = new Date(calYear, calMon, dayNum);
-    const dateStr = d.toISOString().split("T")[0];
+    const dateStr = localDateStr(d);
     const rec = attendance.find(a => {
       const ad = toDate(a.date);
-      return ad && ad.toISOString().split("T")[0] === dateStr;
+      return ad && localDateStr(ad) === dateStr;
     });
     return { dayNum, date: d, status: rec?.status || null };
   });
   const calPresent = attendance.filter(a => { const d = toDate(a.date); return d && d.getMonth() === calMon && d.getFullYear() === calYear && a.status === "present"; }).length;
   const calLate = attendance.filter(a => { const d = toDate(a.date); return d && d.getMonth() === calMon && d.getFullYear() === calYear && a.status === "late"; }).length;
   const calAbsent = attendance.filter(a => { const d = toDate(a.date); return d && d.getMonth() === calMon && d.getFullYear() === calYear && a.status === "absent"; }).length;
+
+  /* Visual-snapshot export — captures the profile DOM exactly as rendered
+     and slices it across PDF pages. Owner gets a document that LOOKS like
+     the on-screen profile (same cards, gradients, tilt-tinted backgrounds
+     minus the live tilt) instead of a separately-styled report.
+
+     Flow:
+       1. Force mobile layout (single column, smaller paddings) so the PDF
+          is portrait + narrow — fits A4 cleanly + reads well on phones.
+       2. Disable tilt3D (`exporting=true`) so transforms don't skew capture.
+       3. Wait two animation frames for React re-render + style settle.
+       4. Snapshot via html2canvas at 2x DPR for sharp text.
+       5. Generate A4 portrait jsPDF, slice the tall canvas across multiple
+          pages so we don't crop content.
+       6. Restore state.
+  */
+  const handleExport = async () => {
+    if (!student || !exportRef.current) return;
+    const studentName = student.name || "Student";
+    setExporting(true);
+    setForceMobile(true);
+
+    /* 2 RAFs: one for state-flush, one for layout settle. Recharts re-renders
+       on width change so giving it a frame avoids capturing mid-layout. */
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    /* Extra 200ms for chart animations + tilt3D unwind to fully settle. */
+    await new Promise(r => setTimeout(r, 250));
+
+    try {
+      const node = exportRef.current;
+      const canvas = await html2canvas(node, {
+        scale: 2,                  // retina-sharp
+        backgroundColor: T.bg,
+        useCORS: true,
+        logging: false,
+        windowWidth: node.scrollWidth,
+        windowHeight: node.scrollHeight,
+      });
+
+      /* A4 portrait: 210 × 297 mm. Map full canvas width to page width;
+         page height becomes proportional. Slicing handled by repositioning
+         the SAME image at -y on each new page. */
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const imgW  = pageW;
+      const imgH  = (canvas.height * imgW) / canvas.width;
+      const imgData = canvas.toDataURL("image/jpeg", 0.92);
+
+      let heightLeft = imgH;
+      let position   = 0;
+
+      pdf.addImage(imgData, "JPEG", 0, position, imgW, imgH);
+      heightLeft -= pageH;
+
+      while (heightLeft > 0) {
+        position -= pageH;
+        pdf.addPage();
+        pdf.addImage(imgData, "JPEG", 0, position, imgW, imgH);
+        heightLeft -= pageH;
+      }
+
+      const fname = `${studentName.replace(/[^a-z0-9]+/gi, "_")}_Profile_${new Date().toISOString().slice(0, 10)}.pdf`;
+      pdf.save(fname);
+      toast.success("Student profile exported");
+    } catch (e) {
+      console.error("[StudentProfile] export failed:", e);
+      toast.error("Export failed. Try again.");
+    } finally {
+      setExporting(false);
+      setForceMobile(false);
+    }
+  };
 
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", gap: 10 }}>
@@ -309,7 +531,20 @@ const StudentProfile = () => {
   }));
 
   return (
-    <div style={{ minHeight: "100vh", background: T.bg, padding: isMobile ? "12px 12px 40px" : "20px 24px 60px", fontFamily: "'Inter','Plus Jakarta Sans',-apple-system,sans-serif" }}>
+    <div
+      ref={exportRef}
+      style={{
+        minHeight: "100vh",
+        background: T.bg,
+        padding: isMobile ? "12px 12px 40px" : "20px 24px 60px",
+        fontFamily: "'Inter','Plus Jakarta Sans',-apple-system,sans-serif",
+        /* When exporting we pin the container to a phone-width canvas (414px,
+           iPhone 12 Pro width) so the snapshot looks like a real mobile
+           rendering. `margin: 0 auto` keeps it centered if the viewport is
+           wider than 414. */
+        ...(forceMobile ? { width: 414, maxWidth: 414, margin: "0 auto" } : {}),
+      }}
+    >
 
       {/* ═══ TOP BAR ══════════════════════════════════════════════════════════ */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
@@ -317,11 +552,39 @@ const StudentProfile = () => {
           <ArrowLeft size={14} /> RETURN
         </button>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => window.print()} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: `1px solid ${T.bdr}`, background: T.white, color: T.ink2, fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
-            <Printer size={13} /> EXPORT
+          {/* Visual-snapshot export — captures the live profile DOM and
+              splits it across PDF pages. Disabled during the async render
+              + capture so user can't double-click. The spinner replaces the
+              icon so the click feels acknowledged. */}
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "8px 16px",
+              borderRadius: 10,
+              border: `1px solid ${T.bdr}`,
+              background: T.white,
+              color: T.ink2,
+              fontSize: 12,
+              fontWeight: 500,
+              cursor: exporting ? "wait" : "pointer",
+              opacity: exporting ? 0.6 : 1,
+            }}
+          >
+            {exporting
+              ? <Loader2 size={13} className="animate-spin" />
+              : <Printer size={13} />}
+            {exporting ? "EXPORTING…" : "EXPORT"}
           </button>
+          {/* Was labeled "CONTACT" but navigated to /reports — misleading. Now
+              the label matches the destination (Reports Center), and the icon
+              reflects the action. If a real parent-contact flow ships later,
+              swap navigate("/reports") for the new route. */}
           <button onClick={() => navigate("/reports")} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: "none", background: T.blue, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-            <MessageSquare size={13} /> CONTACT
+            <FileText size={13} /> REPORTS
           </button>
         </div>
       </div>
@@ -329,7 +592,7 @@ const StudentProfile = () => {
       {/* ═══ HERO: 3-COLUMN ══════════════════════════════════════════════════ */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 280px 1fr", gap: isMobile ? 14 : 20, marginBottom: 20 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <Card title="Academic Performance">
+          <Card icon={Activity} accent="#3B5BDB" staticTilt={exporting} title="Academic Performance">
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
               <div style={{ position: "relative", width: 64, height: 64 }}>
                 <svg width="64" height="64" viewBox="0 0 64 64">
@@ -360,7 +623,7 @@ const StudentProfile = () => {
             ))}
           </Card>
 
-          <Card title="Attendance">
+          <Card icon={Calendar} accent="#16a34a" staticTilt={exporting} title="Attendance">
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
               <div style={{ position: "relative", width: 72, height: 72 }}>
                 <svg width="72" height="72" viewBox="0 0 72 72">
@@ -381,7 +644,7 @@ const StudentProfile = () => {
             </div>
           </Card>
 
-          <Card title="Subject Mastery" action={<DetailLink />}>
+          <Card icon={BookOpen} accent="#7c3aed" staticTilt={exporting} title="Subject Mastery" action={<DetailLink />}>
             {radarData.length >= 3 && (
               <div style={{ height: 180, marginBottom: 12 }}>
                 <ResponsiveContainer width="100%" height="100%">
@@ -419,7 +682,7 @@ const StudentProfile = () => {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <Card title="Behaviour Record" action={<DetailLink />}>
+          <Card icon={AlertCircle} accent="#d97706" staticTilt={exporting} title="Behaviour Record" action={<DetailLink />}>
             {incidents.length === 0 ? (
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: T.glBg, borderRadius: 10 }}>
                 <CheckCircle2 size={14} color={T.grn} /><span style={{ fontSize: 12, color: T.grn, fontWeight: 500 }}>No incidents recorded</span>
@@ -435,19 +698,41 @@ const StudentProfile = () => {
             ))}
           </Card>
 
-          <Card title="AI Intelligence" action={<DetailLink />}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
-              <span style={{ fontSize: 11, color: T.ink3 }}>Predicted next score:</span>
-              <span style={{ fontSize: 20, fontWeight: 700, color: T.blue }}>{Math.min(100, Math.round(m.avg + Math.max(0, (100 - m.avg) * 0.05)))}%</span>
-            </div>
-            <div style={{ fontSize: 11, color: T.ink3, lineHeight: 1.6 }}>
-              {m.trend === "up" ? "Performance trend is positive. Student shows consistent growth." :
-               m.trend === "down" ? "Performance is declining. Intervention may be needed." :
-               "Performance is stable. Encourage continued effort."}
-            </div>
+          <Card icon={TrendingUp} accent="#3B5BDB" staticTilt={exporting} title="Performance Forecast" action={<DetailLink />}>
+            {/* Renamed from "AI Intelligence" — the formula is a deterministic
+                trend-aware extrapolation, not an LLM call. Honest framing
+                lets us still call out the ML-style insight without overpromising
+                generative-AI capabilities the page doesn't have. */}
+            {m.avg > 0 ? (
+              <>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, color: T.ink3 }}>Projected next score:</span>
+                  <span style={{ fontSize: 20, fontWeight: 700, color: T.blue }}>{(() => {
+                    /* Project ±5% of the gap to 100 / 0 based on trend direction.
+                       Was always trending UP regardless of actual trend — a
+                       declining student got predicted "improvement". Now the
+                       direction follows the data. */
+                    const delta =
+                      m.trend === "up"   ? Math.max(0, (100 - m.avg) * 0.05)  :
+                      m.trend === "down" ? -Math.max(0, m.avg * 0.05)         :
+                                            0;
+                    return `${Math.min(100, Math.max(0, Math.round(m.avg + delta)))}%`;
+                  })()}</span>
+                </div>
+                <div style={{ fontSize: 11, color: T.ink3, lineHeight: 1.6 }}>
+                  {m.trend === "up" ? "Performance trend is positive — student shows consistent growth." :
+                   m.trend === "down" ? "Performance is declining — early intervention recommended." :
+                   "Performance is stable — encourage continued effort."}
+                </div>
+              </>
+            ) : (
+              <div style={{ fontSize: 11, color: T.ink3, lineHeight: 1.6 }}>
+                Forecast appears once test scores are recorded.
+              </div>
+            )}
           </Card>
 
-          <Card title="Parent Communication" action={<DetailLink />}>
+          <Card icon={MessageSquare} accent="#16a34a" staticTilt={exporting} title="Parent Communication" action={<DetailLink />}>
             {parentNotes.length === 0 ? (
               <p style={{ fontSize: 12, color: T.ink3, textAlign: "center", padding: "8px 0" }}>No messages yet</p>
             ) : parentNotes.slice(0, 2).map(n => (
@@ -460,7 +745,7 @@ const StudentProfile = () => {
             ))}
           </Card>
 
-          <Card title="Teacher Observations">
+          <Card icon={FileText} accent="#3B5BDB" staticTilt={exporting} title="Teacher Observations">
             {parentNotes.filter(n => n.from === "teacher").length === 0 ? (
               <p style={{ fontSize: 12, color: T.ink3, textAlign: "center" }}>No observations yet</p>
             ) : (
@@ -475,7 +760,7 @@ const StudentProfile = () => {
       </div>
 
       {/* ═══ PERFORMANCE TIMELINE ═══ */}
-      <Card title="Performance Timeline" action={<DetailLink />} style={{ marginBottom: 20 }}>
+      <Card icon={TrendingUp} accent="#3B5BDB" staticTilt={exporting} title="Performance Timeline" action={<DetailLink />} style={{ marginBottom: 20 }}>
         <div style={{ height: 200 }}>
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={m.monthly}>
@@ -496,7 +781,7 @@ const StudentProfile = () => {
 
       {/* ═══ ASSIGNMENTS + RISK ASSESSMENT ═══ */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 14 : 20, marginBottom: 20 }}>
-        <Card title={`Assignments · ${m.subCount}/${m.asgCount}`} action={<span style={{ fontSize: 11, color: T.blue, fontWeight: 500, cursor: "pointer" }}>View All →</span>}>
+        <Card icon={CheckCircle2} accent="#3B5BDB" staticTilt={exporting} title={`Assignments · ${m.subCount}/${m.asgCount}`} action={<span style={{ fontSize: 11, color: T.blue, fontWeight: 500, cursor: "pointer" }}>View All →</span>}>
           {[...assignments].sort((a, b) => (toDate(b.dueDate)?.getTime() || 0) - (toDate(a.dueDate)?.getTime() || 0)).slice(0, 5).map(a => {
             const sub = submissions.find((s: any) => s.assignmentId === a.id);
             return (
@@ -509,7 +794,7 @@ const StudentProfile = () => {
           {assignments.length === 0 && <p style={{ fontSize: 12, color: T.ink3, textAlign: "center" }}>No assignments</p>}
         </Card>
 
-        <Card title="Risk Assessment" action={<DetailLink />}>
+        <Card icon={AlertCircle} accent="#dc2626" staticTilt={exporting} title="Risk Assessment" action={<DetailLink />}>
           <div style={{ fontSize: 22, fontWeight: 800, color: riskColor, marginBottom: 14 }}>{riskLevel}</div>
           {[
             { label: "ATTENDANCE", val: m.attRate, color: m.attRate >= 85 ? T.blue : T.amb, extra: undefined as string | undefined },
@@ -530,7 +815,7 @@ const StudentProfile = () => {
 
       {/* ═══ ATTENDANCE CALENDAR + SUPPORT ACTIONS ═══ */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 14 : 20, marginBottom: 20 }}>
-        <Card title="Attendance Calendar" action={<span style={{ fontSize: 11, color: T.ink3 }}>Daily attendance record</span>}>
+        <Card icon={Calendar} accent="#16a34a" staticTilt={exporting} title="Attendance Calendar" action={<span style={{ fontSize: 11, color: T.ink3 }}>Daily attendance record</span>}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginBottom: 14 }}>
             <button onClick={() => setCalMonth(new Date(calYear, calMon - 1))} style={{ background: "none", border: "none", cursor: "pointer", color: T.ink3 }}><ChevronLeft size={16} /></button>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.ink }}>{MONTHS[calMon]} {calYear}</span>
@@ -579,7 +864,7 @@ const StudentProfile = () => {
           </div>
         </Card>
 
-        <Card title="Support Actions" action={<DetailLink />}>
+        <Card icon={Activity} accent="#d97706" staticTilt={exporting} title="Support Actions" action={<DetailLink />}>
           {interventions.length === 0 ? (
             <p style={{ fontSize: 12, color: T.ink3, textAlign: "center", padding: "20px 0" }}>No active interventions</p>
           ) : interventions.map(iv => (
@@ -601,7 +886,7 @@ const StudentProfile = () => {
 
       {/* ═══ INCIDENTS + OVERVIEW ═══ */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 14 : 20, marginBottom: 20 }}>
-        <Card title="Incidents" action={<DetailLink />}>
+        <Card icon={AlertCircle} accent="#dc2626" staticTilt={exporting} title="Incidents" action={<DetailLink />}>
           {incidents.length === 0 ? (
             <div style={{ textAlign: "center", padding: "20px 0" }}>
               <CheckCircle2 size={24} color={T.grn} style={{ margin: "0 auto 8px" }} />
@@ -623,7 +908,7 @@ const StudentProfile = () => {
           )}
         </Card>
 
-        <Card title="Overview" action={<span style={{ fontSize: 11, color: T.blue, cursor: "pointer" }}>Dashboard →</span>}>
+        <Card icon={BarChart3} accent="#3B5BDB" staticTilt={exporting} title="Overview" action={<span style={{ fontSize: 11, color: T.blue, cursor: "pointer" }}>Dashboard →</span>}>
           {[
             { icon: FileText, label: "TOTAL TESTS", val: testScores.length },
             { icon: BookOpen, label: "SUBJECTS TRACKED", val: subEntries.length },
@@ -645,7 +930,7 @@ const StudentProfile = () => {
 
       {/* ═══ COMMUNICATIONS + SCORE HISTORY ═══ */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 14 : 20, marginBottom: 20 }}>
-        <Card title={`Communications · ${parentNotes.length} entries`} action={<span style={{ fontSize: 11, color: T.blue, cursor: "pointer" }}>View All →</span>}>
+        <Card icon={MessageSquare} accent="#3B5BDB" staticTilt={exporting} title={`Communications · ${parentNotes.length} entries`} action={<span style={{ fontSize: 11, color: T.blue, cursor: "pointer" }}>View All →</span>}>
           {parentNotes.slice(0, 3).map(n => (
             <div key={n.id} style={{ padding: "12px 0", borderBottom: `1px solid ${T.s2}` }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
@@ -659,7 +944,7 @@ const StudentProfile = () => {
           {parentNotes.length === 0 && <p style={{ fontSize: 12, color: T.ink3, textAlign: "center", padding: "16px 0" }}>No communications</p>}
         </Card>
 
-        <Card title={`Score History · ${testScores.length} records`} action={<span style={{ fontSize: 11, color: T.blue, cursor: "pointer" }}>View All →</span>}>
+        <Card icon={BarChart3} accent="#3B5BDB" staticTilt={exporting} title={`Score History · ${testScores.length} records`} action={<span style={{ fontSize: 11, color: T.blue, cursor: "pointer" }}>View All →</span>}>
           {barChartData.length > 0 && (
             <div style={{ height: 150, marginBottom: 12 }}>
               <ResponsiveContainer width="100%" height="100%">
@@ -680,9 +965,13 @@ const StudentProfile = () => {
             <tbody>
               {scoreHistory.map(t => {
                 const d = toDate(t.timestamp || t.createdAt);
+                /* Truncate with ellipsis indicator so user sees there's more to
+                   the subject name. Plain `.slice(0, 20)` chopped silently. */
+                const rawSubject = t.subject || t.subjectName || "TEST";
+                const subject = rawSubject.length > 20 ? `${rawSubject.slice(0, 19)}…` : rawSubject;
                 return (
                   <tr key={t.id} style={{ borderBottom: `1px solid ${T.s2}` }}>
-                    <td style={{ padding: "8px", color: T.ink }}>{(t.subject || t.subjectName || "TEST").slice(0, 20)}</td>
+                    <td style={{ padding: "8px", color: T.ink }} title={rawSubject}>{subject}</td>
                     <td style={{ padding: "8px", color: T.ink3 }}>{d ? d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }).toUpperCase() : "—"}</td>
                     <td style={{ padding: "8px", fontWeight: 600, color: T.blue }}>{Number(t.percentage ?? t.score ?? 0)}%</td>
                   </tr>
@@ -700,7 +989,7 @@ const StudentProfile = () => {
         <span>★ Data: Live</span>
         <span>★ Secured</span>
         <span>★ STUDENT ID: {(student.id || "").slice(0, 8).toUpperCase()}</span>
-        <span style={{ color: T.blue, fontWeight: 600 }}>{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+        <span style={{ color: T.blue, fontWeight: 600 }}>{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
       </div>
     </div>
   );

@@ -103,6 +103,16 @@ export type BranchRaw = {
   location: string;
 };
 
+export type MappingIssue = {
+  /** Total students that didn't resolve to any branch via the normal chain. */
+  unmapped: number;
+  /** Total students in scope (denominator for the unmapped ratio). */
+  total: number;
+  /** True when the all-students-fall-back-to-first-branch hack fired —
+   *  the dashboard would show single-branch attribution that is fictional. */
+  fallbackTriggered: boolean;
+};
+
 export type CoreSnapshot = {
   branches: BranchRaw[];
   /** studentId → canonical branchId */
@@ -122,6 +132,10 @@ export type CoreSnapshot = {
   /** studentId → { total, present } — for per-student alert calc */
   studentAttMap: Map<string, { total: number; present: number }>;
   months: { key: string; label: string }[];
+  /** Diagnostic surface for student→branch mapping problems. Null when the
+   *  dataset is clean. Non-null = UI should warn the Owner that branch
+   *  attribution may be inaccurate. */
+  mappingIssue: MappingIssue | null;
 };
 
 const BRANCH_COLORS = ["#1e3a8a", "#3b82f6", "#f59e0b", "#10b981", "#8b5cf6", "#ec4899"];
@@ -147,6 +161,11 @@ export function computeStatus(ahi: number): "Strong" | "Good" | "Needs Focus" {
   if (ahi >= 70) return "Good";
   return "Needs Focus";
 }
+
+/** Single source of truth for "passed" classification across the whole owner
+ *  dashboard + the `aggregateSchoolStats` cloud function. Mismatched thresholds
+ *  in client vs cloud caused AHI to jump 5–10% between fast/slow paths. */
+export const PASS_THRESHOLD_PERCENT = 50;
 
 /** calculateAHI — weighted: 40% attendance, 40% passRate, 20% feeCollection.
  *  Only buckets with data (value > 0) contribute to the score; the denominator
@@ -202,17 +221,20 @@ export function generateInsights(
   return { strengths, improvements, category };
 }
 
-/** getBranchTrends — monthly attendance % for a branch */
+/** getBranchTrends — monthly attendance % for a branch.
+ *  Returns `null` (not 0) for months with no attendance docs so the line
+ *  chart can break the line at gaps. Plotting 0 falsely tells the Owner
+ *  "0% attendance in March 2025" when actually no data was recorded. */
 export function getBranchTrends(
   branchMonthAtt: Map<string, { total: number; present: number }>,
   months: { key: string; label: string }[],
   schoolAvgAttendance: number
-): { period: string; score: number; schoolAvg: number }[] {
+): { period: string; score: number | null; schoolAvg: number }[] {
   return months.map(m => {
     const mAtt = branchMonthAtt.get(m.key);
     return {
       period: m.label,
-      score: mAtt?.total ? Math.round((mAtt.present / mAtt.total) * 100) : 0,
+      score: mAtt?.total ? Math.round((mAtt.present / mAtt.total) * 100) : null,
       schoolAvg: schoolAvgAttendance,
     };
   });
@@ -224,28 +246,45 @@ export async function loadCoreSnapshot(uid: string): Promise<CoreSnapshot> {
   const cached = getCache<CoreSnapshot>(cacheKey);
   if (cached) return cached;
 
-  const [branchesDocs, studentsDocs, attendanceDocs, resultsDocs, testScoresDocs, feesDocs, teachersDocs, enrollmentsDocs] =
-    await Promise.all([
-      // Branches live as a subcollection under schools/{uid}/branches — no schoolId filter needed.
-      fetchAll(query(collection(db, "schools", uid, "branches")), `schools/${uid}/branches`),
-      fetchSchoolScoped("students",    uid),
-      fetchSchoolScoped("attendance",  uid),
-      fetchSchoolScoped("results",     uid),
-      fetchSchoolScoped("test_scores", uid),
-      fetchSchoolScoped("fees",        uid),
-      fetchSchoolScoped("teachers",    uid),
-      fetchSchoolScoped("enrollments", uid),
-    ]);
+  const [
+    branchesDocs, studentsDocs, attendanceDocs,
+    resultsDocs, testScoresDocs, gradebookDocs,
+    feesDocs, feeStructureDocs,
+    teachersDocs, enrollmentsDocs,
+  ] = await Promise.all([
+    // Branches live as a subcollection under schools/{uid}/branches — no schoolId filter needed.
+    fetchAll(query(collection(db, "schools", uid, "branches")), `schools/${uid}/branches`),
+    fetchSchoolScoped("students",    uid),
+    fetchSchoolScoped("attendance",  uid),
+    fetchSchoolScoped("results",     uid),
+    fetchSchoolScoped("test_scores", uid),
+    /* gradebook_scores — Teacher Dashboard's Gradebook page writes here. Was
+       previously ignored, so any school whose academic data lives only in
+       gradebook_scores (not test_scores or results) saw branch pass rate as
+       N/A despite having real grades in Firestore. */
+    fetchSchoolScoped("gradebook_scores", uid),
+    fetchSchoolScoped("fees",        uid),
+    /* fee_structure — Principal Dashboard's FeeStructure page writes here
+       (Excel upload of class-level rates and per-student paid/pending).
+       Was previously ignored — schools that maintain fee data this way
+       (which is most of them) saw fee collection as N/A even though the
+       paid/pending split was clearly recorded. */
+    fetchSchoolScoped("fee_structure", uid),
+    fetchSchoolScoped("teachers",    uid),
+    fetchSchoolScoped("enrollments", uid),
+  ]);
 
   // Adapt to the { docs: [...] } shape the rest of this function already expects.
-  const branchesSnap   = { docs: branchesDocs };
-  const studentsSnap   = { docs: studentsDocs };
-  const attendanceSnap = { docs: attendanceDocs };
-  const resultsSnap    = { docs: resultsDocs };
-  const testScoresSnap = { docs: testScoresDocs };
-  const feesSnap       = { docs: feesDocs };
-  const teachersSnap   = { docs: teachersDocs };
-  const enrollmentsSnap = { docs: enrollmentsDocs };
+  const branchesSnap     = { docs: branchesDocs };
+  const studentsSnap     = { docs: studentsDocs };
+  const attendanceSnap   = { docs: attendanceDocs };
+  const resultsSnap      = { docs: resultsDocs };
+  const testScoresSnap   = { docs: testScoresDocs };
+  const gradebookSnap    = { docs: gradebookDocs };
+  const feesSnap         = { docs: feesDocs };
+  const feeStructureSnap = { docs: feeStructureDocs };
+  const teachersSnap     = { docs: teachersDocs };
+  const enrollmentsSnap  = { docs: enrollmentsDocs };
 
   const months = getLast6Months();
 
@@ -335,15 +374,17 @@ export async function loadCoreSnapshot(uid: string): Promise<CoreSnapshot> {
   // Last-resort fallback: if no students matched any branch but students exist,
   // assign all to the first branch so dashboard is never empty
   const totalMapped = [...branchStudents.values()].reduce((s, set) => s + set.size, 0);
-  const unmapped = studentsSnap.docs.length - totalMapped;
+  const totalStudentsCount = studentsSnap.docs.length;
+  let unmapped = totalStudentsCount - totalMapped;
+  let fallbackTriggered = false;
   if (unmapped > 0 && totalMapped > 0) {
     // Some students matched, some didn't — warn about the gap
     console.warn(
-      `[analyticsService] ${unmapped} of ${studentsSnap.docs.length} students could not be mapped to any branch.` +
+      `[analyticsService] ${unmapped} of ${totalStudentsCount} students could not be mapped to any branch.` +
       ` Check that student documents contain a valid branchId/schoolId matching a known branch.`
     );
   }
-  if (totalMapped === 0 && studentsSnap.docs.length > 0 && branches.length > 0) {
+  if (totalMapped === 0 && totalStudentsCount > 0 && branches.length > 0) {
     console.warn(
       `[analyticsService] No students could be mapped to any branch — falling back to first branch (${branches[0].name}).` +
       ` This usually means branchId/schoolId fields don't match any branch document. Check data structure.`
@@ -353,7 +394,17 @@ export async function loadCoreSnapshot(uid: string): Promise<CoreSnapshot> {
       branchStudents.get(fallbackId)!.add(d.id);
       studentBranch.set(d.id, fallbackId);
     });
+    fallbackTriggered = true;
+    unmapped = totalStudentsCount;
   }
+  /* Surface the issue so the UI layer can render a banner instead of letting
+     a silent console.warn hide a fundamentally broken attribution. The
+     fallback-triggered case is the worst — single branch credited with every
+     student — and Owner should see that loudly. */
+  const mappingIssue: MappingIssue | null =
+    (unmapped > 0 || fallbackTriggered) && totalStudentsCount > 0
+      ? { unmapped, total: totalStudentsCount, fallbackTriggered }
+      : null;
 
   // Attendance
   (attendanceSnap.docs as any[]).forEach(d => {
@@ -378,11 +429,16 @@ export async function loadCoreSnapshot(uid: string): Promise<CoreSnapshot> {
     }
   });
 
-  // Results — use both `results` and `test_scores` collections
+  // Results — use both `results` and `test_scores` collections.
+  // Pass threshold MUST come from the exported PASS_THRESHOLD_PERCENT constant
+  // (line 154) — that's the single source of truth shared with the cloud
+  // function. A hardcoded literal here would drift the moment that constant
+  // is tuned (e.g. 50 → 60), causing the AHI to jump silently between the
+  // client and `aggregateSchoolStats` paths.
   const processResult = (r: any, cid: string) => {
     const res = branchRes.get(cid)!;
     res.total++;
-    if ((r.percentage || r.score || 0) >= 50) res.passed++;
+    if ((r.percentage || r.score || 0) >= PASS_THRESHOLD_PERCENT) res.passed++;
   };
   (resultsSnap.docs as any[]).forEach(d => {
     const r = d.data();
@@ -394,8 +450,26 @@ export async function loadCoreSnapshot(uid: string): Promise<CoreSnapshot> {
     const cid = studentBranch.get(r.studentId || "");
     if (cid) processResult(r, cid);
   });
+  /* gradebook_scores has `mark` + `maxMarks` instead of percentage. Compute
+     percentage explicitly. Branch resolution prefers the row's own branchId
+     (Gradebook writer sets it directly) and falls back to the studentId
+     chain — handles both writers cleanly. */
+  (gradebookSnap.docs as any[]).forEach(d => {
+    const r = d.data();
+    let cid = "";
+    if (r.branchId) cid = anyIdToCanonical.get(r.branchId) || (branchRes.has(r.branchId) ? r.branchId : "");
+    if (!cid) cid = studentBranch.get(r.studentId || "") || "";
+    if (!cid || !branchRes.has(cid)) return;
+    const mark = Number(r.mark) || 0;
+    const maxMarks = Number(r.maxMarks) || 0;
+    if (maxMarks <= 0) return;
+    const pct = (mark / maxMarks) * 100;
+    const res = branchRes.get(cid)!;
+    res.total++;
+    if (pct >= PASS_THRESHOLD_PERCENT) res.passed++;
+  });
 
-  // Fees
+  // Fees (per-student `fees` collection)
   (feesSnap.docs as any[]).forEach(d => {
     const f = d.data();
     const cid = studentBranch.get(f.studentId || "");
@@ -407,10 +481,42 @@ export async function loadCoreSnapshot(uid: string): Promise<CoreSnapshot> {
     fee.collected += collected;
   });
 
+  /* fee_structure — Principal-uploaded Excel with class-level rates and (when
+     mode === "student") per-student paid/pending split. Each doc carries a
+     direct branchId so we don't need the student chain. Preference order for
+     the paid/pending source:
+       1. studentRows (most granular) when mode === "student"
+       2. rows[].paid + rows[].pending when class-level rows carry aggregates
+     Either way we sum into branchFees so .feeCollection % stays consistent
+     with the per-student `fees` collection above. */
+  (feeStructureSnap.docs as any[]).forEach(d => {
+    const fs = d.data() as any;
+    const rawBranchId = fs.branchId;
+    if (!rawBranchId) return;
+    const cid = anyIdToCanonical.get(rawBranchId) || (branchFees.has(rawBranchId) ? rawBranchId : "");
+    if (!cid || !branchFees.has(cid)) return;
+    const fee = branchFees.get(cid)!;
+
+    const studentRows: any[] = Array.isArray(fs.studentRows) ? fs.studentRows : [];
+    const classRows:   any[] = Array.isArray(fs.rows)        ? fs.rows        : [];
+    const useStudent = fs.mode === "student" && studentRows.length > 0;
+    const source: any[] = useStudent ? studentRows : classRows;
+
+    source.forEach((row: any) => {
+      const paid    = Number(row.paid)    || 0;
+      const pending = Number(row.pending) || 0;
+      const total   = paid + pending;
+      if (total <= 0) return;
+      fee.total     += total;
+      fee.collected += paid;
+    });
+  });
+
   const snapshot: CoreSnapshot = {
     branches, studentBranch, branchStudents,
     branchAtt, branchMonthAtt, branchRes, branchFees,
     branchTeachers, studentAttMap, months,
+    mappingIssue,
   };
   setCache(cacheKey, snapshot);
   return snapshot;

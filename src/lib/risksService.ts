@@ -1,7 +1,118 @@
 import { db, auth } from "./firebase";
-import { collection, getDocs, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore";
+import { collection, getDocs, addDoc, serverTimestamp, doc, getDoc, query, where } from "firebase/firestore";
 import { invalidateCache } from "./analyticsService";
 import { sendCriticalAlertEmail } from "./resend";
+
+/* Helper to scope a root-collection fetch to the current school. EVERY
+   getDocs in this file MUST go through this — without the schoolId filter,
+   Owner sees students/attendance/scores from EVERY school in the database
+   (depends on Firestore rules to block, which is too brittle for privacy). */
+function scopedDocs(collName: string, uid: string) {
+  return getDocs(query(collection(db, collName), where("schoolId", "==", uid)))
+    .catch(() => ({ docs: [] as any[] }));
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   Module-level snapshot cache.
+
+   Why: the previous `fetchRisksOverview` re-fetched 7 collections + the
+   school settings doc + the branches subcollection on EVERY call, including
+   every time the Owner toggled the branch dropdown. Branch switch is a pure
+   filter operation, but it was paying a 1-2s Firestore round-trip each time.
+
+   Now: raw fetches cached at module level for 5 minutes, keyed by uid.
+   Branch switch reuses the cache and re-runs only the in-memory filter +
+   compute (instant). resolveAlert calls invalidateRisksCache to ensure the
+   next read picks up the fresh resolution. uid mismatch invalidates the
+   cache (covers user switching in same SPA tab).
+   ──────────────────────────────────────────────────────────────────────── */
+type RisksRawSnapshot = {
+  uid: string;
+  ts:  number;
+  thresholds: { attendanceCritical: number; attendanceWarning: number };
+  schoolEmail: string;
+  schoolOwnerName: string;
+  schoolName: string;
+  notifCriticalAlerts: boolean;
+  branches: { id: string; name: string }[];
+  branchesSnap: { docs: any[] };
+  anyIdToCanonical: Map<string, string>;
+  testScoresSnap:  { docs: any[] };
+  attendanceSnap:  { docs: any[] };
+  incidentsSnap:   { docs: any[] };
+  studentsSnap:    { docs: any[] };
+  teachersSnap:    { docs: any[] };
+  enrollmentsSnap: { docs: any[] };
+};
+
+const RISKS_CACHE_TTL_MS = 5 * 60 * 1000;
+let risksCache: RisksRawSnapshot | null = null;
+
+export function invalidateRisksCache(): void {
+  risksCache = null;
+}
+
+async function loadRisksSnapshot(uid: string): Promise<RisksRawSnapshot> {
+  if (risksCache && risksCache.uid === uid && Date.now() - risksCache.ts < RISKS_CACHE_TTL_MS) {
+    return risksCache;
+  }
+
+  // School settings: thresholds + notification prefs
+  let thresholds = { attendanceCritical: 65, attendanceWarning: 80 };
+  let schoolEmail = "";
+  let schoolOwnerName = "";
+  let schoolName = "";
+  let notifCriticalAlerts = true;
+  try {
+    const schoolSnap = await getDoc(doc(db, "schools", uid));
+    if (schoolSnap.exists()) {
+      const sd = schoolSnap.data();
+      if (sd.thresholds) thresholds = { ...thresholds, ...sd.thresholds };
+      schoolEmail         = sd.email       || "";
+      schoolOwnerName     = sd.ownerName   || "Owner";
+      schoolName          = sd.schoolName  || "School";
+      notifCriticalAlerts = sd.notifications?.criticalAlerts ?? true;
+    }
+  } catch { /* defaults */ }
+
+  // Branches subcollection
+  const branchesSnap = await getDocs(collection(db, "schools", uid, "branches"));
+  const branches = branchesSnap.docs.map(d => ({
+    id:   d.data().branchId || d.id,
+    name: d.data().name || d.data().schoolName || "Branch",
+  }));
+
+  const anyIdToCanonical = new Map<string, string>();
+  branchesSnap.docs.forEach(d => {
+    const canonical = d.data().branchId || d.id;
+    [d.id, d.data().branchId, d.data().schoolId, d.data().uid]
+      .filter(Boolean)
+      .forEach((v: string) => anyIdToCanonical.set(v, canonical));
+  });
+
+  // Parallel fetch of every needed root collection — single round-trip.
+  const [testScoresSnap, attendanceSnap, incidentsSnap, studentsSnap, teachersSnap, enrollmentsSnap] = await Promise.all([
+    scopedDocs("test_scores",  uid),
+    scopedDocs("attendance",   uid),
+    scopedDocs("incidents",    uid),
+    scopedDocs("students",     uid),
+    scopedDocs("teachers",     uid),
+    scopedDocs("enrollments",  uid),
+  ]);
+
+  const snapshot: RisksRawSnapshot = {
+    uid,
+    ts: Date.now(),
+    thresholds,
+    schoolEmail, schoolOwnerName, schoolName, notifCriticalAlerts,
+    branches,
+    branchesSnap: { docs: branchesSnap.docs },
+    anyIdToCanonical,
+    testScoresSnap, attendanceSnap, incidentsSnap, studentsSnap, teachersSnap, enrollmentsSnap,
+  };
+  risksCache = snapshot;
+  return snapshot;
+}
 
 export type RiskStat = {
   label: string;
@@ -24,77 +135,55 @@ export type AlertItem = {
   attendancePct?: number;   // current attendance %
 };
 
+export type RiskMappingIssue = {
+  unmapped: number;
+  total: number;
+  fallbackTriggered: boolean;
+};
+
 export type RisksData = {
   stats: RiskStat[];
   distribution: { name: string; value: number; fill: string }[];
   trend: { name: string; critical: number; warning: number }[];
   branchRisks: { name: string; value: number; color: string }[];
   alerts: AlertItem[];
+  /* Surfaces broken student→branch attribution so the Owner sees a banner
+     instead of silently-skewed risk counts. Mirrors the analyticsService
+     mappingIssue pattern used in BranchesComparison. */
+  mappingIssue: RiskMappingIssue | null;
 };
 
 export async function fetchRisksOverview(selectedBranchId: string = "all"): Promise<RisksData> {
   const uid = auth.currentUser?.uid;
   if (!uid) throw new Error("User not authenticated");
 
-  // ── Load school settings: thresholds + notification prefs ────────────────
-  let thresholds = { attendanceCritical: 65, attendanceWarning: 80, feeOverdueDays: 30 };
-  let schoolEmail = "";
-  let schoolOwnerName = "";
-  let schoolName = "";
-  let notifCriticalAlerts = true;
-  try {
-    const schoolSnap = await getDoc(doc(db, "schools", uid));
-    if (schoolSnap.exists()) {
-      const sd = schoolSnap.data();
-      if (sd.thresholds) thresholds = { ...thresholds, ...sd.thresholds };
-      schoolEmail       = sd.email       || "";
-      schoolOwnerName   = sd.ownerName   || "Owner";
-      schoolName        = sd.schoolName  || "School";
-      notifCriticalAlerts = sd.notifications?.criticalAlerts ?? true;
-    }
-  } catch { /* use defaults */ }
+  /* Load (or reuse cached) raw snapshot. First call pays the 7-collection
+     round-trip; subsequent calls within 5 min reuse the cache and run only
+     the in-memory filter + compute below — branch switch becomes instant. */
+  const snap = await loadRisksSnapshot(uid);
+  const {
+    thresholds, schoolEmail, schoolOwnerName, schoolName, notifCriticalAlerts,
+    branches, anyIdToCanonical,
+    testScoresSnap, attendanceSnap, incidentsSnap, studentsSnap, teachersSnap, enrollmentsSnap,
+  } = snap;
 
+  /* Cross-page cache coordination: analyticsService caches the same kinds of
+     raw data for branchesService. When risks data is stale enough that we
+     re-fetched (cache miss above), it's likely the analytics cache is stale
+     too — bust it so BranchesComparison sees fresh numbers on its next render. */
   invalidateCache(`core:${uid}`);
-
-  // 1. Fetch branches
-  const branchesSnap = await getDocs(collection(db, "schools", uid, "branches"));
-  const branches = branchesSnap.docs.map(d => ({
-    id:   d.data().branchId || d.id,
-    name: d.data().name || d.data().schoolName || "Branch",
-  }));
-
-  // Build a lookup: ANY possible ID for a branch → canonical branch id
-  // (branch doc may store branchId, schoolId, uid as separate fields)
-  const anyIdToCanonical = new Map<string, string>();
-  branchesSnap.docs.forEach(d => {
-    const canonical = d.data().branchId || d.id;
-    [d.id, d.data().branchId, d.data().schoolId, d.data().uid]
-      .filter(Boolean)
-      .forEach((v: string) => anyIdToCanonical.set(v, canonical));
-  });
 
   const resolveCanonical = (s: any): string => {
     for (const key of ["branchId", "schoolId", "school_id", "uid"]) {
       const v = s[key];
       if (v && anyIdToCanonical.has(v)) return anyIdToCanonical.get(v)!;
     }
-    // Still try raw values even if not in map — at least gives branch-level grouping
     return s.branchId || s.schoolId || s.school_id || "";
   };
 
   const targetSet = selectedBranchId === "all"
     ? new Set(branches.map(b => b.id))
     : new Set([selectedBranchId]);
-
-  // 2. Fetch all needed collections in parallel
-  const [testScoresSnap, attendanceSnap, incidentsSnap, studentsSnap, teachersSnap, enrollmentsSnap] = await Promise.all([
-    getDocs(collection(db, "test_scores")).catch(() => ({ docs: [] as any[] })),
-    getDocs(collection(db, "attendance")).catch(() => ({ docs: [] as any[] })),
-    getDocs(collection(db, "incidents")).catch(() => ({ docs: [] as any[] })),
-    getDocs(collection(db, "students")).catch(() => ({ docs: [] as any[] })),
-    getDocs(collection(db, "teachers")).catch(() => ({ docs: [] as any[] })),
-    getDocs(collection(db, "enrollments")).catch(() => ({ docs: [] as any[] })),
-  ]);
 
   // Build teacher→branch map — CRITICAL: also try teacher doc ID (auth uid)
   const teacherBranchMap = new Map<string, string>();
@@ -153,16 +242,44 @@ export async function fetchRisksOverview(selectedBranchId: string = "all"): Prom
     studentMap.set(d.id, { ...s, _cid: cid, id: d.id });
   });
 
-  // Last-resort fallback: if NO students resolved to any branch but students exist,
-  // assign all to first branch so data is never entirely empty
-  if (studentMap.size === 0 && studentsSnap.docs.length > 0 && branches.length > 0) {
-    const fallbackBranchId = selectedBranchId !== "all" && targetSet.has(selectedBranchId)
-      ? selectedBranchId
-      : branches[0].id;
+  /* Mapping diagnostics — surface broken attribution to the UI. Without this,
+     a school whose students lack matching branchId fields ends up with every
+     metric dragged to fallback-branch, making Owner think one branch is
+     full of risk students when it's actually a data hygiene issue. */
+  const totalStudentsInScope = studentsSnap.docs.length;
+  const mappedBeforeFallback = studentMap.size;
+  let fallbackTriggered = false;
+  /* Last-resort fallback — STRICTLY for "All Branches" view only.
+     Previously this fired for any selection, dumping every student into the
+     selected branch when their `branchId` field didn't resolve. That caused
+     identical risk counts no matter which branch the Owner clicked, hiding a
+     real data hygiene problem behind misleading parity. Restricting to "all"
+     means specific-branch views honestly show 0 students mapped, and the
+     user can compare "All vs each branch" to spot the discrepancy. */
+  if (
+    studentMap.size === 0 &&
+    totalStudentsInScope > 0 &&
+    branches.length > 0 &&
+    selectedBranchId === "all"
+  ) {
+    const fallbackBranchId = branches[0].id;
     (studentsSnap.docs as any[]).forEach(d => {
       studentMap.set(d.id, { ...d.data(), _cid: fallbackBranchId, id: d.id });
     });
+    fallbackTriggered = true;
   }
+  /* Unmapped count: students who never resolved to any in-scope branch.
+     For "All branches" filter this equals `total - mappedBeforeFallback`.
+     For a single-branch filter, this is harder to interpret (some students
+     may belong to OTHER branches and be intentionally excluded), so we only
+     report mappingIssue at the "all" view to avoid false alarms. */
+  const unmapped = selectedBranchId === "all"
+    ? Math.max(0, totalStudentsInScope - mappedBeforeFallback)
+    : 0;
+  const mappingIssue: RiskMappingIssue | null =
+    (fallbackTriggered || unmapped > 0) && totalStudentsInScope > 0
+      ? { unmapped: fallbackTriggered ? totalStudentsInScope : unmapped, total: totalStudentsInScope, fallbackTriggered }
+      : null;
 
   const alerts: AlertItem[] = [];
   let criticalCount = 0, warningCount = 0, infoCount = 0;
@@ -204,9 +321,16 @@ export async function fetchRisksOverview(selectedBranchId: string = "all"): Prom
       else if (attPct < thresholds.attendanceWarning) level = 'warning';
     }
 
-    // Academic risk
-    if (sRes.length > 0) {
-      const avg = sRes.reduce((acc: number, r: any) => acc + (r.percentage || r.score || 0), 0) / sRes.length;
+    // Academic risk — extract numeric values FIRST, then average only over
+    // entries that actually have data. Previously a score doc with neither
+    // `percentage` nor `score` field contributed 0 to the avg, dragging it
+    // below the warning threshold and falsely flagging the student as at-risk
+    // (per `bug_pattern_score_zero_no_data` memory rule).
+    const validScores = sRes
+      .map((r: any) => Number(r.percentage ?? r.score))
+      .filter((v: number) => Number.isFinite(v) && v > 0);
+    if (validScores.length > 0) {
+      const avg = validScores.reduce((acc: number, v: number) => acc + v, 0) / validScores.length;
       if (avg < 60) bStats.lowScoreCount++;
       if (avg < 45) level = 'critical';
       else if (avg < 60 && !level) level = 'warning';
@@ -304,6 +428,10 @@ export async function fetchRisksOverview(selectedBranchId: string = "all"): Prom
     distribution.push({ name: 'Healthy', value: 1, fill: '#22c55e' });
   }
 
+  /* No more `.slice(0, 5)` — silently capping at 5 branches hid risk volume
+     for schools with 6+ branches. The chart already supports horizontal scroll
+     on mobile (BranchesComparison.tsx pattern), and on desktop the bars just
+     get thinner. Showing the full picture > arbitrary cap. */
   const branchRisks = branches.map(b => {
     const stats = branchStats.get(b.id) || { critical: 0, warning: 0 };
     return {
@@ -311,7 +439,7 @@ export async function fetchRisksOverview(selectedBranchId: string = "all"): Prom
       value: stats.critical + stats.warning,
       color: stats.critical > 0 ? '#ef4444' : '#f59e0b'
     };
-  }).filter(b => b.value > 0).slice(0, 5);
+  }).filter(b => b.value > 0);
 
   if (branchRisks.length === 0) {
       branchRisks.push({ name: 'All Clear', value: 0, color: '#22c55e' });
@@ -367,7 +495,7 @@ export async function fetchRisksOverview(selectedBranchId: string = "all"): Prom
   let resolvedCount = 0;
   const recentlyResolved = new Set<string>();
   try {
-    const resolutionsSnap = await getDocs(collection(db, "alert_resolutions"));
+    const resolutionsSnap = await getDocs(query(collection(db, "alert_resolutions"), where("schoolId", "==", uid)));
     const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
     const oneDayAgo     = Date.now() -      24 * 60 * 60 * 1000;
     resolutionsSnap.docs.forEach(d => {
@@ -429,7 +557,8 @@ export async function fetchRisksOverview(selectedBranchId: string = "all"): Prom
     distribution,
     trend,
     branchRisks,
-    alerts: visibleAlerts
+    alerts: visibleAlerts,
+    mappingIssue,
   };
 }
 
@@ -464,16 +593,14 @@ export async function fetchAlertDetail(alertId: string): Promise<AlertDetailData
   const alertType: 'critical' | 'warning' | 'info' =
     prefix === 'crit' ? 'critical' : prefix === 'warn' ? 'warning' : 'info';
 
-  // 1. Branch info
-  const branchesSnap = await getDocs(collection(db, "schools", uid, "branches"));
-  const branchDoc    = branchesSnap.docs.find(d => (d.data().branchId || d.id) === branchId);
-  const branchName   = branchDoc?.data()?.name || branchDoc?.data()?.schoolName || "Branch";
+  /* Use the same cached raw snapshot as fetchRisksOverview — students,
+     attendance, and branches are already loaded. Saves three round-trips
+     when the user clicks an alert from the overview list. */
+  const snap = await loadRisksSnapshot(uid);
+  const { branchesSnap, studentsSnap, attendanceSnap } = snap;
 
-  // 2. Fetch students + attendance in parallel
-  const [studentsSnap, attendanceSnap] = await Promise.all([
-    getDocs(collection(db, "students")).catch(() => ({ docs: [] as any[] })),
-    getDocs(collection(db, "attendance")).catch(() => ({ docs: [] as any[] })),
-  ]);
+  const branchDoc  = branchesSnap.docs.find((d: any) => (d.data().branchId || d.id) === branchId);
+  const branchName = branchDoc?.data()?.name || branchDoc?.data()?.schoolName || "Branch";
 
   // Students belonging to this branch
   const branchStudentIds = new Set<string>();
@@ -551,11 +678,30 @@ export async function fetchAlertDetail(alertId: string): Promise<AlertDetailData
   }));
 
   const totalStudents = branchStudentIds.size;
-  const alertNum      = `RA-${new Date().getFullYear()}-${String((branchId.charCodeAt(0) * 13) % 9000 + 1000)}`;
-  const detectedOn    = new Date().toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  /* Unique alert number — full-branchId hash, not just first char.
+     Previously two branches starting with the same letter got identical
+     alert numbers (e.g. "Banjarahills" and "Bandra" both → RA-2026-XXXX). */
+  const branchHash = (() => {
+    let h = 0;
+    for (let i = 0; i < branchId.length; i++) {
+      h = ((h << 5) - h + branchId.charCodeAt(i)) | 0;
+    }
+    return Math.abs(h) % 9000 + 1000;
+  })();
+  const alertNum = `RA-${new Date().getFullYear()}-${branchHash}`;
 
-  // Duration: estimate days since attendance dropped below baseline
-  // Use earliest below-baseline date in last 7 days trend
+  /* Real "detected on" — earliest day in the 7-day trend window that fell
+     below baseline. Previously this was always today's date, even for an
+     alert that started a week ago. The trend array is in chronological
+     order (oldest → newest), so findIndex gives us the first below-baseline
+     day. The date is reconstructed from the index offset. */
+  const firstBelowIdx = trend.findIndex(t => t.pct > 0 && t.pct < baseline);
+  const detectedDate  = firstBelowIdx >= 0
+    ? new Date(today.getTime() - (6 - firstBelowIdx) * 24 * 60 * 60 * 1000)
+    : new Date();
+  const detectedOn = detectedDate.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+
+  // Duration: actual count of days below baseline in the trend window.
   const durationDays = trend.filter(t => t.pct > 0 && t.pct < baseline).length || 1;
 
   const description = alertType === 'critical'
@@ -572,23 +718,55 @@ export async function fetchAlertDetail(alertId: string): Promise<AlertDetailData
     { title: "Review class schedule for potential conflicts", sub: "Priority: Low • Estimated time: 1 hour", done: false },
   ];
 
-  // Historical alerts from resolved alert_resolutions collection
+  /* Historical alerts from resolved alert_resolutions collection — scoped.
+     Previously this block was largely fabricated:
+       - title alternated between "Attendance Drop" / "Academic Risk" by
+         array index (i === 0 ? ... : ...) regardless of the actual alertId
+         type prefix
+       - branch was always the CURRENT branchName, ignoring which branch
+         the resolution was actually about
+       - resolvedIn was `Math.random() * 7 + 3` — pure fiction
+     Now: parse the alertId (format: "{prefix}-{branchId}") to recover the
+     real type + real branch. Drop the fake resolvedIn since we don't track
+     the alert's first-detection time anywhere — making one up was
+     misleading. */
   let historicalAlerts: AlertDetailData["historicalAlerts"] = [];
   try {
-    const resSnap = await getDocs(collection(db, "alert_resolutions"));
+    const resSnap = await getDocs(query(collection(db, "alert_resolutions"), where("schoolId", "==", uid)));
     historicalAlerts = resSnap.docs
       .map(d => d.data())
       .filter(d => d.action === "resolved")
       .slice(0, 3)
-      .map((d, i) => ({
-        title: i === 0 ? `Attendance Drop - ${branchName}` : `Academic Risk - ${branchName}`,
-        status: "Resolved",
-        branch: branchName,
-        period: d.resolvedAt?.toDate
-          ? d.resolvedAt.toDate().toLocaleDateString("en-US", { month: "short", year: "numeric" })
-          : "Recent",
-        resolvedIn: `Resolved in ${Math.floor(Math.random() * 7) + 3} days`,
-      }));
+      .map((d) => {
+        const altId = String(d.alertId || "");
+        const dashIdx = altId.indexOf("-");
+        const altPrefix   = dashIdx >= 0 ? altId.slice(0, dashIdx) : altId;
+        const altBranchId = dashIdx >= 0 ? altId.slice(dashIdx + 1) : "";
+
+        const altBranchDoc = branchesSnap.docs.find(b => (b.data().branchId || b.id) === altBranchId);
+        const altBranchName = altBranchDoc?.data()?.name
+          || altBranchDoc?.data()?.schoolName
+          || branchName; // fallback only if we can't resolve
+
+        const titleByPrefix =
+          altPrefix === "crit"  ? `Attendance Drop - ${altBranchName}` :
+          altPrefix === "score" ? `Low Academic Performance - ${altBranchName}` :
+          altPrefix === "warn"  ? `Attendance Monitoring - ${altBranchName}` :
+                                  `Resolved Alert - ${altBranchName}`;
+
+        const resolvedAtDate = d.resolvedAt?.toDate ? d.resolvedAt.toDate() : null;
+        const period = resolvedAtDate
+          ? resolvedAtDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+          : "Recent";
+
+        return {
+          title:      titleByPrefix,
+          status:     "Resolved",
+          branch:     altBranchName,
+          period,
+          resolvedIn: "", // honest empty — alert createdAt isn't tracked
+        };
+      });
   } catch { /* graceful fail */ }
 
   return {
@@ -637,7 +815,16 @@ export async function resolveAlert(
   const uid = auth.currentUser?.uid;
   if (!uid) return;
   await addDoc(collection(db, "alert_resolutions"), {
+    /* schoolId on write so the scoped read in fetchRisksOverview can find it.
+       Without this field, the where("schoolId", "==", uid) filter would
+       silently exclude the just-written resolution row. */
+    schoolId: uid,
     alertId, action, resolvedBy: uid, resolvedAt: serverTimestamp(),
     ...(assignedTo ? { assignedTo } : {}),
   });
+  /* Bust the snapshot cache so the next fetchRisksOverview / fetchAlertDetail
+     re-pulls fresh `alert_resolutions` (which we DON'T cache because they
+     change with every resolve action). The 5-min raw cache is still useful
+     for student/attendance/test_scores which change less frequently. */
+  invalidateRisksCache();
 }

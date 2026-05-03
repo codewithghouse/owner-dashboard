@@ -12,11 +12,11 @@ import { useState } from "react";
 import { useAcademicsOverview, useSubjectDetail } from "@/hooks/useAcademics";
 import {
   B1, T1, T3, T4, GREEN, RED, GOLD, VIOLET,
-  GRAD_PRIMARY, GRAD_HERO, GRAD_BLUE, GRAD_GREEN, GRAD_VIOLET, GRAD_GOLD, GRAD_RED,
+  GRAD_PRIMARY, GRAD_BLUE, GRAD_GREEN, GRAD_VIOLET, GRAD_GOLD, GRAD_RED,
   SHADOW_SM, SHADOW_LG, SHADOW_BTN, usePageShellStyle,
   DashGlobalStyles, PageHead, StatTile, DarkHero, Card3D, AIInsightCard,
 } from "@/lib/dashboardTokens";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useBreakpoint } from "@/hooks/useBreakpoint";
 
 // ── mobile-only hardening: neutralise 3D hover transforms on touch devices
 //     (they stay "stuck" after tap and cause the card to overflow horizontally,
@@ -69,11 +69,22 @@ const getMatrixColor = (value: number) => {
 
 const getMatrixText = (value: number) => value >= 60 ? "#fff" : value > 0 ? "#fff" : T4;
 
+// ── solid pill gradients ──────────────────────────────────────────────────────
+// Imported GRAD_RED / GRAD_GOLD / GRAD_GREEN are PASTEL card backgrounds
+// (~#FEF8F9 → #FCEAEE). Using them as a pill background with white text
+// gives white-on-near-white — invisible. These are the vivid solid pairs
+// for active pills / status badges. (See memory:
+// bug_pattern_pastel_grad_on_button.)
+const SOLID_RED   = "linear-gradient(135deg,#FF3355 0%,#DC2626 100%)";
+const SOLID_GOLD  = "linear-gradient(135deg,#F59E0B 0%,#D97706 100%)";
+const SOLID_GREEN = "linear-gradient(135deg,#10B981 0%,#059669 100%)";
+const SOLID_SLATE = "linear-gradient(135deg,#94A3B8 0%,#64748B 100%)"; // no-data / neutral
+
 // ── main component ────────────────────────────────────────────────────────────
 export default function AcademicsOverview() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const isMobile = useIsMobile();
+  const isMobile = useBreakpoint() === "mobile";
   const pageShellStyle = usePageShellStyle();
   const [activeTab, setActiveTab] = useState("Performance");
 
@@ -93,11 +104,6 @@ export default function AcademicsOverview() {
       );
     }
     if (!subject) return null;
-
-    const statusGrad =
-      subject.status === "Strong" ? GRAD_GREEN :
-      subject.status === "Good" ? GRAD_BLUE :
-      subject.status === "No Data" ? "linear-gradient(135deg,#99AACC,#5070B0)" : GRAD_GOLD;
 
     return (
       <>
@@ -280,7 +286,7 @@ export default function AcademicsOverview() {
                           <h4 style={{ fontSize: isMobile ? 13 : 15, fontWeight:800, color:T1, margin:0, letterSpacing:"-0.3px", minWidth:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{area.topic}</h4>
                           <span style={{
                             fontSize:9, fontWeight:800, padding:"3px 9px", borderRadius:999,
-                            background: critical ? GRAD_RED : GRAD_GOLD,
+                            background: critical ? SOLID_RED : SOLID_GOLD,
                             color:"#fff", letterSpacing:"0.10em", textTransform:"uppercase",
                             flexShrink:0,
                           }}>
@@ -562,7 +568,9 @@ export default function AcademicsOverview() {
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: isMobile ? 10 : 14 }}>
               <div style={{ minWidth:0 }}>
                 <h3 style={{ fontSize: isMobile ? 14 : 15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Exam Results Distribution</h3>
-                <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>By score range</p>
+                <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>
+                  By score range · stacked by {activeData?.examDistributionDimension === "grade" ? "grade" : "branch"}
+                </p>
               </div>
               <div style={{ width: isMobile ? 28 : 32, height: isMobile ? 28 : 32, borderRadius:10, background:"rgba(255,170,0,.12)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
                 <Award size={isMobile ? 14 : 16} color={GOLD} strokeWidth={2.3}/>
@@ -570,26 +578,57 @@ export default function AcademicsOverview() {
             </div>
             {overviewLoading ? (
               <div style={{ height: isMobile ? 240 : 300, background:"rgba(0,85,255,.04)", borderRadius:12 }}/>
-            ) : (
-              <div style={{ height: isMobile ? 260 : 300 }}>
+            ) : (() => {
+              // Series = branch names (overall) or grade labels (per-branch).
+              // Filter to series that actually have any data so we don't pad
+              // the legend with empty stacks.
+              const allSeries = activeData?.examDistributionSeries ?? [];
+              const series = allSeries.filter(s =>
+                activeData!.examDistribution.some(row => Number(row[s] || 0) > 0)
+              );
+              const palette = [B1, GREEN, GOLD, RED, VIOLET, "#2277FF", "#F97316", "#06B6D4"];
+              return (
+              <div style={{ height: isMobile ? 280 : 320 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={activeData!.examDistribution} margin={{ top:8, right: isMobile ? 8 : 10, bottom: isMobile ? 20 : 10, left: isMobile ? -14 : 0 }}>
+                  <BarChart data={activeData!.examDistribution} margin={{ top:8, right: isMobile ? 8 : 10, bottom: isMobile ? 28 : 22, left: isMobile ? -14 : 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,85,255,.07)"/>
                     <XAxis dataKey="range" axisLine={false} tickLine={false}
                       tick={{ fill:T3, fontSize: isMobile ? 10 : 11, fontWeight:700 }}
                       dy={8} interval={0}/>
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill:T3, fontSize: isMobile ? 9 : 11, fontWeight:700 }} width={isMobile ? 30 : 40}/>
-                    <Tooltip contentStyle={{ borderRadius:12, border:"none", boxShadow:SHADOW_LG, fontSize:11, fontWeight:700 }} cursor={{ fill:"rgba(0,85,255,.04)" }}/>
-                    <Bar dataKey="count" name="Students" radius={[6,6,0,0]} barSize={isMobile ? 28 : 36}
-                      label={{ position:"top", fill:T3, fontSize: isMobile ? 10 : 11, fontWeight:800 }}>
-                      {activeData!.examDistribution.map((_,i)=>(
-                        <Cell key={`c-${i}`} fill={[GREEN, B1, "#2277FF", GOLD, RED][i % 5]}/>
-                      ))}
-                    </Bar>
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill:T3, fontSize: isMobile ? 9 : 11, fontWeight:700 }} width={isMobile ? 30 : 40} allowDecimals={false}/>
+                    <Tooltip
+                      contentStyle={{ borderRadius:12, border:"none", boxShadow:SHADOW_LG, fontSize:11, fontWeight:700 }}
+                      cursor={{ fill:"rgba(0,85,255,.04)" }}
+                      formatter={(value: any, name: any) => [`${value} student${value === 1 ? "" : "s"}`, name]}
+                    />
+                    <Legend
+                      verticalAlign="bottom" iconType="circle"
+                      wrapperStyle={{ paddingTop:6, fontSize: isMobile ? 9 : 10, fontWeight:700 }}
+                    />
+                    {/* One stacked Bar per series — last bar in stack gets
+                        rounded top corners so the column reads as one bar. */}
+                    {series.length === 0 ? (
+                      <Bar dataKey="total" name="Students" stackId="x" radius={[6,6,0,0]} barSize={isMobile ? 28 : 36}>
+                        {activeData!.examDistribution.map((_,i)=>(
+                          <Cell key={`c-${i}`} fill={[GREEN, B1, "#2277FF", GOLD, RED][i % 5]}/>
+                        ))}
+                      </Bar>
+                    ) : series.map((s, i) => (
+                      <Bar
+                        key={s}
+                        dataKey={s}
+                        name={s}
+                        stackId="x"
+                        fill={palette[i % palette.length]}
+                        radius={i === series.length - 1 ? [6,6,0,0] : [0,0,0,0]}
+                        barSize={isMobile ? 28 : 36}
+                      />
+                    ))}
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-            )}
+              );
+            })()}
           </Card3D>
 
           <Card3D padding={isMobile ? "16px 14px" : "22px 24px"}>
@@ -645,7 +684,14 @@ export default function AcademicsOverview() {
             </div>
             <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(300px, 1fr))", gap: isMobile ? 10 : 14 }}>
               {branches.map(b => {
-                const statusGrad = b.passRate >= 80 ? GRAD_GREEN : b.passRate >= 60 ? GRAD_GOLD : b.passRate > 0 ? GRAD_RED : "linear-gradient(135deg,#99AACC,#5070B0)";
+                // Solid gradients for the status pill (white text on pastel
+                // = invisible — see memory: bug_pattern_pastel_grad_on_button).
+                // No-data branches use neutral slate, not red.
+                const statusGrad =
+                  b.passRate >= 80 ? SOLID_GREEN :
+                  b.passRate >= 60 ? SOLID_GOLD :
+                  b.passRate > 0   ? SOLID_RED :
+                                     SOLID_SLATE;
                 const statusLabel = b.passRate >= 80 ? "Strong" : b.passRate >= 60 ? "Average" : b.passRate > 0 ? "Weak" : "No Data";
                 return (
                   <div
@@ -682,11 +728,16 @@ export default function AcademicsOverview() {
                       </span>
                     </div>
                     <div style={{ display:"flex", flexDirection:"column", gap: isMobile ? 6 : 8 }}>
+                      {/* No-data values render as "—" with neutral slate
+                          colour — without the explicit `=== 0` gate, an
+                          untested branch's metrics show as gold/red
+                          ("warning" / "at risk") which is misleading.
+                          (See memory: bug_pattern_score_zero_no_data.) */}
                       {[
-                        { label:"Avg Score", value:b.avgScore>0?`${b.avgScore}%`:"—", color: b.avgScore>=75?GREEN:GOLD },
-                        { label:"Pass Rate", value:b.passRate>0?`${b.passRate}%`:"—", color: b.passRate>=80?GREEN:GOLD },
-                        { label:"Distinction", value:b.distinctionRate>0?`${b.distinctionRate}%`:"—", color:B1 },
-                        { label:"Attendance", value:b.avgAttendance>0?`${b.avgAttendance}%`:"—", color: b.avgAttendance>=85?GREEN:RED },
+                        { label:"Avg Score",   value:b.avgScore>0?`${b.avgScore}%`:"—",         color: b.avgScore===0      ? T4 : b.avgScore>=75      ? GREEN : GOLD },
+                        { label:"Pass Rate",   value:b.passRate>0?`${b.passRate}%`:"—",         color: b.passRate===0      ? T4 : b.passRate>=80      ? GREEN : GOLD },
+                        { label:"Distinction", value:b.distinctionRate>0?`${b.distinctionRate}%`:"—", color: b.distinctionRate===0 ? T4 : B1 },
+                        { label:"Attendance",  value:b.avgAttendance>0?`${b.avgAttendance}%`:"—", color: b.avgAttendance===0 ? T4 : b.avgAttendance>=85 ? GREEN : RED },
                       ].map(m => (
                         <div key={m.label} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", paddingBottom: isMobile ? 5 : 6, borderBottom:"0.5px solid rgba(0,85,255,.06)" }}>
                           <span style={{ fontSize: isMobile ? 10 : 11, fontWeight:600, color:T3 }}>{m.label}</span>

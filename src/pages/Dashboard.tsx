@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { db, auth } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
 import { collection, getDocs, query, where, orderBy, limit, onSnapshot, doc, getDoc, setDoc } from "firebase/firestore";
-import { calculateAHI, invalidateCache } from "@/lib/analyticsService";
+import { calculateAHI, invalidateCache, PASS_THRESHOLD_PERCENT } from "@/lib/analyticsService";
 import { loadDashboardStats, invalidateDashboardCache, type CloudSchoolStats } from "@/lib/cloudAggregation";
 import {
   computeFeeStats, bucketFeeHistory, normalizeFeeDoc,
@@ -20,6 +19,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import BenchmarkCard from "@/components/BenchmarkCard";
 import { tilt3D, tilt3DStyle } from "@/lib/use3DTilt";
+import { useBreakpoint } from "@/hooks/useBreakpoint";
 
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -38,34 +38,6 @@ const GRAD_HERO = "linear-gradient(135deg,#001040 0%,#001888 35%,#0033CC 70%,#00
 const SHADOW_SM = "0 0 0 .5px rgba(0,85,255,.08), 0 2px 8px rgba(0,85,255,.08), 0 10px 26px rgba(0,85,255,.10)";
 const SHADOW_LG = "0 0 0 .5px rgba(0,85,255,.10), 0 4px 16px rgba(0,85,255,.11), 0 18px 44px rgba(0,85,255,.13)";
 const SHADOW_BTN = "0 6px 22px rgba(0,85,255,.40), 0 2px 5px rgba(0,85,255,.20)";
-
-/* ── responsive breakpoint hook ──────────────────────────────────────────
-   rAF-throttled — listener fires once per animation frame instead of once
-   per resize event (which can fire every pixel during a drag). */
-function useBreakpoint() {
-  const get = () => {
-    if (typeof window === "undefined") return "desktop" as const;
-    const w = window.innerWidth;
-    return w < 768 ? ("mobile" as const) : w < 1024 ? ("tablet" as const) : ("desktop" as const);
-  };
-  const [bp, setBp] = useState<"mobile" | "tablet" | "desktop">(get);
-  useEffect(() => {
-    let frame = 0;
-    const onResize = () => {
-      if (frame) return;
-      frame = requestAnimationFrame(() => {
-        frame = 0;
-        setBp(get());
-      });
-    };
-    window.addEventListener("resize", onResize);
-    return () => {
-      window.removeEventListener("resize", onResize);
-      if (frame) cancelAnimationFrame(frame);
-    };
-  }, []);
-  return bp;
-}
 
 /* ── helpers ─────────────────────────────────────────── */
 function timeAgo(ts: any): string {
@@ -107,12 +79,16 @@ export default function Dashboard() {
   const [loading,             setLoading]             = useState(true);
   const [lastRefreshed,       setLastRefreshed]       = useState<Date | null>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Dedup the monthly-snapshot save: fetchAll runs every 5 min + on branch
+  // list changes, so the "if not exists" guard alone still costs one read +
+  // one round-trip per refresh. After the first successful save in this
+  // session we skip entirely.
+  const snapshotSavedRef = useRef(false);
 
   /* ── data fetch ─────────────────────────────────── */
   useEffect(() => {
     let alertsUnsub = () => {};
     let branchesUnsub = () => {};
-    let started = false;  // guard against multiple onAuthStateChanged firings
 
     // ── Save monthly historical snapshot (once per month) ─────────────────
     const saveMonthlySnapshot = async (
@@ -144,7 +120,7 @@ export default function Dashboard() {
 
         let activeBranches: Array<{
           id: string; name: string; students: number; ahi: number;
-          avgMarks: number; avgAttendance: number; passRate: number; feeRate: number;
+          avgAttendance: number; passRate: number; feeRate: number;
         }>;
 
         if (cloudStats) {
@@ -154,7 +130,6 @@ export default function Dashboard() {
             name:          b.name,
             students:      b.students,
             ahi:           b.ahi,
-            avgMarks:      b.passRate,    // proxy until per-branch avgMarks added to cloud fn
             avgAttendance: b.attendance,
             passRate:      b.passRate,
             feeRate:       b.feeCollection,
@@ -163,64 +138,113 @@ export default function Dashboard() {
           setTotalStudents(cloudStats.totals.totalStudents);
           setAhi(cloudStats.totals.avgAhi);
         } else {
-          // Slow path — full client-side per-branch aggregation
-          const branchData = await Promise.all(
-            branchDocs.map(async (school) => {
-              const sid = school.id;
+          // Slow path — single query per collection (5 reads), group-by branchId
+          // in memory. Replaces the old N+1 (4 reads × N branches). Students
+          // counted by unique studentId via Set, so multi-class students are
+          // not double-counted. `results` merged with `test_scores` to mirror
+          // the cloud aggregator (some schools record exam scores in results/).
+          const swallow = (label: string) => (err: unknown) => {
+            console.warn(`[Dashboard] ${label} fetch failed:`, err);
+            return { docs: [] as any[] } as any;
+          };
+          const [enrollSnap, scoresSnap, resultsSnap, attSnap, feesSnap] = await Promise.all([
+            getDocs(query(collection(db, "enrollments"), where("schoolId", "==", uid))).catch(swallow("enrollments")),
+            getDocs(query(collection(db, "test_scores"), where("schoolId", "==", uid))).catch(swallow("test_scores")),
+            getDocs(query(collection(db, "results"),     where("schoolId", "==", uid))).catch(swallow("results")),
+            getDocs(query(collection(db, "attendance"),  where("schoolId", "==", uid))).catch(swallow("attendance")),
+            getDocs(query(collection(db, "fees"),        where("schoolId", "==", uid))).catch(swallow("fees")),
+          ]);
 
-              const enrollSnap  = await getDocs(query(collection(db, "enrollments"), where("branchId","==",sid)));
-              const studentCount = enrollSnap.size;
+          const allScoreDocs = [...scoresSnap.docs, ...resultsSnap.docs];
 
-              const scoresSnap  = await getDocs(query(collection(db, "test_scores"), where("branchId","==",sid)));
-              const allPct      = scoresSnap.docs
-                .map(d => parseFloat(d.data().percentage ?? d.data().score ?? ""))
-                .filter(n => !isNaN(n));
-              const avgMarks    = allPct.length
-                ? Math.round(allPct.reduce((a,b)=>a+b,0) / allPct.length)
-                : 0;
-              const passRate    = allPct.length
-                ? Math.round(allPct.filter(p => p >= 40).length / allPct.length * 100)
-                : 0;
+          const branchStudents = new Map<string, Set<string>>();
+          enrollSnap.docs.forEach(d => {
+            const data = d.data() as any;
+            const bid = data.branchId; const sid = data.studentId;
+            if (!bid || !sid) return;
+            let set = branchStudents.get(bid);
+            if (!set) { set = new Set(); branchStudents.set(bid, set); }
+            set.add(sid);
+          });
 
-              const attSnap     = await getDocs(query(collection(db, "attendance"), where("branchId","==",sid)));
-              const presentCnt  = attSnap.docs.filter(d => (d.data().status||"").toLowerCase()==="present").length;
-              const avgAtt      = attSnap.size ? Math.round((presentCnt / attSnap.size) * 100) : 0;
+          const branchScores = new Map<string, number[]>();
+          allScoreDocs.forEach(d => {
+            const data = d.data() as any;
+            const bid = data.branchId;
+            if (!bid) return;
+            const pct = parseFloat(data.percentage ?? data.score ?? "");
+            if (isNaN(pct)) return;
+            let arr = branchScores.get(bid);
+            if (!arr) { arr = []; branchScores.set(bid, arr); }
+            arr.push(pct);
+          });
 
-              const branchFeesSnap = await getDocs(query(collection(db, "fees"), where("branchId","==",sid)));
-              const branchPaid     = branchFeesSnap.docs.filter(d => (d.data().status||"").toLowerCase()==="paid").length;
-              const branchFeeRate  = branchFeesSnap.size ? Math.round((branchPaid / branchFeesSnap.size) * 100) : 0;
+          const branchAtt = new Map<string, { total: number; present: number }>();
+          attSnap.docs.forEach(d => {
+            const data = d.data() as any;
+            const bid = data.branchId;
+            if (!bid) return;
+            let b = branchAtt.get(bid);
+            if (!b) { b = { total: 0, present: 0 }; branchAtt.set(bid, b); }
+            b.total++;
+            if (String(data.status || "").toLowerCase() === "present") b.present++;
+          });
 
-              return {
-                id:            sid,
-                name:          school.name || school.schoolName || "Branch",
-                students:      studentCount,
-                ahi:           calculateAHI(avgAtt, passRate, branchFeeRate),
-                avgMarks,
-                avgAttendance: avgAtt,
-                passRate,
-                feeRate:       branchFeeRate,
-              };
-            })
-          );
-          activeBranches = branchData;
+          const branchFees = new Map<string, { total: number; paid: number }>();
+          feesSnap.docs.forEach(d => {
+            const data = d.data() as any;
+            const bid = data.branchId;
+            if (!bid) return;
+            let f = branchFees.get(bid);
+            if (!f) { f = { total: 0, paid: 0 }; branchFees.set(bid, f); }
+            f.total++;
+            if (String(data.status || "").toLowerCase() === "paid") f.paid++;
+          });
+
+          activeBranches = branchDocs.map(school => {
+            const sid = school.id;
+            const sCount = branchStudents.get(sid)?.size ?? 0;
+            const sArr = branchScores.get(sid) ?? [];
+            const passRate = sArr.length
+              ? Math.round(sArr.filter(p => p >= PASS_THRESHOLD_PERCENT).length / sArr.length * 100) : 0;
+            const att = branchAtt.get(sid);
+            const avgAtt = att?.total ? Math.round((att.present / att.total) * 100) : 0;
+            const feeAgg = branchFees.get(sid);
+            const branchFeeRate = feeAgg?.total ? Math.round((feeAgg.paid / feeAgg.total) * 100) : 0;
+            return {
+              id:            sid,
+              name:          school.name || school.schoolName || "Branch",
+              students:      sCount,
+              ahi:           calculateAHI(avgAtt, passRate, branchFeeRate),
+              avgAttendance: avgAtt,
+              passRate,
+              feeRate:       branchFeeRate,
+            };
+          });
           setBranches(activeBranches);
 
-          const totalStuds = activeBranches.reduce((s,b)=>s+b.students, 0);
-          setTotalStudents(totalStuds);
+          setTotalStudents(activeBranches.reduce((s, b) => s + b.students, 0));
 
-          const overallAHI = activeBranches.length > 0
-            ? Math.round(activeBranches.reduce((s,b)=>s+b.ahi,0) / activeBranches.length)
-            : 0;
-          setAhi(overallAHI);
+          setAhi(activeBranches.length > 0
+            ? Math.round(activeBranches.reduce((s, b) => s + b.ahi, 0) / activeBranches.length)
+            : 0);
         }
 
-        /* 4. Risk distribution + score time-bucket — single Firestore read,
-              single pass over docs. A student is classified once by their AVERAGE
-              score across all their test_scores docs; that student then contributes
-              to both the "all" bucket and their own branch's bucket.
-              The score time-bucket (used by Improvement Timeline below) is also
-              built in this same pass to avoid re-walking the docs later. */
-        const allScoresSnap = await getDocs(query(collection(db, "test_scores"), where("schoolId", "==", uid)));
+        /* 4. Risk distribution + score time-bucket — merged scoreDocs from
+              `test_scores` AND `results` (mirrors cloud aggregator). Single
+              pass classifies each student by their AVERAGE score; the student
+              contributes to both the "all" bucket and their own branch bucket.
+              The score time-bucket (used by Improvement Timeline below) is
+              built in the same pass to avoid re-walking the docs later. */
+        const swallowDocs = (label: string) => (err: unknown) => {
+          console.warn(`[Dashboard] ${label} fetch failed:`, err);
+          return { docs: [] as any[] } as any;
+        };
+        const [allScoresSnap, allResultsSnap] = await Promise.all([
+          getDocs(query(collection(db, "test_scores"), where("schoolId", "==", uid))).catch(swallowDocs("test_scores")),
+          getDocs(query(collection(db, "results"),     where("schoolId", "==", uid))).catch(swallowDocs("results")),
+        ]);
+        const allScoreDocs = [...allScoresSnap.docs, ...allResultsSnap.docs];
 
         // Robust date parser — handles Firestore Timestamp, ISO string, and Date.
         const parseDate = (raw: unknown): Date | null => {
@@ -240,9 +264,13 @@ export default function Dashboard() {
 
         const studentScores = new Map<string, number[]>();
         const studentBranch = new Map<string, string>();
+        // Tracks the timestamp of each student's most-recent score doc, so a
+        // transferred student lands in their NEW branch's risk bucket instead
+        // of being permanently stuck in the first branch we ever saw them in.
+        const studentBranchTs = new Map<string, number>();
         const scoreBucket   = new Map<number, { sum: number; count: number }>();
 
-        allScoresSnap.docs.forEach(d => {
+        allScoreDocs.forEach(d => {
           const data = d.data();
           const sid = data.studentId || data.studentEmail || d.id;
           const pct = parseFloat(data.percentage ?? data.score ?? "");
@@ -252,11 +280,17 @@ export default function Dashboard() {
           const arr = studentScores.get(sid) ?? [];
           arr.push(pct);
           studentScores.set(sid, arr);
+
+          const ts = parseDate(data.createdAt) ?? parseDate(data.timestamp);
+          const tsMs = ts?.getTime() ?? 0;
+
           const bid = typeof data.branchId === "string" ? data.branchId : "";
-          if (bid && !studentBranch.has(sid)) studentBranch.set(sid, bid);
+          if (bid && tsMs >= (studentBranchTs.get(sid) ?? -1)) {
+            studentBranch.set(sid, bid);
+            studentBranchTs.set(sid, tsMs);
+          }
 
           // Improvement-timeline bookkeeping (per-month average)
-          const ts = parseDate(data.createdAt) ?? parseDate(data.timestamp);
           if (ts) {
             const k = monthKey(ts);
             const b = scoreBucket.get(k) ?? { sum: 0, count: 0 };
@@ -310,8 +344,9 @@ export default function Dashboard() {
               as per-branch AHI, so timeline trend matches header AHI.
               Bounded by owner join date so a new account doesn't see hollow months
               from before they ever existed. */
-        const allAttSnap = await getDocs(query(collection(db, "attendance"), where("schoolId","==",uid)));
-
+        // Compute the timeline window FIRST — drives the bounded attendance
+        // read below, so a school with deep history doesn't trigger a
+        // 200K-row scan on every refresh.
         const now2 = new Date();
         const currentKey = monthKey(now2);
 
@@ -328,6 +363,20 @@ export default function Dashboard() {
         // for older accounts; a brand-new account starts at its join month only.
         const earliestKey = Math.max(joinKey, currentKey - 5);
         const monthCount = Math.max(1, Math.min(6, currentKey - earliestKey + 1));
+
+        // attendance.date is "YYYY-MM-DD" string → string ">=" works as a date
+        // bound. Cuts the read from "all-time" to "last 6 months".
+        const earliestY = Math.floor(earliestKey / 12);
+        const earliestM = ((earliestKey % 12) + 12) % 12;
+        const earliestDateStr = `${earliestY}-${String(earliestM + 1).padStart(2, "0")}-01`;
+        const allAttSnap = await getDocs(query(
+          collection(db, "attendance"),
+          where("schoolId", "==", uid),
+          where("date", ">=", earliestDateStr),
+        )).catch(err => {
+          console.warn("[Dashboard] attendance fetch failed:", err);
+          return { docs: [] as any[] } as any;
+        });
 
         const timelineMonths = Array.from({ length: monthCount }, (_, i) => {
           const k = earliestKey + i;
@@ -394,15 +443,18 @@ export default function Dashboard() {
         setTimelineSpan(monthCount);
 
         // ── Save this month's snapshot for historical trend ───────────────
-        const overallAtt  = activeBranches.length > 0
-          ? Math.round(activeBranches.reduce((s, b) => s + b.avgAttendance, 0) / activeBranches.length) : 0;
-        const overallPass = activeBranches.length > 0
-          ? Math.round(activeBranches.reduce((s, b) => s + b.passRate, 0) / activeBranches.length) : 0;
-        const overallFee  = activeBranches.length > 0
-          ? Math.round(activeBranches.reduce((s, b) => s + b.feeRate, 0) / activeBranches.length) : 0;
-        const overallAhi  = cloudStats?.totals.avgAhi ?? (activeBranches.length > 0
-          ? Math.round(activeBranches.reduce((s, b) => s + b.ahi, 0) / activeBranches.length) : 0);
-        saveMonthlySnapshot(uid, overallAhi, overallAtt, overallPass, overallFee);
+        // Once-per-session: skip the get+set round-trip after the first
+        // successful save. The `if (!exists)` guard inside saveMonthlySnapshot
+        // still protects against double-writes across sessions.
+        if (!snapshotSavedRef.current && activeBranches.length > 0) {
+          snapshotSavedRef.current = true;
+          const overallAtt  = Math.round(activeBranches.reduce((s, b) => s + b.avgAttendance, 0) / activeBranches.length);
+          const overallPass = Math.round(activeBranches.reduce((s, b) => s + b.passRate, 0) / activeBranches.length);
+          const overallFee  = Math.round(activeBranches.reduce((s, b) => s + b.feeRate, 0) / activeBranches.length);
+          const overallAhi  = cloudStats?.totals.avgAhi
+            ?? Math.round(activeBranches.reduce((s, b) => s + b.ahi, 0) / activeBranches.length);
+          saveMonthlySnapshot(uid, overallAhi, overallAtt, overallPass, overallFee);
+        }
 
       } catch(e) {
         console.error("Dashboard fetch error:", e);
@@ -411,12 +463,15 @@ export default function Dashboard() {
       setLastRefreshed(new Date());
     };
 
-    // Bind all uid-dependent listeners. Wrapped so we can start/stop on auth changes.
+    // Bind all uid-dependent listeners. Called exactly once per mount.
     const start = (uid: string) => {
-      if (started) return;
-      started = true;
-
       // ── Real-time onSnapshot for branches ─────────────────────────────────
+      // Heavy aggregate refetch is gated on the BRANCH LIST changing (count or
+      // ids). Metadata-only edits (name/color tweaks) refresh the in-page
+      // cards in place, without triggering a 5-collection refetch + cache
+      // wipe. The 5-min interval below still catches drift in scores / fees /
+      // attendance that aren't tied to a branch-doc edit.
+      let prevBranchIdsKey = "";
       branchesUnsub = onSnapshot(
         collection(db, "schools", uid, "branches"),
         (snap) => {
@@ -424,13 +479,28 @@ export default function Dashboard() {
             id: d.data().branchId || d.data().schoolId || d.id,
             ...d.data() as any
           }));
-          invalidateCache(`core:${uid}`);
-          invalidateDashboardCache();
-          invalidateFeeHistoryCache(uid);
-          fetchAll(uid, docs);
+          const idsKey = docs.map(d => d.id).sort().join("|");
+          const isFirstFire = prevBranchIdsKey === "";
+          const idsChanged = idsKey !== prevBranchIdsKey;
+          prevBranchIdsKey = idsKey;
+
+          if (isFirstFire || idsChanged) {
+            invalidateCache(`core:${uid}`);
+            invalidateDashboardCache();
+            invalidateFeeHistoryCache(uid);
+            fetchAll(uid, docs);
+          } else {
+            // Metadata-only update — refresh names in place, skip aggregation.
+            setBranches(prev => prev.map(b => {
+              const fresh = docs.find(d => d.id === b.id);
+              return fresh
+                ? { ...b, name: (fresh.name || fresh.schoolName || b.name) as string }
+                : b;
+            }));
+          }
         },
         () => {
-          // Fallback on permission error
+          // Permission-denied fallback — one-shot read, no realtime, no gate.
           getDocs(collection(db, "schools", uid, "branches")).then(s => {
             fetchAll(uid, s.docs.map(d => ({ id: d.data().branchId || d.id, ...d.data() as any })));
           });
@@ -492,15 +562,23 @@ export default function Dashboard() {
             .map(d => ({ id: d.id, ...d.data() as any }))
             .filter(d => (d.type || "").toUpperCase() !== "POSITIVE")
             .map(d => {
-              const typeUpper = String(d.type || "").toUpperCase();
+              // Principal Discipline.tsx writes student as a NESTED object
+              // ({ name, grade }) and severity as a flat string ("low" |
+              // "medium" | "high" | "critical"). Earlier this block expected
+              // flat d.studentName / d.className and inferred severity from
+              // type — both wrong, so the student name never rendered and
+              // every incident silently became a "warning".
+              const studentName = d.student?.name ?? d.studentName ?? "";
+              const studentGrade = d.student?.grade ?? d.className ?? "";
+              const sev = String(d.severity || "").toLowerCase();
               return {
                 ...d,
-                message: d.studentName
-                  ? `${d.studentName}${d.className ? ` · ${d.className}` : ""} — ${d.description || d.content || (d.type || "Incident")}`
-                  : (d.description || d.content || d.type || "Student incident"),
-                // Only docs explicitly typed "INCIDENT" are critical. Missing-type
-                // docs default to warning — never silently escalate.
-                severity: typeUpper === "INCIDENT" ? "critical" : "warning",
+                message: studentName
+                  ? `${studentName}${studentGrade ? ` · ${studentGrade}` : ""} — ${d.title || d.description || d.content || (d.type || "Incident")}`
+                  : (d.title || d.description || d.content || d.type || "Student incident"),
+                // Trust the doc-level severity. "high" + "critical" both bubble
+                // up to the red treatment; everything else stays as warning.
+                severity: (sev === "critical" || sev === "high") ? "critical" : "warning",
               };
             });
           mergeAndSet();
@@ -515,13 +593,13 @@ export default function Dashboard() {
       };
     };
 
-    // Subscribe to auth — start once uid is available, tear down on sign-out.
-    const authUnsub = onAuthStateChanged(auth, (u) => {
-      if (u?.uid) start(u.uid);
-    });
+    // App.tsx already gates this route on `auth.currentUser`, so by the time
+    // Dashboard mounts the uid is guaranteed to be present. Avoids a
+    // redundant onAuthStateChanged subscription + token refresh round-trip.
+    const uid = auth.currentUser?.uid;
+    if (uid) start(uid);
 
     return () => {
-      authUnsub();
       alertsUnsub();
       branchesUnsub();
       if (refreshTimerRef.current) clearInterval(refreshTimerRef.current);

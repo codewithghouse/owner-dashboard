@@ -363,7 +363,12 @@ export default function FeeStructureOverview() {
     );
   }
 
-  const branchOptions = ["All", ...[...new Set(structures.map(s => s.branchName || ""))].filter(Boolean).sort()];
+  /* Branch options come from the canonical `branches` subcollection (already
+     loaded into branchMap). Sourcing from `structures` would silently hide
+     branches that haven't uploaded a fee structure yet — the Owner couldn't
+     even tell from this page that a new branch exists, which is misleading
+     for decisions about which branches need attention. */
+  const branchOptions = ["All", ...[...branchMap.values()].filter(Boolean).sort()];
   const chartColors = [B1, GREEN, GOLD, RED, VIOLET, "#14b8a6", "#f97316", "#ec4899"];
 
   return (
@@ -692,10 +697,19 @@ export default function FeeStructureOverview() {
                           <Building2 className="w-4 h-4 md:w-5 md:h-5 text-white" />
                         </div>
                         <div className="min-w-0">
-                          <h3 className="text-sm md:text-base font-extrabold text-[#1e294b] truncate">{s.branchName}</h3>
-                          <p className="text-[9px] md:text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-sm md:text-base font-extrabold text-[#1e294b] truncate">{s.branchName}</h3>
+                            {/* Academic Year — promoted from inline text to a vivid chip
+                                so the value Principal entered on the upload form is
+                                immediately visible at the top of the card. */}
+                            {s.academicYear && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-[10px] md:text-[11px] font-extrabold text-emerald-700 tracking-wide whitespace-nowrap">
+                                AY {s.academicYear}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[9px] md:text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-1">
                             {s.rows.length} classes · {s.termTypes.length} terms
-                            {s.academicYear && <> · AY {s.academicYear}</>}
                           </p>
                         </div>
                       </div>
@@ -708,9 +722,12 @@ export default function FeeStructureOverview() {
                     </div>
 
                     {s.notes && (
-                      <div className="px-3 md:px-5 py-2 bg-amber-50/50 border-b border-amber-100 flex items-start gap-2">
+                      <div className="px-3 md:px-5 py-2.5 bg-amber-50/50 border-b border-amber-100 flex items-start gap-2">
                         <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                        <p className="text-[10px] md:text-[11px] text-amber-700 font-semibold">{s.notes}</p>
+                        <div className="min-w-0">
+                          <p className="text-[8px] md:text-[9px] font-extrabold text-amber-600 uppercase tracking-widest">Notes</p>
+                          <p className="text-[11px] md:text-[12px] text-amber-700 font-semibold mt-0.5 leading-snug">{s.notes}</p>
+                        </div>
                       </div>
                     )}
 

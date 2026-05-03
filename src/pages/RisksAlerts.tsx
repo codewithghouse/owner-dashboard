@@ -9,7 +9,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Legend, BarChart, Bar,
 } from "recharts";
 import { useNavigate } from "react-router-dom";
-import { fetchRisksOverview, RisksData } from "@/lib/risksService";
+import { fetchRisksOverview, RisksData, AlertItem } from "@/lib/risksService";
 import { auth, db } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
 import {
@@ -28,17 +28,26 @@ export default function RisksAlerts() {
   const [branches, setBranches] = useState<{id: string, name: string}[]>([]);
   const [data, setData] = useState<RisksData | null>(null);
   const [loading, setLoading] = useState(true);
+  /* refreshKey bumps on Retry click. Keeping this separate from selectedBranchId
+     so a same-value retry still triggers the load useEffect. */
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const loadBranches = async () => {
       const uid = auth.currentUser?.uid;
       if (!uid) return;
-      const branchesSnap = await getDocs(collection(db, "schools", uid, "branches"));
-      const bList = branchesSnap.docs.map(d => ({
-        id: d.data().branchId || d.id,
-        name: d.data().name || d.data().schoolName || "Branch",
-      }));
-      setBranches(bList);
+      try {
+        const branchesSnap = await getDocs(collection(db, "schools", uid, "branches"));
+        const bList = branchesSnap.docs.map(d => ({
+          id: d.data().branchId || d.id,
+          name: d.data().name || d.data().schoolName || "Branch",
+        }));
+        setBranches(bList);
+      } catch (err) {
+        /* Without this catch, a permission/network failure leaves branches []
+           silently — dropdown only shows "All Branches" with no diagnostic. */
+        console.error("[RisksAlerts] branches fetch failed:", err);
+      }
     };
     loadBranches();
   }, []);
@@ -56,10 +65,20 @@ export default function RisksAlerts() {
       }
     };
     loadData();
-  }, [selectedBranchId]);
+  }, [selectedBranchId, refreshKey]);
 
-  const getAlertIcon = (title: string) => {
-    const t = title.toLowerCase();
+  /* Pick the icon from the alertId prefix — canonical source from risksService.
+     Was previously matched by `title.toLowerCase().includes("...")`, which
+     broke the moment a copy edit changed wording (e.g. "Attendance Drop" →
+     "Roll-call Deficit" would silently lose the GraduationCap icon).
+     Falls back to the old title heuristic for legacy or unknown ids so we
+     don't regress on alerts created before this change. */
+  const getAlertIcon = (alert: AlertItem) => {
+    const id = alert.id || "";
+    if (id.startsWith("crit-"))  return GraduationCap; // attendance drop
+    if (id.startsWith("warn-"))  return GraduationCap; // attendance monitoring
+    if (id.startsWith("score-")) return FileText;      // academic underperformance
+    const t = (alert.title || "").toLowerCase();
     if (t.includes("attendance")) return GraduationCap;
     if (t.includes("fee") || t.includes("finance")) return DollarSign;
     if (t.includes("performance") || t.includes("score")) return FileText;
@@ -76,7 +95,36 @@ export default function RisksAlerts() {
     );
   }
 
-  const activeData = data!;
+  /* Guard: fetchRisksOverview can throw (Firestore rules deny, network blip).
+     The catch on line 53 sets loading=false but leaves data=null — without
+     this guard the next line's `data!` non-null assertion crashes the page
+     with "Cannot read properties of null". Show a graceful retry UI instead. */
+  if (!data) {
+    return (
+      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:14, padding:"40px 20px", textAlign:"center" }}>
+        <div style={{ width:56, height:56, borderRadius:16, background:"rgba(255,51,85,.1)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <AlertOctagon size={28} color={RED} strokeWidth={2.2}/>
+        </div>
+        <p style={{ fontSize:13, fontWeight:800, color:T1, margin:0 }}>Could not load risk data</p>
+        <p style={{ fontSize:11, fontWeight:500, color:T4, margin:0, maxWidth:340 }}>
+          Either Firestore is unreachable or your account lacks permission. Check your network or contact support.
+        </p>
+        <button
+          onClick={() => setRefreshKey(k => k + 1)}
+          style={{
+            padding:"9px 18px", borderRadius:11,
+            background:GRAD_PRIMARY, color:"#fff",
+            fontSize:10, fontWeight:800, letterSpacing:"0.10em", textTransform:"uppercase",
+            border:"none", cursor:"pointer", boxShadow:SHADOW_BTN,
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  const activeData = data;
   const criticalCount = activeData.stats.find(s => s.label.toLowerCase().includes("critical"))?.value ?? "—";
   const totalAlerts   = activeData.alerts.filter(a => a.id !== "no-alerts").length;
   const hasCritical   = activeData.alerts.some(a => a.type === "critical");
@@ -128,6 +176,53 @@ export default function RisksAlerts() {
           subtitle={`Active alert${totalAlerts!==1?"s":""} tracked across ${selectedBranchId==="all" ? branches.length + " branches" : "selected branch"} · ${hasCritical ? "Immediate attention required" : "No critical alerts"}`}
           stats={activeData.stats.slice(0, 3).map(s => ({ label: s.label, value: s.value }))}
         />
+
+        {/* Mapping issue banner — surfaced from risksService when student→branch
+            attribution is broken. Risk counts are computed off this attribution,
+            so a broken mapping silently distorts every metric on this page. */}
+        {activeData.mappingIssue && (
+          <div
+            style={{
+              borderRadius: isMobile ? 14 : 16,
+              padding: isMobile ? "12px 14px" : "14px 18px",
+              display:"flex", alignItems:"flex-start", gap:12,
+              background: activeData.mappingIssue.fallbackTriggered
+                ? "rgba(255,51,85,0.08)"
+                : "rgba(255,170,0,0.08)",
+              border: activeData.mappingIssue.fallbackTriggered
+                ? "0.5px solid rgba(255,51,85,0.3)"
+                : "0.5px solid rgba(255,170,0,0.3)",
+            }}
+          >
+            <AlertTriangle
+              size={isMobile ? 18 : 20}
+              color={activeData.mappingIssue.fallbackTriggered ? RED : GOLD}
+              style={{ flexShrink:0, marginTop:2 }}
+              strokeWidth={2.2}
+            />
+            <div style={{ minWidth:0, flex:1 }}>
+              <p style={{
+                fontSize: isMobile ? 11 : 12, fontWeight:800,
+                color: activeData.mappingIssue.fallbackTriggered ? "#991B1B" : "#92400E",
+                margin:"0 0 4px 0",
+                letterSpacing:"0.06em", textTransform:"uppercase",
+              }}>
+                {activeData.mappingIssue.fallbackTriggered
+                  ? "Risk attribution may be incorrect"
+                  : `${activeData.mappingIssue.unmapped} of ${activeData.mappingIssue.total} students unmapped`}
+              </p>
+              <p style={{
+                fontSize: isMobile ? 10 : 11, fontWeight:500,
+                color: activeData.mappingIssue.fallbackTriggered ? "#7F1D1D" : "#78350F",
+                margin:0, lineHeight:1.5,
+              }}>
+                {activeData.mappingIssue.fallbackTriggered
+                  ? `No students could be matched to any branch via branchId/schoolId, so all ${activeData.mappingIssue.total.toLocaleString()} are temporarily attributed to one branch. Risk counts shown here may not reflect reality. Update student records with valid branchId values to fix.`
+                  : `These students have no branchId/schoolId field that matches a known branch — they are excluded from risk calculations. Update their records to restore accurate risk attribution.`}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Bright Stat Grid */}
         <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: isMobile ? 10 : 16 }}>
@@ -286,7 +381,7 @@ export default function RisksAlerts() {
           ) : (
             <div style={{ display:"flex", flexDirection:"column", gap: isMobile ? 10 : 12 }}>
               {activeData.alerts.filter(a => a.id !== "no-alerts").map(alert => {
-                const Icon = getAlertIcon(alert.title);
+                const Icon = getAlertIcon(alert);
                 const accentGrad = alert.type === "critical" ? GRAD_RED : alert.type === "warning" ? GRAD_GOLD : GRAD_BLUE;
                 const accentColor = alert.type === "critical" ? RED : alert.type === "warning" ? GOLD : B1;
                 const accentBg = alert.type === "critical" ? "rgba(255,51,85,.06)" : alert.type === "warning" ? "rgba(255,170,0,.06)" : "rgba(0,85,255,.05)";

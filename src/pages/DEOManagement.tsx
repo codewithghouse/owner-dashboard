@@ -16,7 +16,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { auth, db } from "@/lib/firebase";
 import {
   collection, query, where, onSnapshot, updateDoc, doc,
-  getDocs, getDoc
+  getDocs, getDoc, serverTimestamp,
 } from "firebase/firestore";
 import { toast } from "sonner";
 import { addAuditLog } from "@/lib/auditService";
@@ -92,14 +92,21 @@ export default function DEOManagement() {
   useEffect(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
-    getDocs(collection(db, "schools", uid, "branches")).then(snap => {
-      const map: Record<string, string> = {};
-      snap.docs.forEach(d => {
-        const bid = d.data().branchId || d.id;
-        map[bid] = d.data().name || "Branch";
+    /* Catch needed — without it, a permission/network failure leaves branches
+       empty silently and the branch filter dropdown / branch column on every
+       row shows "—" with no diagnostic for the Owner. */
+    getDocs(collection(db, "schools", uid, "branches"))
+      .then(snap => {
+        const map: Record<string, string> = {};
+        snap.docs.forEach(d => {
+          const bid = d.data().branchId || d.id;
+          map[bid] = d.data().name || "Branch";
+        });
+        setBranches(map);
+      })
+      .catch(err => {
+        console.error("[DEOManagement] branches fetch failed:", err);
       });
-      setBranches(map);
-    });
   }, []);
 
   // ── Realtime DEO requests (access_requests where schoolId == ownerUid) ────
@@ -107,6 +114,11 @@ export default function DEOManagement() {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
 
+    /* Listener intentionally has empty deps — `branches` is NOT used at snap
+       time anymore (the render path resolves branchName via `branches[req.branchId]`
+       fallback). Including branches as a dep would tear down + recreate this
+       listener every time the branches map updates, causing wasted churn and
+       a brief flicker of "loading" between resubscriptions. */
     const unsub = onSnapshot(
       query(collection(db, "access_requests"), where("schoolId", "==", uid)),
       snap => {
@@ -120,7 +132,7 @@ export default function DEOManagement() {
             phone:           data.phone      || "",
             role:            data.role       || "DEO",
             branchId,
-            branchName:      data.branchName || branches[branchId] || "—",
+            branchName:      data.branchName || "—",
             schoolId:        data.schoolId,
             status:          data.status     || "pending",
             requestDate:     data.requestDate || data.createdAt || null,
@@ -145,19 +157,21 @@ export default function DEOManagement() {
       }
     );
     return () => unsub();
-  }, [branches]);
+  }, []);
 
   // ── Revoke access (approved → rejected) ───────────────────────────────────
   const handleRevoke = async (req: DEORequest) => {
     if (!window.confirm(`Revoke access for ${req.name}? They will lose access to the principal dashboard.`)) return;
     setRevoking(req.id);
     try {
+      /* serverTimestamp() (not ISO string) so rejectedAt is sortable Timestamp,
+         consistent with how Principal-side writes the field. */
       await updateDoc(doc(db, "access_requests", req.id), {
         status: "rejected",
         rejectionReason: "Access revoked by school owner",
-        rejectedAt: new Date().toISOString(),
+        rejectedAt: serverTimestamp(),
       });
-      addAuditLog("deo_revoked", `DEO access revoked for ${req.name}`, req.branchName || req.email);
+      addAuditLog("deo_revoked", `DEO access revoked for ${req.name}`, req.branchName || req.email).catch(() => {});
       toast.success(`Access revoked for ${req.name}`);
     } catch (e) {
       console.error(e);
@@ -169,6 +183,10 @@ export default function DEOManagement() {
 
   // ── Reinstate (rejected → pending, so principal can re-approve) ──────────
   const handleReinstate = async (req: DEORequest) => {
+    /* Confirmed even though less destructive than revoke — reinstating
+       sends a request back into the principal's queue, which is meaningful
+       enough that a misclick should be caught. */
+    if (!window.confirm(`Reinstate ${req.name} as pending? The branch principal will need to approve again.`)) return;
     setRevoking(req.id);
     try {
       await updateDoc(doc(db, "access_requests", req.id), {
@@ -176,7 +194,7 @@ export default function DEOManagement() {
         rejectionReason: "",
         rejectedAt: null,
       });
-      addAuditLog("deo_reinstated", `${req.name} reinstated to pending status`);
+      addAuditLog("deo_reinstated", `${req.name} reinstated to pending status`, req.branchName || req.email).catch(() => {});
       toast.success(`${req.name} reinstated as pending — principal can now approve.`);
     } catch (e) {
       console.error(e);
@@ -203,7 +221,12 @@ export default function DEOManagement() {
     rejected: requests.filter(r => r.status === "rejected").length,
   };
 
-  const branchList = Object.entries(branches);
+  /* Sort alphabetically by name so branch dropdown order is deterministic
+     across renders (Object.entries iteration order tracks insertion, which
+     varies with Firestore docs arrival order). */
+  const branchList = Object.entries(branches).sort((a, b) =>
+    (a[1] || "").localeCompare(b[1] || "")
+  );
 
   const formatDate = (ts: any) => {
     if (!ts) return "—";

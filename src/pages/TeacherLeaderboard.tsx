@@ -73,6 +73,12 @@ function filterByTime<T extends { date?: any; createdAt?: any; uploadedAt?: any 
   });
 }
 
+/* Composite=0 alone doesn't mean "bad teacher" — it can also mean "no data
+   recorded yet". Distinguish so we don't paint new teachers red on the list
+   or include them in averages (per `bug_pattern_score_zero_no_data` memory rule). */
+const hasTeacherData = (r: TeacherScore) =>
+  r.composite > 0 && (r.testCount > 0 || r.assignments > 0 || r.attendance !== null);
+
 // ═════════════════════════════════════════════════════════════════════════
 export default function TeacherLeaderboard() {
   const isMobile = useIsMobile();
@@ -131,12 +137,16 @@ export default function TeacherLeaderboard() {
     return () => unsubs.forEach((u) => u());
   }, []);
 
-  // ── Branch options ───────────────────────────────────────────────────────
+  // ── Branch options — sourced from `branches` subcollection so branches with
+  //     no teachers yet still appear (per `bug_pattern_branch_dropdown_derived`
+  //     memory rule). Deriving from `teachers[].branchId` would silently hide
+  //     newly-opened branches and skew Owner's mental model.
   const branchOptions = useMemo(() => {
-    const set = new Set<string>();
-    teachers.forEach((t) => { if (t.branchId) set.add(t.branchId); });
-    return ["All", ...Array.from(set)];
-  }, [teachers]);
+    const ids = [...branchMap.keys()].sort((a, b) =>
+      (branchMap.get(a) || "").localeCompare(branchMap.get(b) || "")
+    );
+    return ["All", ...ids];
+  }, [branchMap]);
 
   // ── Apply filters + compute scores ───────────────────────────────────────
   const ranked: TeacherScore[] = useMemo(() => {
@@ -147,12 +157,24 @@ export default function TeacherLeaderboard() {
       return list.filter((x: any) => x.branchId === branchFilter);
     };
 
+    /* Time-range key sets must cover every timestamp field name writers use,
+       otherwise filterByTime silently drops every doc and leaderboard scores
+       collapse to 0% under "Term"/"Month" range. Discovered fields per writer:
+         - test_scores      → `timestamp` (EnterScores.tsx)
+         - gradebook_scores → `updatedAt` (Gradebook.tsx)
+         - results          → `date` / `createdAt` (Excel uploads)
+         - attendance       → `date` + `timestamp` (MarkAttendance.tsx)
+         - assignments      → `createdAt` (CreateAssignment.tsx)
+         - teacher_attendance → `date` / `timestamp` (Principal-side) */
+    const scoreKeys     = ["timestamp", "updatedAt", "date", "createdAt", "uploadedAt"];
+    const attKeys       = ["timestamp", "date", "createdAt"];
+    const assignKeys    = ["createdAt", "timestamp", "uploadedAt", "date"];
     const scored = scoreTeachers({
-      teachers:           filtered(teachers),
-      scores:             filterByTime(filtered([...testScores, ...results, ...gradebook]) as any, cut, ["date", "createdAt", "uploadedAt"]),
-      attendance:         filterByTime(filtered(attendance) as any, cut, ["date", "createdAt"]),
-      assignments:        filterByTime(filtered(assignments) as any, cut, ["createdAt", "uploadedAt", "date"]),
-      teacherAttendance:  filterByTime(filtered(tAttendance) as any, cut, ["date", "createdAt"]),
+      teachers:            filtered(teachers),
+      scores:              filterByTime(filtered([...testScores, ...results, ...gradebook]) as any, cut, scoreKeys),
+      attendance:          filterByTime(filtered(attendance) as any, cut, attKeys),
+      assignments:         filterByTime(filtered(assignments) as any, cut, assignKeys),
+      teacherAttendance:   filterByTime(filtered(tAttendance) as any, cut, attKeys),
       teachingAssignments: filtered(teachingAssignments),
     });
 
@@ -167,18 +189,25 @@ export default function TeacherLeaderboard() {
   // ── Stats for top cards ──────────────────────────────────────────────────
   const stats = useMemo(() => {
     const total = ranked.length;
-    const avg = total > 0 ? ranked.reduce((a, b) => a + b.composite, 0) / total : 0;
-    const top = ranked[0];
-    const active = ranked.filter((r) => r.testCount > 0 || r.assignments > 0).length;
+    const withData = ranked.filter(hasTeacherData);
+    /* Avg over teachers WITH data — including 0%/no-data teachers would drag
+       the average down and read as "team is failing" when really data just
+       hasn't been recorded yet. */
+    const avg = withData.length > 0
+      ? withData.reduce((a, b) => a + b.composite, 0) / withData.length
+      : 0;
+    /* Top is the highest-scoring teacher WITH data, not just ranked[0] which
+       could be a new teacher with composite=0 and a misleading "leads" badge. */
+    const top = withData[0];
+    /* "Active" should mean "has any signal at all" — same definition as
+       hasTeacherData so the count matches the podium-eligible set. */
+    const active = withData.length;
     return { total, avg, top, active };
   }, [ranked]);
 
-  // Only put teachers with actual data on the podium — 0% "New Teacher"
-  // entries should appear in the full list at the bottom, not crowned.
-  const hasData = (r: TeacherScore) =>
-    r.composite > 0 && (r.testCount > 0 || r.assignments > 0 || r.attendance !== null);
-  const dataTeachers   = ranked.filter(hasData);
-  const noDataTeachers = ranked.filter((r) => !hasData(r));
+  // Podium and "rest" derived from the same definition used in stats.
+  const dataTeachers   = ranked.filter(hasTeacherData);
+  const noDataTeachers = ranked.filter((r) => !hasTeacherData(r));
   const top3 = dataTeachers.slice(0, 3);
   const rest = [...dataTeachers.slice(3), ...noDataTeachers];
 
@@ -522,6 +551,9 @@ function PodiumCard({
 function TeacherRow({
   rank, score, branchName, onClick, isMobile = false,
 }: { rank: number; score: TeacherScore; branchName: string; onClick: () => void; isMobile?: boolean }) {
+  /* No-data teachers should not look like they're failing. Show "—" in
+     neutral gray instead of "0%" in red. */
+  const noData = !hasTeacherData(score);
   // Mobile: 2-line row — top line has rank + avatar + name/branch + score.
   // Progress bar occupies full row width below for clearer signal.
   if (isMobile) {
@@ -556,18 +588,25 @@ function TeacherRow({
           </div>
 
           {/* Score */}
-          <p className={`text-base font-black shrink-0 ${scoreTone(score.composite)}`}>
-            {score.composite.toFixed(0)}%
-          </p>
+          {noData ? (
+            <p className="text-base font-black shrink-0 text-slate-300">—</p>
+          ) : (
+            <p className={`text-base font-black shrink-0 ${scoreTone(score.composite)}`}>
+              {score.composite.toFixed(0)}%
+            </p>
+          )}
         </div>
 
-        {/* Full-width progress bar */}
-        <div className="mt-2 ml-9 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-          <div
-            className={`h-full ${scoreBgTone(score.composite)} rounded-full transition-all duration-500`}
-            style={{ width: `${Math.min(100, score.composite)}%` }}
-          />
-        </div>
+        {/* Full-width progress bar — hidden for no-data so we don't render an
+            empty/colored sliver that signals failure. */}
+        {!noData && (
+          <div className="mt-2 ml-9 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+            <div
+              className={`h-full ${scoreBgTone(score.composite)} rounded-full transition-all duration-500`}
+              style={{ width: `${Math.min(100, score.composite)}%` }}
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -614,15 +653,24 @@ function TeacherRow({
       {/* Score */}
       <div className="flex items-center gap-3 ml-auto md:ml-0">
         <div className="w-20 md:w-32 flex flex-col items-end">
-          <p className={`text-base md:text-lg font-black ${scoreTone(score.composite)}`}>
-            {score.composite.toFixed(0)}%
-          </p>
-          <div className="w-full h-1.5 rounded-full bg-slate-100 overflow-hidden">
-            <div
-              className={`h-full ${scoreBgTone(score.composite)} rounded-full transition-all duration-500`}
-              style={{ width: `${Math.min(100, score.composite)}%` }}
-            />
-          </div>
+          {noData ? (
+            <>
+              <p className="text-base md:text-lg font-black text-slate-300">—</p>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">No data yet</p>
+            </>
+          ) : (
+            <>
+              <p className={`text-base md:text-lg font-black ${scoreTone(score.composite)}`}>
+                {score.composite.toFixed(0)}%
+              </p>
+              <div className="w-full h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                <div
+                  className={`h-full ${scoreBgTone(score.composite)} rounded-full transition-all duration-500`}
+                  style={{ width: `${Math.min(100, score.composite)}%` }}
+                />
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
