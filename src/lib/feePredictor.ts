@@ -70,8 +70,9 @@ export async function fetchFeePredictions(): Promise<{
     const feesSnap = await getDocs(query(collection(db, "fees"), where("schoolId", "==", uid)));
     const fees = feesSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
 
-    // 3. Attendance for attendance correlation
-    const attSnap = await getDocs(collection(db, "attendance"));
+    // 3. Attendance for attendance correlation — schoolId-scoped to
+    // prevent cross-tenant leak (memory: bug_pattern_unscoped_collection_reads).
+    const attSnap = await getDocs(query(collection(db, "attendance"), where("schoolId", "==", uid)));
     const attMap  = new Map<string, { p: number; t: number }>();
     attSnap.docs.forEach(d => {
       const data = d.data() as any;
@@ -83,8 +84,9 @@ export async function fetchFeePredictions(): Promise<{
       if ((data.status || "").toLowerCase() === "present") cur.p++;
     });
 
-    // 4. Enrollments for name/branch/grade
-    const enrollSnap = await getDocs(collection(db, "enrollments"));
+    // 4. Enrollments for name/branch/grade — schoolId-scoped to prevent
+    // cross-tenant leak.
+    const enrollSnap = await getDocs(query(collection(db, "enrollments"), where("schoolId", "==", uid)));
     const enrollMap  = new Map<string, any>();
     enrollSnap.docs.forEach(d => {
       const data = d.data() as any;
