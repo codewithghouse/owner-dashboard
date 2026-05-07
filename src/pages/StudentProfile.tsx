@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Printer, MessageSquare, AlertCircle, Loader2, ChevronLeft, ChevronRight, CheckCircle2, FileText, BookOpen, Calendar, TrendingUp, BarChart3, Activity } from "lucide-react";
+import { ArrowLeft, Printer, MessageSquare, AlertCircle, Loader2, ChevronLeft, ChevronRight, CheckCircle2, FileText, BookOpen, Calendar, TrendingUp, BarChart3, Activity, Star, Lightbulb } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, Radar } from "recharts";
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
@@ -155,6 +155,11 @@ const StudentProfile = () => {
   const [incidents, setIncidents] = useState<any[]>([]);
   const [parentNotes, setParentNotes] = useState<any[]>([]);
   const [interventions, setInterventions] = useState<any[]>([]);
+  // Teacher-side behaviour signals — synced from teacher dashboard's
+  // StudentBehaviour page. Same Firestore source of truth as parent /
+  // principal views, so an owner sees the exact same picture.
+  const [studentRatings, setStudentRatings] = useState<any[]>([]);
+  const [improvementAreas, setImprovementAreas] = useState<any[]>([]);
   const [calMonth, setCalMonth] = useState(new Date());
   /* Live clock for the bottom status bar. Was rendering Date.now() once at
      mount and never updating — visually a static timestamp pretending to be
@@ -273,14 +278,16 @@ const StudentProfile = () => {
            interventions per `dual_query_pattern_studentid_email` memory rule.
            Some Teacher Dashboard writers key by studentEmail; without merging
            both keys, those records would be invisible in this view. */
-        const [aI, aE, sI, sE, rI, rE, subI, subE, incI, incE, pnI, pnE, ivI, ivE] = await Promise.all([
-          byId("attendance"),    byEmail("attendance"),
-          byId("test_scores"),   byEmail("test_scores"),
-          byId("results"),       byEmail("results"),
-          byId("submissions"),   byEmail("submissions"),
-          byId("incidents"),     byEmail("incidents"),
-          byId("parent_notes"),  byEmail("parent_notes"),
-          byId("interventions"), byEmail("interventions"),
+        const [aI, aE, sI, sE, rI, rE, subI, subE, incI, incE, pnI, pnE, ivI, ivE, srI, srE, imI, imE] = await Promise.all([
+          byId("attendance"),         byEmail("attendance"),
+          byId("test_scores"),        byEmail("test_scores"),
+          byId("results"),            byEmail("results"),
+          byId("submissions"),        byEmail("submissions"),
+          byId("incidents"),          byEmail("incidents"),
+          byId("parent_notes"),       byEmail("parent_notes"),
+          byId("interventions"),      byEmail("interventions"),
+          byId("student_ratings"),    byEmail("student_ratings"),
+          byId("improvement_areas"),  byEmail("improvement_areas"),
         ]);
         setAttendance(merge(aI, aE));
         setTestScores([...merge(sI, sE), ...merge(rI, rE)]);
@@ -288,6 +295,8 @@ const StudentProfile = () => {
         setIncidents(merge(incI, incE));
         setParentNotes(merge(pnI, pnE));
         setInterventions(merge(ivI, ivE));
+        setStudentRatings(merge(srI, srE));
+        setImprovementAreas(merge(imI, imE));
 
         /* Multi-class assignment lookup. A student in 3 classes (e.g. Maths
            + Science + English under different subject teachers) has 3 distinct
@@ -981,6 +990,119 @@ const StudentProfile = () => {
           </table>
         </Card>
       </div>
+
+      {/* ═══ TEACHER RATINGS + IMPROVEMENT AREAS (cross-dashboard sync) ═══════
+           Teacher writes via StudentBehaviour page — surfaced here so owners
+           see the same picture parents and principal see. Single Firestore
+           source of truth across all 4 dashboards. */}
+      {(studentRatings.length > 0 || improvementAreas.length > 0) && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+          {/* Teacher Ratings */}
+          <Card icon={Star} accent="#FFAA00" staticTilt={exporting} title={`Teacher Ratings · ${studentRatings.length}`} action={<DetailLink />}>
+            {studentRatings.length === 0 ? (
+              <p style={{ fontSize: 12, color: T.ink3, textAlign: "center", padding: "16px 0" }}>No teacher ratings yet</p>
+            ) : (() => {
+              const valid = studentRatings.filter(r => typeof r.rating === "number");
+              const avg = valid.length > 0 ? valid.reduce((a, r) => a + r.rating, 0) / valid.length : null;
+              const sorted = [...studentRatings].sort((a, b) => (toDate(b.createdAt)?.getTime() || 0) - (toDate(a.createdAt)?.getTime() || 0));
+              return (
+                <>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 18px", borderBottom: `1px solid ${T.bdr}` }}>
+                    <div style={{ fontSize: 26, fontWeight: 700, color: "#FFAA00", letterSpacing: "-0.6px" }}>
+                      {avg !== null ? avg.toFixed(1) : "—"}
+                      <span style={{ fontSize: 13, color: T.ink3, fontWeight: 500 }}> / 5</span>
+                    </div>
+                    <div style={{ display: "flex", gap: 2 }}>
+                      {[1,2,3,4,5].map(n => (
+                        <Star key={n} size={13}
+                          color={avg !== null && n <= Math.round(avg) ? "#FFAA00" : T.ink3}
+                          fill={avg !== null && n <= Math.round(avg) ? "#FFAA00" : "transparent"} />
+                      ))}
+                    </div>
+                    <span style={{ fontSize: 11, color: T.ink3, marginLeft: "auto" }}>{valid.length} rating{valid.length === 1 ? "" : "s"}</span>
+                  </div>
+                  <div style={{ padding: "0 18px" }}>
+                    {sorted.slice(0, 5).map(r => (
+                      <div key={r.id} style={{ display: "flex", gap: 10, padding: "10px 0", borderBottom: `1px solid ${T.bdr}` }}>
+                        <div style={{ display: "flex", gap: 1, flexShrink: 0, marginTop: 3 }}>
+                          {[1,2,3,4,5].map(n => (
+                            <Star key={n} size={11}
+                              color={typeof r.rating === "number" && n <= r.rating ? "#FFAA00" : T.ink3}
+                              fill={typeof r.rating === "number" && n <= r.rating ? "#FFAA00" : "transparent"} />
+                          ))}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          {r.note && <p style={{ fontSize: 12, color: T.ink2, lineHeight: 1.5, margin: 0 }}>{r.note}</p>}
+                          <div style={{ fontSize: 10, color: T.ink3, marginTop: 3 }}>
+                            {r.teacherName || "Teacher"} · {timeAgo(r.createdAt)}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
+          </Card>
+
+          {/* Improvement Areas */}
+          <Card icon={Lightbulb} accent="#7c3aed" staticTilt={exporting} title={`Improvement Areas · ${improvementAreas.length}`} action={<DetailLink />}>
+            {improvementAreas.length === 0 ? (
+              <p style={{ fontSize: 12, color: T.ink3, textAlign: "center", padding: "16px 0" }}>No improvement areas tracked</p>
+            ) : (() => {
+              const isResolvedFn = (s?: string) => String(s || "").toLowerCase() === "resolved";
+              const active = improvementAreas.filter(i => !isResolvedFn(i.status));
+              const resolved = improvementAreas.filter(i => isResolvedFn(i.status));
+              const sorted = [...improvementAreas].sort((a, b) => (toDate(b.createdAt)?.getTime() || 0) - (toDate(a.createdAt)?.getTime() || 0));
+              return (
+                <>
+                  <div style={{ display: "flex", gap: 10, padding: "10px 18px", borderBottom: `1px solid ${T.bdr}` }}>
+                    <div style={{ flex: 1, padding: "6px 10px", background: T.alBg, borderRadius: 8 }}>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: T.amb }}>{active.length}</div>
+                      <div style={{ fontSize: 9, color: T.ink3, fontWeight: 600 }}>ACTIVE</div>
+                    </div>
+                    <div style={{ flex: 1, padding: "6px 10px", background: T.glBg, borderRadius: 8 }}>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: T.grn }}>{resolved.length}</div>
+                      <div style={{ fontSize: 9, color: T.ink3, fontWeight: 600 }}>RESOLVED</div>
+                    </div>
+                  </div>
+                  <div style={{ padding: "0 18px" }}>
+                    {sorted.slice(0, 5).map(imp => {
+                      const r = isResolvedFn(imp.status);
+                      const pri = String(imp.priority || "low").toLowerCase();
+                      const priColor = pri === "high" ? T.red : pri === "medium" ? T.amb : T.blue;
+                      const priBg    = pri === "high" ? T.rlBg : pri === "medium" ? T.alBg : T.blBg;
+                      return (
+                        <div key={imp.id} style={{ display: "flex", gap: 10, padding: "10px 0", borderBottom: `1px solid ${T.bdr}`, opacity: r ? 0.6 : 1 }}>
+                          <div style={{ width: 16, height: 16, borderRadius: 4, background: r ? T.grn : "transparent", border: `1.5px solid ${r ? T.grn : T.bdr}`, flexShrink: 0, marginTop: 2, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            {r && <CheckCircle2 size={11} color="#fff" />}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3, flexWrap: "wrap" }}>
+                              <span style={{ fontSize: 13, fontWeight: 600, color: T.ink, textDecoration: r ? "line-through" : "none" }}>
+                                {imp.title || "Untitled"}
+                              </span>
+                              <span style={{ padding: "1px 7px", borderRadius: 5, background: priBg, color: priColor, fontSize: 9, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                                {pri}
+                              </span>
+                            </div>
+                            {imp.description && (
+                              <p style={{ fontSize: 11, color: T.ink2, lineHeight: 1.4, margin: 0 }}>{imp.description}</p>
+                            )}
+                            <div style={{ fontSize: 10, color: T.ink3, marginTop: 3 }}>
+                              {imp.teacherName || "Teacher"} · {timeAgo(imp.createdAt)}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              );
+            })()}
+          </Card>
+        </div>
+      )}
 
       {/* ═══ BOTTOM STATUS BAR ═══ */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 20px", background: T.white, border: `1px solid ${T.bdr}`, borderRadius: 12, fontSize: 10, color: T.ink3 }}>
