@@ -15,6 +15,7 @@ import {
   DashGlobalStyles, PageHead, StatTile, DarkHero, AIInsightCard,
 } from "@/lib/dashboardTokens";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { tilt3D, tilt3DStyle, BLUE_SHADOW } from "@/lib/use3DTilt";
 import { fetchFeePredictions, FeePrediction } from "@/lib/feePredictor";
 import { sendFeeReminderWA } from "@/lib/whatsappService";
 import { toast } from "sonner";
@@ -1747,12 +1748,12 @@ export default function FinanceFees() {
           {/* Stats */}
           {!predLoading && feePredictions.length > 0 && (
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 text-center">
+              <div {...tilt3D} className="bg-white rounded-2xl p-4 text-center" style={{ boxShadow: BLUE_SHADOW, ...tilt3DStyle }}>
                 <p className="text-2xl font-black text-red-600">{predStats.totalAtRisk}</p>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Students at risk</p>
                 <p className="text-[10px] text-slate-400 mt-0.5">Medium + High risk combined</p>
               </div>
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 text-center">
+              <div {...tilt3D} className="bg-white rounded-2xl p-4 text-center" style={{ boxShadow: BLUE_SHADOW, ...tilt3DStyle }}>
                 <p className="text-2xl font-black text-amber-600">
                   ₹{predStats.expectedOutstanding.toLocaleString("en-IN")}
                 </p>
@@ -1840,7 +1841,7 @@ export default function FinanceFees() {
               ))}
             </div>
           ) : (
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div {...tilt3D} className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: BLUE_SHADOW, ...tilt3DStyle }}>
               <div className="overflow-x-auto">
                 <table className="w-full text-left min-w-[680px]">
                   <thead>

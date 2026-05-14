@@ -22,7 +22,7 @@ import {
   CheckCircle2, IndianRupee, BookOpen, Activity,
   ShieldAlert, Eye, Mail, Phone, RefreshCw,
 } from "lucide-react";
-import { tilt3D, tilt3DStyle } from "@/lib/use3DTilt";
+import { tilt3D, tilt3DStyle, BLUE_SHADOW } from "@/lib/use3DTilt";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface SchoolContact {
@@ -293,7 +293,7 @@ export default function ParentPortal() {
         {/* ── Key Metrics ─────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 gap-3">
           {/* Attendance */}
-          <div {...tilt3D} style={tilt3DStyle} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex flex-col items-center gap-2">
+          <div {...tilt3D} className="bg-white rounded-2xl p-4 flex flex-col items-center gap-2" style={{ boxShadow: BLUE_SHADOW, ...tilt3DStyle }}>
             <CircleProgress value={data.attendance} color={getAttColor(data.attendance)} label="Attendance" />
             <p className="text-xs font-black text-slate-500 uppercase tracking-wider">Attendance</p>
             {data.attendance < 75 && (
@@ -302,7 +302,7 @@ export default function ParentPortal() {
           </div>
 
           {/* Average Score */}
-          <div {...tilt3D} style={tilt3DStyle} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex flex-col items-center gap-2">
+          <div {...tilt3D} className="bg-white rounded-2xl p-4 flex flex-col items-center gap-2" style={{ boxShadow: BLUE_SHADOW, ...tilt3DStyle }}>
             <CircleProgress value={data.avgScore} color={getScoreColor(data.avgScore)} label="Average Score" />
             <p className="text-xs font-black text-slate-500 uppercase tracking-wider">Avg Score</p>
             {data.avgScore < 50 && (
@@ -313,7 +313,7 @@ export default function ParentPortal() {
 
         {/* ── Recent Test Scores ───────────────────────────────────────── */}
         {data.recentScores.length > 0 && (
-          <div {...tilt3D} style={tilt3DStyle} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+          <div {...tilt3D} className="bg-white rounded-2xl p-5" style={{ boxShadow: BLUE_SHADOW, ...tilt3DStyle }}>
             <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
               <BookOpen className="w-3.5 h-3.5" />
               Recent Test Scores
@@ -396,7 +396,7 @@ export default function ParentPortal() {
 
         {/* ── Risk Factors ─────────────────────────────────────────────── */}
         {data.riskFactors.length > 0 && data.riskLevel !== "Safe" && (
-          <div {...tilt3D} style={tilt3DStyle} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+          <div {...tilt3D} className="bg-white rounded-2xl p-5" style={{ boxShadow: BLUE_SHADOW, ...tilt3DStyle }}>
             <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
               <Activity className="w-3.5 h-3.5" />
               Areas Needing Attention
@@ -417,7 +417,7 @@ export default function ParentPortal() {
             published no contact (older snapshots, or owner left fields
             blank) — better than rendering an empty section. */}
         {(data.schoolContact.email || data.schoolContact.phone) && (
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+          <div {...tilt3D} className="bg-white rounded-2xl p-4" style={{ boxShadow: BLUE_SHADOW, ...tilt3DStyle }}>
             <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Questions? Contact School</p>
             <div className="flex flex-col gap-2">
               {data.schoolContact.phone && (

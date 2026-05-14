@@ -18,6 +18,7 @@ import {
   scoreTeachers, TeacherScore, TeacherDoc, ScoreDoc,
   AttendanceDoc, AssignmentDoc, TeacherAttendanceDoc,
 } from "@/lib/teacherScorer";
+import { tilt3D, tilt3DStyle, BLUE_SHADOW } from "@/lib/use3DTilt";
 
 type TimeRange = "term" | "month" | "all";
 
@@ -422,7 +423,7 @@ export default function TeacherLeaderboard() {
           </div>
 
           {/* ═══ Full ranked list ══════════════════════════════════════ */}
-          <div className="dash3d bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: SHADOW_SM }}>
+          <div {...tilt3D} className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: BLUE_SHADOW, ...tilt3DStyle }}>
             <div className="px-4 md:px-5 py-3 md:py-3.5 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
               <h3 className="text-[11px] md:text-xs font-extrabold text-[#1e294b] uppercase tracking-wider flex items-center gap-2">
                 <Filter className="w-3 h-3 md:w-3.5 md:h-3.5" /> Full Rankings ({ranked.length})

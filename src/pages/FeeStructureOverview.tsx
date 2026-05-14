@@ -15,6 +15,7 @@ import {
   DashGlobalStyles, PageHead, StatTile, DarkHero, AIInsightCard,
 } from "@/lib/dashboardTokens";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { tilt3D, tilt3DStyle, BLUE_SHADOW } from "@/lib/use3DTilt";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import {
@@ -520,7 +521,7 @@ export default function FeeStructureOverview() {
               {defaultersByBranch
                 .filter(g => defaulterBranchFilter === "All" || g.branchName === defaulterBranchFilter)
                 .map(group => (
-                <div key={group.branchName} className="bg-white rounded-2xl border border-red-100 shadow-sm overflow-hidden">
+                <div key={group.branchName} {...tilt3D} className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: BLUE_SHADOW, ...tilt3DStyle }}>
                   <div className="px-3 md:px-5 py-3 md:py-3.5 border-b border-red-100 bg-gradient-to-r from-red-50 to-orange-50 flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3">
                     <div className="flex items-center gap-2.5 md:gap-3 min-w-0">
                       <div className="w-8 h-8 rounded-lg bg-white border border-red-200 flex items-center justify-center shrink-0">
@@ -636,7 +637,7 @@ export default function FeeStructureOverview() {
           )}
 
           {/* Filters + view toggle */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-3 md:p-4 flex flex-col md:flex-row md:items-center gap-2.5 md:gap-3">
+          <div {...tilt3D} className="bg-white rounded-2xl p-3 md:p-4 flex flex-col md:flex-row md:items-center gap-2.5 md:gap-3" style={{ boxShadow: BLUE_SHADOW, ...tilt3DStyle }}>
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-slate-400" />
               <span className="text-[11px] font-black uppercase tracking-widest text-slate-500">Filter</span>
@@ -686,7 +687,7 @@ export default function FeeStructureOverview() {
 
           {/* Chart view — term-wise by branch */}
           {viewMode === "chart" && (
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 md:p-6">
+            <div {...tilt3D} className="bg-white rounded-2xl p-4 md:p-6" style={{ boxShadow: BLUE_SHADOW, ...tilt3DStyle }}>
               <h3 className="text-[13px] md:text-sm font-extrabold text-[#1e294b] mb-3 md:mb-4">Fee Breakdown by Branch & Term</h3>
               {chartData.length === 0 ? (
                 <div className="h-60 md:h-80 flex items-center justify-center text-xs md:text-sm text-slate-400 font-semibold">No branches match filter</div>
@@ -715,7 +716,7 @@ export default function FeeStructureOverview() {
           {viewMode === "table" && (
             <div className="space-y-3 md:space-y-4">
               {filtered.length === 0 ? (
-                <div className="bg-white border border-slate-100 rounded-2xl p-6 md:p-8 text-center text-xs md:text-sm text-slate-400 font-semibold">
+                <div className="bg-white rounded-2xl p-6 md:p-8 text-center text-xs md:text-sm text-slate-400 font-semibold" style={{ boxShadow: BLUE_SHADOW }}>
                   No branches match the filter
                 </div>
               ) : filtered.map(s => {
@@ -726,7 +727,7 @@ export default function FeeStructureOverview() {
                 const branchTotal = Object.values(perTermTotal).reduce((a, b) => a + b, 0);
                 const ts = toDate(s.uploadedAt);
                 return (
-                  <div key={s.id} className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+                  <div key={s.id} {...tilt3D} className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: BLUE_SHADOW, ...tilt3DStyle }}>
                     <div className="px-3 md:px-5 py-3 md:py-4 border-b border-slate-100 flex items-start justify-between gap-3 flex-wrap">
                       <div className="flex items-center gap-2.5 md:gap-3 min-w-0">
                         <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-[#1e3a8a] flex items-center justify-center shrink-0">
