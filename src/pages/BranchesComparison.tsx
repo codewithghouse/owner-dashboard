@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -22,7 +22,11 @@ import { tilt3D, tilt3DStyle } from "@/lib/use3DTilt";
 import {
   subscribeBranchesComparison, subscribeBranchDetail,
   BranchComparisonData, BranchDetailData,
+  ComparisonRow, ComparisonCell, ComparisonMetricKey,
+  WinnerCallout, BranchSummary,
 } from "@/lib/branchesService";
+import { buildReport, openReportWindow, type ReportSection } from "@/lib/reportTemplate";
+import { Trophy, Crown } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import {
   collection, addDoc, updateDoc, deleteDoc,
@@ -42,108 +46,6 @@ interface BranchForm {
   color: string;
 }
 const EMPTY_FORM: BranchForm = { name: "", location: "", established: "", color: "#1e3a8a" };
-
-/* ══════════════════════════════════════════════════════════════════════════
-   BranchTiltCard — 3D mouse-tracking wrapper.
-   Each instance tracks its own tilt + cursor position.
-   Adds: perspective rotation, subtle Z-lift on hover, cursor spotlight.
-   ══════════════════════════════════════════════════════════════════════════ */
-function BranchTiltCard({
-  children, onClick, outerStyle, outerClassName, isDark, disableTilt = false,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  outerStyle: React.CSSProperties;
-  outerClassName: string;
-  isDark: boolean;
-  disableTilt?: boolean;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [tilt, setTilt]     = useState({ x: 0, y: 0 });
-  const [mouse, setMouse]   = useState({ x: 50, y: 50 }); // percent
-  const [hovered, setHovered] = useState(false);
-
-  const MAX_TILT = 8;    // degrees
-  const LIFT_Z   = 20;   // pixels on hover
-
-  const handleMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (disableTilt || !ref.current) return;
-    const rect = ref.current.getBoundingClientRect();
-    const relX = (e.clientX - rect.left) / rect.width;   // 0..1
-    const relY = (e.clientY - rect.top)  / rect.height;  // 0..1
-    /* Invert Y so moving up tilts forward */
-    setTilt({
-      x: (0.5 - relY) * MAX_TILT * 2,
-      y: (relX - 0.5) * MAX_TILT * 2,
-    });
-    setMouse({ x: relX * 100, y: relY * 100 });
-  };
-
-  const handleLeave = () => {
-    setTilt({ x: 0, y: 0 });
-    setHovered(false);
-  };
-
-  if (disableTilt) {
-    return (
-      <div
-        ref={ref}
-        onClick={onClick}
-        role="button"
-        tabIndex={0}
-        style={outerStyle}
-        className={outerClassName}
-      >
-        {children}
-      </div>
-    );
-  }
-
-  return (
-    <div
-      style={{ perspective: 1400 }}
-      className="[transform-style:preserve-3d]"
-    >
-      <div
-        ref={ref}
-        onClick={onClick}
-        onMouseMove={handleMove}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={handleLeave}
-        role="button"
-        tabIndex={0}
-        style={{
-          ...outerStyle,
-          transform:
-            `perspective(1400px) ` +
-            `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) ` +
-            `translateZ(${hovered ? LIFT_Z : 0}px)`,
-          transition: hovered
-            ? "transform 80ms linear, box-shadow 200ms ease-out"
-            : "transform 400ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 300ms ease-out",
-          transformStyle: "preserve-3d",
-          willChange: "transform",
-        }}
-        className={outerClassName}
-      >
-        {children}
-
-        {/* Cursor-following spotlight — an extra sheen that chases the pointer */}
-        <div
-          className="absolute inset-0 pointer-events-none transition-opacity duration-200 rounded-[1.65rem]"
-          style={{
-            opacity: hovered ? 1 : 0,
-            background: `radial-gradient(420px circle at ${mouse.x}% ${mouse.y}%, ${
-              isDark ? "rgba(197,167,112,0.22)" : "rgba(30,58,138,0.10)"
-            } 0%, transparent 55%)`,
-            mixBlendMode: isDark ? "screen" : "multiply",
-            zIndex: 5,
-          }}
-        />
-      </div>
-    </div>
-  );
-}
 
 // ── Branch Modal (Add / Edit) ─────────────────────────────────────────────────
 function BranchModal({
@@ -347,6 +249,443 @@ function DeleteModal({
     </div>
   );
 }
+
+// ── Local tokens (owner-dashboard tokens only export T1/T3/T4; T2 is the
+//    secondary deep blue between them, matching teacher-dashboard's scale). ─
+const T2 = "#002080";
+
+// ── Per-metric value color ramp (shared by card + matrix) ───────────────────
+function valueColorForMetric(metricKey: ComparisonMetricKey, v: number, hasData: boolean): string {
+  if (!hasData) return "#CBD5E1";
+  // For "lower is better" metrics (alerts, failures), invert: 0 = green, big = red
+  if (metricKey === "activeAlerts" || metricKey === "failedTestCount") {
+    return v === 0 ? "#10B981" : v <= 3 ? "#3B82F6" : v <= 8 ? "#F59E0B" : "#F43F5E";
+  }
+  // Higher is better — pct ramp
+  return v >= 85 ? "#10B981" : v >= 70 ? "#3B82F6" : v >= 50 ? "#F59E0B" : "#F43F5E";
+}
+
+// ── Winners Strip — horizontal scroll of metric leaders, page-top ─────────────
+const WinnersStripImpl: React.FC<{ winners: WinnerCallout[]; isMobile: boolean }> = ({ winners, isMobile }) => {
+  if (winners.length === 0) return null;
+  return (
+    <div className="bg-white rounded-2xl md:rounded-[1.5rem] p-4 md:p-5"
+      style={{ boxShadow: SHADOW_SM, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+      <div className="flex items-center gap-2 mb-3">
+        <Trophy className="w-4 h-4" style={{ color: GOLD }} strokeWidth={2.5} />
+        <span className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: T3 }}>
+          Metric Leaders
+        </span>
+      </div>
+      <div className={`flex gap-2 ${isMobile ? "overflow-x-auto pb-1" : "flex-wrap"}`} style={{ scrollbarWidth: "none" }}>
+        {winners.map(w => (
+          <div key={`${w.metricKey}_${w.branchId}`}
+            className="shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-xl"
+            style={{
+              background: `linear-gradient(135deg, ${w.branchColor}10 0%, ${w.branchColor}22 100%)`,
+              border: `0.5px solid ${w.branchColor}55`,
+            }}>
+            <div className="w-6 h-6 rounded-md flex items-center justify-center"
+              style={{ background: w.branchColor, boxShadow: `0 2px 6px ${w.branchColor}55` }}>
+              <Crown className="w-3 h-3 text-white" strokeWidth={2.5} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[9px] font-black uppercase tracking-wider" style={{ color: T4 }}>
+                {w.metricLabel}
+              </div>
+              <div className="text-[12px] font-bold whitespace-nowrap" style={{ color: T1 }}>
+                {w.branchName} <span style={{ color: w.branchColor }}>· {w.display}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ── Comparison Matrix — branches × metrics table, page-top headline view ────
+const ComparisonMatrixImpl: React.FC<{
+  rows: ComparisonRow[];
+  branches: BranchSummary[];
+  isMobile: boolean;
+  onBranchClick: (id: string) => void;
+}> = ({ rows, branches, isMobile, onBranchClick }) => {
+  const visibleRows = rows.filter(r => r.hasAnyData);
+  if (visibleRows.length === 0 || branches.length === 0) return null;
+
+  // Mobile = vertical layout (metric cards listing each branch's value).
+  // Desktop = real table (rows = metrics, cols = branches).
+  if (isMobile) {
+    return (
+      <div className="bg-white rounded-2xl p-4"
+        style={{ boxShadow: SHADOW_SM, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+        <div className="flex items-center gap-2 mb-4">
+          <BarChart3 className="w-4 h-4" style={{ color: B1 }} strokeWidth={2.5} />
+          <span className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: T1 }}>
+            Side-by-Side Comparison
+          </span>
+        </div>
+        <div className="space-y-3">
+          {visibleRows.map(row => (
+            <div key={row.key} className="rounded-xl p-3"
+              style={{ background: "#F5F9FF", border: "0.5px solid rgba(0,85,255,0.08)" }}>
+              <div className="text-[10px] font-black uppercase tracking-wider mb-2" style={{ color: T3 }}>
+                {row.label}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {row.cells.map(cell => (
+                  <button key={cell.branchId} onClick={() => onBranchClick(cell.branchId)}
+                    className="text-left px-2.5 py-2 rounded-lg transition-transform active:scale-[0.97]"
+                    style={{
+                      background: cell.isLeader
+                        ? `linear-gradient(135deg, ${cell.branchColor}22 0%, ${cell.branchColor}33 100%)`
+                        : "#FFFFFF",
+                      border: cell.isLeader
+                        ? `0.5px solid ${cell.branchColor}88`
+                        : "0.5px solid rgba(148,163,184,0.18)",
+                    }}>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: cell.branchColor }} />
+                      <span className="text-[10px] font-bold truncate" style={{ color: T2 }}>{cell.branchName}</span>
+                      {cell.isLeader && <Crown className="w-3 h-3 shrink-0" style={{ color: GOLD }} />}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[15px] font-black"
+                        style={{ color: valueColorForMetric(row.key, cell.value ?? 0, cell.value != null) }}>
+                        {cell.display}
+                      </span>
+                      {cell.deltaVsLeader != null && cell.deltaVsLeader < 0 && (
+                        <span className="text-[9px] font-bold" style={{ color: T4 }}>
+                          {cell.deltaVsLeader}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop: real table layout
+  return (
+    <div className="bg-white rounded-[1.5rem] p-6"
+      style={{ boxShadow: SHADOW_SM, border: "0.5px solid rgba(0,85,255,0.10)" }}>
+      <div className="flex items-center gap-2 mb-5">
+        <BarChart3 className="w-4 h-4" style={{ color: B1 }} strokeWidth={2.5} />
+        <span className="text-[12px] font-black uppercase tracking-[0.14em]" style={{ color: T1 }}>
+          Side-by-Side Comparison
+        </span>
+        <span className="text-[11px] font-medium ml-auto" style={{ color: T4 }}>
+          🏆 = metric leader · grey = no data
+        </span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
+          <thead>
+            <tr>
+              <th className="text-left text-[10px] font-black uppercase tracking-wider pb-3 pr-4"
+                style={{ color: T4 }}>
+                Metric
+              </th>
+              {branches.map(b => (
+                <th key={b.id} className="text-left pb-3 px-3 cursor-pointer hover:bg-slate-50 rounded-md"
+                  onClick={() => onBranchClick(b.id)}
+                  style={{ minWidth: 140 }}>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-md shrink-0"
+                      style={{ background: b.color, boxShadow: `0 2px 4px ${b.color}66` }} />
+                    <span className="text-[12px] font-bold truncate" style={{ color: T1 }}>{b.name}</span>
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {visibleRows.map((row, rIdx) => (
+              <tr key={row.key} style={{ background: rIdx % 2 === 0 ? "#FAFCFF" : "transparent" }}>
+                <td className="text-[12px] font-bold py-3 pr-4" style={{ color: T2 }}>
+                  {row.label}
+                </td>
+                {row.cells.map(cell => {
+                  const color = valueColorForMetric(row.key, cell.value ?? 0, cell.value != null);
+                  return (
+                    <td key={cell.branchId} className="py-3 px-3"
+                      style={{
+                        background: cell.isLeader ? `${cell.branchColor}11` : undefined,
+                        borderLeft: cell.isLeader ? `2px solid ${cell.branchColor}` : "2px solid transparent",
+                      }}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[16px] font-black tabular-nums" style={{ color }}>
+                          {cell.display}
+                        </span>
+                        {cell.isLeader && cell.value != null && (
+                          <Crown className="w-3.5 h-3.5 shrink-0" style={{ color: GOLD }} />
+                        )}
+                        {cell.rank != null && cell.rank > 1 && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                            style={{ color: T4, background: "rgba(148,163,184,0.10)" }}>
+                            #{cell.rank}
+                          </span>
+                        )}
+                        {cell.deltaVsLeader != null && cell.deltaVsLeader < 0 && (
+                          <span className="text-[10px] font-bold tabular-nums" style={{ color: RED }}>
+                            {cell.deltaVsLeader}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+// ── Branch Card — strong visual identity per branch + rank chips ────────────
+const BranchCardImpl: React.FC<{
+  branch: BranchSummary;
+  cellsByMetric: Map<ComparisonMetricKey, ComparisonCell>;
+  isMobile: boolean;
+  totalBranches: number;
+  onClick: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}> = ({ branch: b, cellsByMetric, isMobile, totalBranches, onClick, onEdit, onDelete }) => {
+  const accent = b.color || "#3B82F6";
+  // 3-mode discriminator: empty / awaiting / active
+  const mode: "empty" | "awaiting" | "active" =
+    b.studentCount === 0 ? "empty" :
+    (b.ahi > 0 || b.feeCollection > 0 || b.passRate > 0 || b.attendance > 0) ? "active" : "awaiting";
+
+  // STRONG accent gradient for active cards — 30% alpha at the corner reads
+  // unmistakably as "this card is X colour" instead of the previous 12% tint
+  // which made every branch card look like a white card with a hint of blue.
+  const cardBg =
+    mode === "active"
+      ? `linear-gradient(135deg, #FFFFFF 0%, ${accent}0D 50%, ${accent}33 100%)`
+      : `linear-gradient(135deg, #FCFDFE 0%, #F5F7FB 100%)`;
+  const cardBorder =
+    mode === "active"
+      ? `0.5px solid ${accent}66`
+      : `0.5px solid rgba(148,163,184,0.20)`;
+  const accentShadow =
+    mode === "active"
+      ? `0 8px 24px ${accent}22, 0 2px 6px rgba(15,23,42,0.06)`
+      : SHADOW_LG;
+
+  // Status palette — driven off branch.status for active mode
+  const statusPalette =
+    mode !== "active"
+      ? { bg: "rgba(148,163,184,0.14)", fg: "#64748B", label: mode === "empty" ? "EMPTY" : "AWAITING DATA" }
+      : b.status === "Strong"
+        ? { bg: "linear-gradient(135deg, #10B981 0%, #059669 100%)", fg: "#FFFFFF", label: "STRONG" }
+        : b.status === "Good"
+          ? { bg: "linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)", fg: "#FFFFFF", label: "GOOD" }
+          : { bg: "linear-gradient(135deg, #F43F5E 0%, #E11D48 100%)", fg: "#FFFFFF", label: "NEEDS FOCUS" };
+
+  const cardMetrics: { key: ComparisonMetricKey; label: string; icon: any }[] = [
+    { key: "ahi",           label: "AHI",        icon: Activity },
+    { key: "passRate",      label: "Pass Rate",  icon: GraduationCap },
+    { key: "feeCollection", label: "Fee Coll.",  icon: CircleDollarSign },
+    { key: "attendance",    label: "Attendance", icon: CalendarCheck2 },
+  ];
+
+  return (
+    <div
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      {...tilt3D}
+      style={{
+        background: cardBg,
+        border: cardBorder,
+        borderRadius: isMobile ? 18 : 22,
+        padding: 0,                 // padding moved inside for top stripe
+        boxShadow: accentShadow,
+        position: "relative",
+        overflow: "hidden",
+        cursor: "pointer",
+        minHeight: isMobile ? 250 : 290,
+        ...tilt3DStyle,
+      }}
+      className="clickable-card group"
+    >
+      {/* TOP ACCENT STRIPE — 6px bold band of branch colour. The single
+           strongest identity signal. Carries on hover-lift. */}
+      <div style={{
+        height: 6,
+        background: mode === "active"
+          ? `linear-gradient(90deg, ${accent} 0%, ${accent}AA 100%)`
+          : "linear-gradient(90deg, #CBD5E1 0%, #E2E8F0 100%)",
+      }} />
+
+      <div style={{ padding: isMobile ? 18 : 22, position: "relative" }}>
+        {/* Decorative faded icon — bottom-right */}
+        <div style={{
+          position: "absolute",
+          bottom: isMobile ? 10 : 14,
+          right: isMobile ? 12 : 18,
+          color: accent,
+          opacity: mode === "active" ? 0.10 : 0.06,
+          pointerEvents: "none",
+          lineHeight: 0,
+        }}>
+          <Building2 size={isMobile ? 56 : 76} strokeWidth={1.8}/>
+        </div>
+
+        {/* Edit / Delete — top-right, hover-revealed on desktop */}
+        <div className={`absolute top-3 right-3 flex items-center gap-1 z-[3] transition-opacity duration-200 ${
+          isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+        }`}>
+          <button
+            onClick={(e) => { e.stopPropagation(); onEdit(); }}
+            className="w-7 h-7 rounded-lg bg-white/95 border border-slate-200 hover:bg-white hover:border-blue-300 flex items-center justify-center transition-all backdrop-blur-sm"
+            title="Edit branch"
+          >
+            <Pencil className="w-3 h-3 text-slate-500" />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="w-7 h-7 rounded-lg bg-white/95 border border-slate-200 hover:bg-rose-50 hover:border-rose-300 flex items-center justify-center transition-all backdrop-blur-sm"
+            title="Delete branch"
+          >
+            <Trash2 className="w-3 h-3 text-slate-500" />
+          </button>
+        </div>
+
+        {/* Header: solid icon badge + branch name + meta */}
+        <div className="relative z-[2] flex items-start gap-3 mb-4 md:mb-5">
+          <div style={{
+            width: isMobile ? 42 : 46,
+            height: isMobile ? 42 : 46,
+            borderRadius: isMobile ? 12 : 13,
+            background: accent,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: `0 4px 14px ${accent}66, 0 0 0 2px #FFFFFF`,
+            flexShrink: 0,
+          }}>
+            <Building2 size={isMobile ? 19 : 22} color="#FFFFFF" strokeWidth={2.5}/>
+          </div>
+          <div className="flex-1 min-w-0 pr-12">
+            <h3 className="text-[15px] md:text-base font-bold text-[#0F172A] truncate"
+              style={{ letterSpacing: "-0.2px" }}>
+              {b.name}
+            </h3>
+            <p className="text-[10px] md:text-[11px] font-bold uppercase tracking-wider mt-1 truncate"
+              style={{ color: "#64748B" }}>
+              {b.studentCount.toLocaleString()} {b.studentCount === 1 ? "student" : "students"}
+              {b.location && b.location !== "—" ? ` · ${b.location}` : ""}
+              {b.teacherCount > 0 ? ` · ${b.teacherCount} teacher${b.teacherCount === 1 ? "" : "s"}` : ""}
+            </p>
+          </div>
+        </div>
+
+        {/* 2x2 metric grid — frosted white tiles WITH RANK CHIPS */}
+        <div className="relative z-[2] grid grid-cols-2 gap-2 md:gap-2.5 mb-4">
+          {cardMetrics.map(m => {
+            const cell = cellsByMetric.get(m.key);
+            const has = cell?.value != null;
+            const Icon = m.icon;
+            const valColor = valueColorForMetric(m.key, cell?.value ?? 0, has);
+            return (
+              <div key={m.label} className="rounded-xl p-2.5 md:p-3 relative"
+                style={{
+                  background: "rgba(255,255,255,0.85)",
+                  border: cell?.isLeader
+                    ? `0.5px solid ${accent}77`
+                    : "0.5px solid rgba(255,255,255,0.6)",
+                  backdropFilter: "blur(4px)",
+                  boxShadow: cell?.isLeader ? `inset 0 0 0 1px ${accent}33` : "none",
+                }}>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Icon size={11} color="#94A3B8" strokeWidth={2}/>
+                  <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-wider flex-1 truncate">
+                    {m.label}
+                  </p>
+                  {cell?.isLeader && has && (
+                    <Crown size={11} style={{ color: GOLD }} strokeWidth={2.5} />
+                  )}
+                </div>
+                <div className="flex items-baseline gap-1.5">
+                  <p className="text-[16px] md:text-[18px] font-black leading-tight"
+                    style={{ color: valColor }}>
+                    {cell?.display ?? "—"}
+                  </p>
+                  {has && cell && totalBranches > 1 && (
+                    cell.isLeader ? (
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded"
+                        style={{ color: GOLD, background: `${GOLD}1F` }}>
+                        #1
+                      </span>
+                    ) : cell.rank != null ? (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+                        style={{ color: "#64748B", background: "rgba(148,163,184,0.14)" }}>
+                        #{cell.rank}
+                        {cell.deltaVsLeader != null && cell.deltaVsLeader < 0 ? ` · ${cell.deltaVsLeader}` : ""}
+                      </span>
+                    ) : null
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer: status pill + at-risk + failures, OR explicit empty hint */}
+        <div className="relative z-[2] flex items-center justify-between gap-3 flex-wrap">
+          {mode === "active" ? (
+            <>
+              <span style={{
+                background: statusPalette.bg,
+                color: statusPalette.fg,
+                fontSize: 10,
+                fontWeight: 800,
+                padding: "5px 12px",
+                borderRadius: 999,
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                boxShadow: "0 2px 6px rgba(0,0,0,0.10)",
+              }}>
+                {statusPalette.label}
+              </span>
+              <div className="flex items-center gap-1.5">
+                {b.activeAlerts > 0 && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-rose-50 border border-rose-100 text-rose-500">
+                    <AlertTriangle className="w-3 h-3 shrink-0"/>
+                    {b.activeAlerts} at-risk
+                  </span>
+                )}
+                {b.failedTestCount > 0 && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-50 border border-amber-100 text-amber-700">
+                    {b.failedTestCount} fail{b.failedTestCount === 1 ? "" : "s"}
+                  </span>
+                )}
+              </div>
+            </>
+          ) : (
+            <p className="text-[10px] md:text-[11px] font-semibold leading-snug"
+              style={{ color: "#64748B" }}>
+              {mode === "empty"
+                ? "0 students enrolled — first enrollment will appear here"
+                : "Awaiting performance data — appears once attendance/scores are recorded"}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default function BranchesComparison() {
   const { id }     = useParams();
@@ -566,220 +905,6 @@ export default function BranchesComparison() {
     }
   }, [id]);
 
-  // ── Metric color helper ───────────────────────────────────────────────────
-  const metricColor = (v: number) =>
-    v >= 85 ? "text-[#22c55e]" : v >= 70 ? "text-[#f59e0b]" : "text-[#ef4444]";
-
-  /* ── Luxury-metal theme: looks like real platinum / gold / onyx ──
-     Each tier uses MULTI-STOP gradients to fake the way light hits metal,
-     plus an overlay specular highlight + noise grain layered on top. */
-  const tierTheme = (status: string, hasData: boolean) => {
-
-    if (!hasData) {
-      /* PEARL — iridescent mother-of-pearl finish for empty branches */
-      return {
-        key: "neutral",
-        label: "AWAITING DATA",
-        bg:
-          /* Soft pearl with subtle pink-blue iridescence */
-          "linear-gradient(135deg," +
-            "#fdfdfd 0%," +
-            "#f8fafc 22%," +
-            "#f0eef5 48%," +
-            "#f6f4f8 72%," +
-            "#eef2f7 100%)",
-        /* Specular highlight — diagonal gloss band near top-left */
-        gloss:
-          "linear-gradient(125deg," +
-            "rgba(255,255,255,0) 0%," +
-            "rgba(255,255,255,0.55) 18%," +
-            "rgba(255,255,255,0.0) 38%)",
-        ringBorder:
-          "linear-gradient(135deg,#ffffff 0%,#cfd6e0 50%,#9aa4b2 100%)",
-        border: "border-transparent",
-        title:      "text-[#1e294b]",
-        subtitle:   "text-slate-500",
-        metricLabel:"text-slate-500",
-        divider:    "border-slate-100",
-        iconBg:     "linear-gradient(135deg,#cbd5e1 0%,#94a3b8 50%,#64748b 100%)",
-        patternOpacity: 0.55,
-        badgeBg:    "bg-gradient-to-r from-slate-100 to-slate-200",
-        badgeText:  "text-slate-700",
-        accent:     "#B8985F",
-        noiseOpacity: 0.18,
-      };
-    }
-
-    if (status === "Strong") {
-      /* OBSIDIAN + 24K — black-platinum tile with deep gold trim (Luxury) */
-      return {
-        key: "luxury",
-        label: "LUXURY",
-        bg:
-          /* Layered: radial highlight near top-right + diagonal black-gradient */
-          "radial-gradient(120% 80% at 100% 0%, rgba(197,167,112,0.18) 0%, rgba(197,167,112,0) 45%)," +
-          "linear-gradient(135deg," +
-            "#0A1424 0%," +
-            "#0F1E36 25%," +
-            "#15264B 50%," +
-            "#0F1E36 75%," +
-            "#070D18 100%)",
-        gloss:
-          "linear-gradient(120deg," +
-            "rgba(255,255,255,0) 0%," +
-            "rgba(229,212,177,0.18) 12%," +
-            "rgba(255,255,255,0) 28%)",
-        ringBorder:
-          "linear-gradient(135deg,#E5D4B1 0%,#C5A770 30%,#8B6D3E 60%,#C5A770 100%)",
-        border: "border-transparent",
-        title:      "text-white",
-        subtitle:   "text-[#E5D4B1]",
-        metricLabel:"text-[#C5A770]/85",
-        divider:    "border-[#C5A770]/15",
-        iconBg:
-          "linear-gradient(135deg," +
-            "#F4E5BE 0%," +
-            "#D4B26A 30%," +
-            "#A07F3B 65%," +
-            "#7A5A24 100%)",
-        patternOpacity: 1,
-        badgeBg:
-          "bg-gradient-to-r from-[#F4E5BE] via-[#C5A770] to-[#8B6D3E]",
-        badgeText:  "text-[#0A1424]",
-        accent:     "#C5A770",
-        noiseOpacity: 0.12,
-      };
-    }
-
-    if (status === "Good") {
-      /* 24K LIQUID GOLD — molten gold finish with bright reflection band (Premium) */
-      return {
-        key: "premium",
-        label: "PREMIUM",
-        bg:
-          /* Reflection band near top + smooth gold gradient */
-          "radial-gradient(120% 90% at 0% 0%, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 40%)," +
-          "linear-gradient(135deg," +
-            "#D4A85F 0%," +
-            "#C09255 22%," +
-            "#A57B45 50%," +
-            "#8E6938 78%," +
-            "#7A5926 100%)",
-        gloss:
-          "linear-gradient(115deg," +
-            "rgba(255,255,255,0) 0%," +
-            "rgba(255,255,255,0.32) 14%," +
-            "rgba(255,255,255,0) 32%)",
-        ringBorder:
-          "linear-gradient(135deg,#FFE9B8 0%,#D4A85F 35%,#7A5926 65%,#D4A85F 100%)",
-        border: "border-transparent",
-        title:      "text-white",
-        subtitle:   "text-white/90",
-        metricLabel:"text-white/78",
-        divider:    "border-white/20",
-        iconBg:
-          "linear-gradient(135deg," +
-            "#ffffff 0%," +
-            "#FFF4DC 35%," +
-            "#F4E5BE 100%)",
-        patternOpacity: 0.95,
-        badgeBg:    "bg-gradient-to-r from-white to-[#FFF4DC]",
-        badgeText:  "text-[#7A5926]",
-        accent:     "#ffffff",
-        noiseOpacity: 0.12,
-      };
-    }
-
-    /* OBSIDIAN + GOLD — same luxury navy-gold palette for "Needs Focus",
-       distinguished from LUXURY only by the red icon + red status pill. */
-    return {
-      key: "standard",
-      label: "NEEDS FOCUS",
-      bg:
-        /* Same layered navy as LUXURY, but the radial tint uses a rose hint
-           near top-right so the "alert" mood is subtly embedded in the finish. */
-        "radial-gradient(120% 80% at 100% 0%, rgba(239,68,68,0.14) 0%, rgba(239,68,68,0) 45%)," +
-        "linear-gradient(135deg," +
-          "#0A1424 0%," +
-          "#0F1E36 25%," +
-          "#15264B 50%," +
-          "#0F1E36 75%," +
-          "#070D18 100%)",
-      gloss:
-        "linear-gradient(120deg," +
-          "rgba(255,255,255,0) 0%," +
-          "rgba(229,212,177,0.18) 12%," +
-          "rgba(255,255,255,0) 28%)",
-      ringBorder:
-        "linear-gradient(135deg,#E5D4B1 0%,#C5A770 30%,#8B6D3E 60%,#C5A770 100%)",
-      border: "border-transparent",
-      title:      "text-white",
-      subtitle:   "text-[#E5D4B1]",
-      metricLabel:"text-[#C5A770]/80",
-      divider:    "border-[#C5A770]/15",
-      iconBg:
-        /* Rose-red icon tile — retains "Needs Focus" signal against gold theme */
-        "linear-gradient(135deg," +
-          "#fb7185 0%," +
-          "#ef4444 50%," +
-          "#b91c1c 100%)",
-      patternOpacity: 1,
-      badgeBg:    "bg-gradient-to-r from-rose-500 to-rose-600",
-      badgeText:  "text-white",
-      accent:     "#C5A770",
-      noiseOpacity: 0.12,
-    };
-  };
-
-  /* Subtle film-grain noise to give cards a real "metal" texture (no API call — pure SVG) */
-  const NOISE_SVG =
-    "data:image/svg+xml;utf8," +
-    encodeURIComponent(
-      `<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'>
-        <filter id='n'>
-          <feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='4'/>
-          <feColorMatrix values='0 0 0 0 1   0 0 0 0 1   0 0 0 0 1   0 0 0 0.6 0'/>
-        </filter>
-        <rect width='180' height='180' filter='url(#n)'/>
-      </svg>`
-    );
-
-  /* Decorative flowing-lines SVG pattern — dense silk curves (right half of card) */
-  const LINES_PATTERN =
-    "data:image/svg+xml;utf8," +
-    encodeURIComponent(
-      `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 400' fill='none' preserveAspectRatio='xMaxYMid slice'>
-        <g stroke='currentColor' stroke-width='0.55' fill='none'>
-          <path stroke-opacity='0.18' d='M 420 -60 C 280 40, 180 180, 360 440' />
-          <path stroke-opacity='0.22' d='M 420 -40 C 290 50, 195 195, 370 440' />
-          <path stroke-opacity='0.26' d='M 420 -20 C 300 60, 210 210, 380 440' />
-          <path stroke-opacity='0.30' d='M 420   0 C 310 70, 225 225, 390 440' />
-          <path stroke-opacity='0.34' d='M 420  20 C 320 80, 240 240, 400 440' />
-          <path stroke-opacity='0.38' d='M 420  40 C 330 90, 250 250, 405 440' />
-          <path stroke-opacity='0.42' d='M 420  60 C 340 100, 260 260, 410 440' />
-          <path stroke-opacity='0.46' d='M 420  80 C 350 110, 270 270, 413 440' />
-          <path stroke-opacity='0.50' d='M 420 100 C 355 120, 280 280, 416 440' />
-          <path stroke-opacity='0.54' d='M 420 120 C 360 130, 290 290, 418 440' />
-          <path stroke-opacity='0.55' d='M 420 140 C 365 140, 300 300, 420 440' />
-          <path stroke-opacity='0.55' d='M 420 160 C 370 150, 310 310, 422 440' />
-          <path stroke-opacity='0.54' d='M 420 180 C 375 160, 318 320, 424 440' />
-          <path stroke-opacity='0.50' d='M 420 200 C 380 170, 326 330, 426 440' />
-          <path stroke-opacity='0.46' d='M 420 220 C 385 180, 332 340, 428 440' />
-          <path stroke-opacity='0.42' d='M 420 240 C 388 192, 338 350, 430 440' />
-          <path stroke-opacity='0.38' d='M 420 260 C 390 204, 344 358, 432 440' />
-          <path stroke-opacity='0.34' d='M 420 280 C 392 216, 350 366, 434 440' />
-          <path stroke-opacity='0.30' d='M 420 300 C 394 228, 356 374, 436 440' />
-          <path stroke-opacity='0.26' d='M 420 320 C 396 240, 362 382, 438 440' />
-          <path stroke-opacity='0.22' d='M 420 340 C 398 252, 368 390, 440 440' />
-        </g>
-      </svg>`
-    );
-
-  const statusConfig = (status: string) => {
-    if (status === "Strong")      return "bg-emerald-500";
-    if (status === "Good")        return "bg-blue-500";
-    return "bg-[#ef4444]";
-  };
 
   // ── Loading state ─────────────────────────────────────────────────────────
   if (loading) {
@@ -911,10 +1036,16 @@ export default function BranchesComparison() {
                   const SOLID_GREEN = "linear-gradient(135deg,#10B981 0%,#059669 100%)";
                   const SOLID_GOLD  = "linear-gradient(135deg,#F59E0B 0%,#D97706 100%)";
                   const SOLID_RED   = "linear-gradient(135deg,#FF3355 0%,#DC2626 100%)";
+                  const SOLID_GREY  = "linear-gradient(135deg,#94A3B8 0%,#64748B 100%)";
+                  // Default to neutral grey for unknown status — earlier the
+                  // fall-through treated everything-not-Strong-or-Good as
+                  // "Needs Focus" (red), so a future 4th status string would
+                  // look like an alarm even if it isn't.
                   const pillBg =
-                    summary.status === "Strong" ? SOLID_GREEN :
-                    summary.status === "Good"   ? SOLID_GOLD :
-                                                  SOLID_RED;   // "Needs Focus"
+                    summary.status === "Strong"      ? SOLID_GREEN :
+                    summary.status === "Good"        ? SOLID_GOLD :
+                    summary.status === "Needs Focus" ? SOLID_RED :
+                                                       SOLID_GREY;
                   return (
                     <span style={{
                       fontSize: isMobile ? 9 : 10, fontWeight:800, padding: isMobile ? "6px 10px" : "8px 14px", borderRadius:10,
@@ -927,7 +1058,11 @@ export default function BranchesComparison() {
                   );
                 })()}
                 <button
-                  onClick={() => navigate("/reports")}
+                  // Branch-scoped: pass branchId via query param so the
+                  // generic /reports page can pre-filter to this branch.
+                  // Earlier this navigated to /reports plain — Owner clicked
+                  // expecting the current branch's report and got a generic page.
+                  onClick={() => navigate(`/reports?branchId=${encodeURIComponent(id || "")}`)}
                   className="dash-btn"
                   style={{
                     display:"inline-flex", alignItems:"center", justifyContent:"center", gap:6,
@@ -1111,7 +1246,10 @@ export default function BranchesComparison() {
     );
   }
 
-  const { branches, performanceRanking, comparativeTrends, efficiencyMetrics, mappingIssue } = listData;
+  const {
+    branches, performanceRanking, comparativeTrends, efficiencyMetrics, mappingIssue,
+    comparisonMatrix, winners, headlineLeader, headlineLaggard,
+  } = listData;
 
   // Show all ranking rows always (0 will render as short bar)
   const rankingWithData = performanceRanking;
@@ -1131,6 +1269,118 @@ export default function BranchesComparison() {
     : 0;
   const totalAlertsList = branches.reduce((a, b) => a + (b.activeAlerts || 0), 0);
   const totalStudentsList = branches.reduce((a, b) => a + (b.studentCount || 0), 0);
+
+  // Actionable hero subtitle: surface leader + laggard (if more than one branch
+  // with data). Falls back to descriptive text when only 1 branch / no data.
+  const heroSubtitle = headlineLeader && headlineLaggard
+    ? `${headlineLeader.name.split(" ")[0]} leading at ${headlineLeader.ahi}% · ${headlineLaggard.name.split(" ")[0]} needs focus at ${headlineLaggard.ahi}%`
+    : headlineLeader
+      ? `${headlineLeader.name.split(" ")[0]} leading at ${headlineLeader.ahi}% AHI · ${branches.length} branch${branches.length !== 1 ? "es" : ""} · ${totalStudentsList.toLocaleString()} students`
+      : `${branches.length} branch${branches.length !== 1 ? "es" : ""} · ${totalStudentsList.toLocaleString()} students · awaiting performance data`;
+
+  // Build a per-branch lookup of all comparison cells, indexed by metric key.
+  // Cards consume this so they can show rank/leader/delta per metric without
+  // recomputing the comparison logic per render.
+  const cellsByBranchByMetric = new Map<string, Map<ComparisonMetricKey, ComparisonCell>>();
+  comparisonMatrix.forEach(row => {
+    row.cells.forEach(cell => {
+      let m = cellsByBranchByMetric.get(cell.branchId);
+      if (!m) { m = new Map(); cellsByBranchByMetric.set(cell.branchId, m); }
+      m.set(row.key, cell);
+    });
+  });
+
+  // Export Comparison PDF — uses reportTemplate.buildReport (same infra the
+  // teacher Pre-Result Predictor uses). Opens in new blob: window with print
+  // button. Replaces the previous "no export" gap.
+  const handleExportComparison = () => {
+    if (branches.length === 0) {
+      toast.info("Add at least one branch before exporting.");
+      return;
+    }
+    try {
+      const sections: ReportSection[] = [];
+
+      // 1. Headline (text)
+      sections.push({
+        title: "Network Headline",
+        type: "text",
+        text: heroSubtitle,
+      });
+
+      // 2. Winners (list) — one bullet per metric leader
+      if (winners.length > 0) {
+        sections.push({
+          title: "Metric Leaders",
+          type: "list",
+          items: winners.map(w => `${w.metricLabel}: ${w.branchName} — ${w.display}`),
+        });
+      }
+
+      // 3. Side-by-side comparison table
+      const visibleRows = comparisonMatrix.filter(r => r.hasAnyData);
+      if (visibleRows.length > 0) {
+        sections.push({
+          title: "Side-by-Side Comparison",
+          type: "table",
+          headers: ["Metric", ...branches.map(b => b.name)],
+          rows: visibleRows.map(row => ({
+            cells: [
+              row.label,
+              ...row.cells.map(c =>
+                c.value == null ? "—" :
+                c.isLeader ? `${c.display} 🏆` :
+                c.deltaVsLeader != null && c.deltaVsLeader < 0 ? `${c.display} (${c.deltaVsLeader})` :
+                c.display
+              ),
+            ],
+          })),
+        });
+      }
+
+      // 4. Efficiency metrics
+      sections.push({
+        title: "Efficiency Metrics",
+        type: "stats",
+        stats: efficiencyMetrics.map(m => ({ label: m.label, value: `${m.value} — ${m.note}` })),
+      });
+
+      // 5. Per-branch summary
+      sections.push({
+        title: "Per-Branch Summary",
+        type: "table",
+        headers: ["Branch", "Students", "Teachers", "Status", "Location"],
+        rows: branches.map(b => ({
+          cells: [
+            b.name,
+            b.studentCount,
+            b.teacherCount || 0,
+            b.status,
+            b.location && b.location !== "—" ? b.location : "—",
+          ],
+        })),
+      });
+
+      const html = buildReport({
+        title: "Branch Network Comparison",
+        subtitle: heroSubtitle,
+        badge: `${branches.length} BRANCHES`,
+        heroStats: [
+          { label: "Avg AHI", value: `${listAhiAvg}%` },
+          { label: "Total Students", value: totalStudentsList.toLocaleString() },
+          { label: "Total At-Risk", value: totalAlertsList.toString() },
+          { label: "Branches", value: branches.length.toString() },
+        ],
+        sections,
+        schoolName: "Branch Network",
+        generatedBy: "Owner Dashboard",
+      });
+      openReportWindow(html);
+    } catch (err) {
+      console.error("[BranchesComparison] export failed", err);
+      toast.error("Could not open report. Please try again.");
+    }
+  };
 
   return (
     <>
@@ -1160,20 +1410,38 @@ export default function BranchesComparison() {
         title="Branches Comparison"
         subtitle="Side-by-side performance analysis"
         right={
-          <button
-            onClick={() => { setCrudForm(EMPTY_FORM); setAddOpen(true); }}
-            className="dash-btn"
-            style={{
-              display:"inline-flex", alignItems:"center", justifyContent:"center", gap:7,
-              padding: isMobile ? "10px 16px" : "11px 18px", borderRadius: isMobile ? 12 : 14,
-              background:GRAD_PRIMARY, color:"#fff",
-              fontSize: isMobile ? 11 : 12, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
-              border:"none", cursor:"pointer", boxShadow:SHADOW_BTN, fontFamily:"inherit",
-              width: isMobile ? "100%" : "auto",
-            }}
-          >
-            <Plus size={isMobile ? 14 : 15} strokeWidth={2.4}/> Add Branch
-          </button>
+          <div style={{ display: "flex", gap: 8, width: isMobile ? "100%" : "auto" }}>
+            {branches.length > 0 && (
+              <button
+                onClick={handleExportComparison}
+                className="dash-btn"
+                style={{
+                  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  padding: isMobile ? "10px 14px" : "11px 16px", borderRadius: isMobile ? 12 : 14,
+                  background: "#fff", color: T2,
+                  fontSize: isMobile ? 11 : 12, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase",
+                  border: "0.5px solid rgba(0,85,255,0.18)", cursor: "pointer", boxShadow: SHADOW_SM, fontFamily: "inherit",
+                  flex: isMobile ? 1 : undefined,
+                }}
+              >
+                <FileText size={isMobile ? 13 : 14} strokeWidth={2.3}/> Export PDF
+              </button>
+            )}
+            <button
+              onClick={() => { setCrudForm(EMPTY_FORM); setAddOpen(true); }}
+              className="dash-btn"
+              style={{
+                display:"inline-flex", alignItems:"center", justifyContent:"center", gap:7,
+                padding: isMobile ? "10px 16px" : "11px 18px", borderRadius: isMobile ? 12 : 14,
+                background:GRAD_PRIMARY, color:"#fff",
+                fontSize: isMobile ? 11 : 12, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
+                border:"none", cursor:"pointer", boxShadow:SHADOW_BTN, fontFamily:"inherit",
+                flex: isMobile ? 1 : undefined,
+              }}
+            >
+              <Plus size={isMobile ? 14 : 15} strokeWidth={2.4}/> Add Branch
+            </button>
+          </div>
         }
       />
 
@@ -1182,7 +1450,7 @@ export default function BranchesComparison() {
           icon={BarChart3}
           eyebrow="Branch Intelligence"
           title={`${listAhiAvg}%`}
-          subtitle={`Average academic health across ${branches.length} branch${branches.length!==1?"es":""} · ${totalStudentsList.toLocaleString()} students`}
+          subtitle={heroSubtitle}
           stats={[
             { label:"Branches", value: branches.length.toString() },
             { label:"Students", value: totalStudentsList.toLocaleString() },
@@ -1190,6 +1458,23 @@ export default function BranchesComparison() {
                attendance-based at-risk students, not all alert types. */
             { label:"At-Risk",  value: totalAlertsList.toString() },
           ]}
+        />
+      )}
+
+      {/* WINNERS STRIP — page-top "who leads what" at-a-glance ─────────── */}
+      {branches.length > 0 && winners.length > 0 && (
+        <WinnersStripImpl winners={winners} isMobile={isMobile} />
+      )}
+
+      {/* SIDE-BY-SIDE COMPARISON MATRIX — the headline view that delivers
+          on the page subtitle. Branches × metrics, leader marked with crown,
+          rank chips on every other cell. The promise the page actually keeps. */}
+      {branches.length > 1 && (
+        <ComparisonMatrixImpl
+          rows={comparisonMatrix}
+          branches={branches}
+          isMobile={isMobile}
+          onBranchClick={(bid) => navigate(`/branches/${bid}`)}
         />
       )}
 
@@ -1247,190 +1532,18 @@ export default function BranchesComparison() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
           {branches.map(b => {
-            const hasData = b.ahi > 0 || b.feeCollection > 0 || b.passRate > 0 || b.attendance > 0;
-            const accent = b.color || "#3B82F6";
-
-            /* Pastel background — branch color tinted at ~12% over a near-white
-               base. Mirrors Dashboard.tsx 4-card aesthetic: clean, light, with
-               a subtle accent corner. `${accent}1F` = hex alpha 0x1F (~12%). */
-            const cardBg = hasData
-              ? `linear-gradient(135deg, #FAFCFF 0%, #F5F9FF 55%, ${accent}1F 100%)`
-              : `linear-gradient(135deg, #FCFDFE 0%, #F5F7FB 100%)`;
-            const cardBorder = hasData
-              ? `0.5px solid ${accent}33`
-              : `0.5px solid rgba(148,163,184,0.18)`;
-
-            /* Status pill colors — clean, low-opacity per Dashboard. */
-            const statusPalette = !hasData
-              ? { bg: "rgba(148,163,184,0.12)", fg: "#64748B" }
-              : b.status === "Strong"
-                ? { bg: "rgba(16,185,129,0.12)", fg: "#10B981" }
-                : b.status === "Good"
-                  ? { bg: "rgba(59,130,246,0.12)", fg: "#3B82F6" }
-                  : { bg: "rgba(244,63,94,0.12)", fg: "#F43F5E" };
-
-            const cardMetrics = [
-              { label: "AHI",        value: b.ahi,           has: b.ahi > 0,           icon: Activity },
-              { label: "Pass Rate",  value: b.passRate,      has: b.passRate > 0,      icon: GraduationCap },
-              { label: "Fee Coll.",  value: b.feeCollection, has: b.feeCollection > 0, icon: CircleDollarSign },
-              { label: "Attendance", value: b.attendance,    has: b.attendance > 0,    icon: CalendarCheck2 },
-            ];
-            /* Per-metric value color — same ramp as Dashboard StatTile so a
-               75% here looks the same shade as a 75% on the home page. */
-            const valColor = (v: number) =>
-              v >= 85 ? "#10B981" :
-              v >= 70 ? "#3B82F6" :
-              v >= 50 ? "#F59E0B" :
-                        "#F43F5E";
-
+            const cellsByMetric = cellsByBranchByMetric.get(b.id) || new Map();
             return (
-              <div
+              <BranchCardImpl
                 key={b.id}
+                branch={b}
+                cellsByMetric={cellsByMetric}
+                isMobile={isMobile}
+                totalBranches={branches.length}
                 onClick={() => navigate(`/branches/${b.id}`)}
-                role="button"
-                tabIndex={0}
-                {...tilt3D}
-                style={{
-                  background: cardBg,
-                  border: cardBorder,
-                  borderRadius: isMobile ? 18 : 22,
-                  padding: isMobile ? 18 : 22,
-                  boxShadow: SHADOW_LG,
-                  position: "relative",
-                  overflow: "hidden",
-                  cursor: "pointer",
-                  minHeight: isMobile ? 230 : 270,
-                  ...tilt3DStyle,
-                }}
-                className="clickable-card group"
-              >
-                {/* Decorative faded icon — bottom-right (Dashboard pattern) */}
-                <div style={{
-                  position: "absolute",
-                  bottom: isMobile ? 10 : 14,
-                  right: isMobile ? 12 : 18,
-                  color: accent,
-                  opacity: hasData ? 0.18 : 0.10,
-                  pointerEvents: "none",
-                  lineHeight: 0,
-                }}>
-                  <Building2 size={isMobile ? 56 : 76} strokeWidth={1.8}/>
-                </div>
-
-                {/* Edit / Delete — top-right, hover-revealed on desktop */}
-                <div className={`absolute top-3 right-3 flex items-center gap-1 z-[3] transition-opacity duration-200 ${
-                  isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                }`}>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); openEdit(b, b.id); }}
-                    className="w-7 h-7 rounded-lg bg-white/85 border border-slate-200 hover:bg-white hover:border-blue-300 flex items-center justify-center transition-all backdrop-blur-sm"
-                    title="Edit branch"
-                  >
-                    <Pencil className="w-3 h-3 text-slate-500" />
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); openDelete(b.id, b.name); }}
-                    className="w-7 h-7 rounded-lg bg-white/85 border border-slate-200 hover:bg-rose-50 hover:border-rose-300 flex items-center justify-center transition-all backdrop-blur-sm"
-                    title="Delete branch"
-                  >
-                    <Trash2 className="w-3 h-3 text-slate-500" />
-                  </button>
-                </div>
-
-                {/* Header: solid icon badge + branch name + meta */}
-                <div className="relative z-[2] flex items-start gap-3 mb-4 md:mb-5">
-                  <div style={{
-                    width: isMobile ? 40 : 44,
-                    height: isMobile ? 40 : 44,
-                    borderRadius: isMobile ? 11 : 12,
-                    background: accent,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    boxShadow: `0 4px 12px ${accent}44`,
-                    flexShrink: 0,
-                  }}>
-                    <Building2 size={isMobile ? 18 : 20} color="#FFFFFF" strokeWidth={2.5}/>
-                  </div>
-                  <div className="flex-1 min-w-0 pr-12">
-                    <h3
-                      className="text-[15px] md:text-base font-bold text-[#0F172A] truncate"
-                      style={{ letterSpacing: "-0.2px" }}
-                    >
-                      {b.name}
-                    </h3>
-                    <p className="text-[10px] md:text-[11px] font-bold text-slate-400 uppercase tracking-wider mt-1 truncate">
-                      {b.studentCount.toLocaleString()} {b.studentCount === 1 ? "student" : "students"}
-                      {b.location && b.location !== "—" ? ` · ${b.location}` : ""}
-                    </p>
-                  </div>
-                </div>
-
-                {/* 2x2 metric grid — frosted white tiles over the pastel grad */}
-                <div className="relative z-[2] grid grid-cols-2 gap-2 md:gap-2.5 mb-4">
-                  {cardMetrics.map(m => {
-                    const Icon = m.icon;
-                    return (
-                      <div
-                        key={m.label}
-                        className="rounded-xl p-2.5 md:p-3"
-                        style={{
-                          background: "rgba(255,255,255,0.72)",
-                          border: "0.5px solid rgba(255,255,255,0.6)",
-                          backdropFilter: "blur(4px)",
-                        }}
-                      >
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <Icon size={11} color="#94A3B8" strokeWidth={2}/>
-                          <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                            {m.label}
-                          </p>
-                        </div>
-                        <p
-                          className="text-[14px] md:text-[15px] font-bold leading-tight mt-0.5"
-                          style={{ color: m.has ? valColor(m.value) : "#CBD5E1" }}
-                        >
-                          {m.has ? `${m.value}%` : "—"}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Footer: status pill + at-risk count, OR explicit empty hint */}
-                <div className="relative z-[2] flex items-center justify-between gap-3 flex-wrap">
-                  {hasData ? (
-                    <>
-                      <span
-                        style={{
-                          background: statusPalette.bg,
-                          color: statusPalette.fg,
-                          fontSize: 9,
-                          fontWeight: 800,
-                          padding: "4px 10px",
-                          borderRadius: 999,
-                          letterSpacing: "0.14em",
-                          textTransform: "uppercase",
-                        }}
-                      >
-                        {b.status}
-                      </span>
-                      {b.activeAlerts > 0 && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-rose-50 border border-rose-100 text-rose-500">
-                          <AlertTriangle className="w-3 h-3 shrink-0"/>
-                          {b.activeAlerts} at-risk
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <p className="text-[10px] md:text-[11px] font-semibold text-slate-400 leading-snug">
-                      {b.studentCount === 0
-                        ? "0 students enrolled — first enrollment will appear here"
-                        : "Awaiting performance data — appears once attendance/scores are recorded"}
-                    </p>
-                  )}
-                </div>
-              </div>
+                onEdit={() => openEdit(b, b.id)}
+                onDelete={() => openDelete(b.id, b.name)}
+              />
             );
           })}
         </div>
@@ -1470,7 +1583,7 @@ export default function BranchesComparison() {
                       )}
                     />
                     {branches.map((b, i) => (
-                      <Bar key={b.id} dataKey={`b${i}`} name={b.name.split(" ")[0]}
+                      <Bar key={b.id} dataKey={`b${i}`} name={b.name}
                         fill={b.color} radius={[0, 2, 2, 0]} barSize={isMobile ? 8 : 10} />
                     ))}
                   </BarChart>
@@ -1511,7 +1624,7 @@ export default function BranchesComparison() {
                       )}
                     />
                     {branches.map((b, i) => (
-                      <Line key={b.id} type="monotone" dataKey={`b${i}`} name={b.name.split(" ")[0]}
+                      <Line key={b.id} type="monotone" dataKey={`b${i}`} name={b.name}
                         stroke={b.color} strokeWidth={isMobile ? 2.5 : 3}
                         dot={{ r: isMobile ? 3.5 : 5, fill: "#fff", strokeWidth: 2, stroke: b.color }}
                         activeDot={{ r: 7 }} />

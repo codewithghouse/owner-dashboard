@@ -37,6 +37,58 @@ export type BranchSummary = {
   failedTestCount: number;
 };
 
+/* ── Side-by-side comparison primitives ─────────────────────────────────────
+   The UI's headline ("Side-by-side performance analysis") demands a real
+   matrix shape — branches as rows × metrics as columns — with leader/rank/
+   delta baked in so the page renders the comparison instead of leaving the
+   diff work to the Owner's eyes. */
+export type ComparisonMetricKey =
+  | "ahi" | "attendance" | "passRate" | "feeCollection" | "activeAlerts" | "failedTestCount";
+
+export type ComparisonCell = {
+  branchId: string;
+  branchName: string;
+  branchColor: string;
+  /** Raw numeric value. `null` means no data was recorded for this metric on
+   *  this branch — the cell should render as "—" and is excluded from
+   *  ranking. */
+  value: number | null;
+  /** Pre-formatted display string ("87%", "12 students", "—"). */
+  display: string;
+  /** 1-based rank among branches that have data for this metric. `null` if
+   *  this branch has no data (cell shows "—"). */
+  rank: number | null;
+  /** True when this branch is the metric leader (rank === 1). */
+  isLeader: boolean;
+  /** Signed delta vs the leader (negative for laggards, 0 for the leader,
+   *  null when no data). For "lower is better" metrics (alerts, failures)
+   *  the sign is flipped so positive always means "ahead of leader". */
+  deltaVsLeader: number | null;
+};
+
+export type ComparisonRow = {
+  key: ComparisonMetricKey;
+  /** Human-readable metric name shown as the row header. */
+  label: string;
+  /** Higher is better (pct, AHI) vs lower is better (alerts, failures). */
+  betterIsLower: boolean;
+  /** Per-branch cells in the same order as `branches`. */
+  cells: ComparisonCell[];
+  /** Branch id of the leader for this metric, or null when no branch has data. */
+  leaderBranchId: string | null;
+  /** True when at least one cell has data — otherwise the row is hidden. */
+  hasAnyData: boolean;
+};
+
+export type WinnerCallout = {
+  metricKey: ComparisonMetricKey;
+  metricLabel: string;
+  branchId: string;
+  branchName: string;
+  branchColor: string;
+  display: string;
+};
+
 export type BranchComparisonData = {
   branches: BranchSummary[];
   performanceRanking: Record<string, string | number>[];
@@ -49,6 +101,16 @@ export type BranchComparisonData = {
    *  is partially or fully broken. UI should render a banner so the Owner
    *  knows the dashboard data may be misleading. */
   mappingIssue: MappingIssue | null;
+  /** NEW — Side-by-side comparison matrix (branches × metrics). Powers the
+   *  primary "Side-by-side comparison" view at the top of the page. */
+  comparisonMatrix: ComparisonRow[];
+  /** NEW — One winner per non-trivial metric. Renders as the page-top
+   *  "Winners" strip so the Owner sees the leaders at a glance. */
+  winners: WinnerCallout[];
+  /** NEW — Per-branch headline statement. Powers actionable hero subtitle
+   *  ("Banjarahills leading at 87% · Hyderabad needs focus at 64%"). */
+  headlineLeader: { name: string; ahi: number } | null;
+  headlineLaggard: { name: string; ahi: number } | null;
 };
 
 export type BranchDetailData = {
@@ -200,7 +262,10 @@ export async function fetchBranchesComparison(): Promise<BranchComparisonData> {
       col: teacherRatio > 0 && teacherRatio <= 20 ? "text-[#22c55e]" : "text-[#f59e0b]",
     },
     {
-      label: "Resource Util.",
+      // Renamed from "Resource Util." (was misleading — Owner read it as
+      // facility/teacher utilization). Underlying value is just average
+      // attendance % across branches with data, so the label now matches.
+      label: "Avg Attendance",
       value: avgAtt > 0 ? `${avgAtt}%` : "N/A",
       note: (() => {
         const lead = branches.filter(b => b.attendance > 0)
@@ -210,18 +275,181 @@ export async function fetchBranchesComparison(): Promise<BranchComparisonData> {
       col: avgAtt >= 85 ? "text-[#22c55e]" : avgAtt >= 70 ? "text-[#f59e0b]" : "text-slate-400",
     },
     {
-      label: "Activity Trend",
+      // Renamed from "Activity Trend" — the underlying growthRate proxies
+      // attendance volume change (last month vs 6mo ago), NOT student
+      // enrollment growth. Calling it "Activity Trend" let the Owner read
+      // it as enrollment growth, which is wrong and could mis-direct
+      // expansion decisions.
+      label: "Attendance Volume Trend",
       value: bestGrowth && bestGrowth.growthRate !== 0
         ? `${bestGrowth.growthRate > 0 ? "+" : ""}${bestGrowth.growthRate}%`
         : "N/A",
       note: bestGrowth && bestGrowth.growthRate !== 0
-        ? `${bestGrowth.name.split(" ")[0]} · attendance volume vs 6mo ago`
+        ? `${bestGrowth.name.split(" ")[0]} · attendance days vs 6mo ago`
         : "Insufficient history",
       col: bestGrowth && bestGrowth.growthRate > 0 ? "text-[#22c55e]" : "text-[#f59e0b]",
     },
   ];
 
-  return { branches, performanceRanking, comparativeTrends, efficiencyMetrics, mappingIssue };
+  // ── Comparison matrix: branches × metrics, with rank/leader/delta baked in
+  const comparisonMatrix = buildComparisonMatrix(branches);
+
+  // ── Per-metric winners (one callout per metric where leader exists) ─────
+  const winners: WinnerCallout[] = [];
+  comparisonMatrix.forEach(row => {
+    if (!row.leaderBranchId) return;
+    const cell = row.cells.find(c => c.branchId === row.leaderBranchId);
+    if (!cell) return;
+    winners.push({
+      metricKey: row.key,
+      metricLabel: row.label,
+      branchId: cell.branchId,
+      branchName: cell.branchName,
+      branchColor: cell.branchColor,
+      display: cell.display,
+    });
+  });
+
+  // ── Headline leader + laggard (drives the actionable hero subtitle) ────
+  const branchesWithAhi = branches.filter(b => b.ahi > 0);
+  const headlineLeader = branchesWithAhi.length > 0
+    ? (() => {
+        const best = branchesWithAhi.reduce((a, b) => b.ahi > a.ahi ? b : a);
+        return { name: best.name, ahi: best.ahi };
+      })()
+    : null;
+  const headlineLaggard = branchesWithAhi.length > 1
+    ? (() => {
+        const worst = branchesWithAhi.reduce((a, b) => b.ahi < a.ahi ? b : a);
+        return worst.name === headlineLeader?.name ? null : { name: worst.name, ahi: worst.ahi };
+      })()
+    : null;
+
+  return {
+    branches, performanceRanking, comparativeTrends, efficiencyMetrics, mappingIssue,
+    comparisonMatrix, winners, headlineLeader, headlineLaggard,
+  };
+}
+
+// ── Internal: build the side-by-side comparison matrix ─────────────────────
+function buildComparisonMatrix(branches: BranchSummary[]): ComparisonRow[] {
+  const metricDefs: Array<{
+    key: ComparisonMetricKey;
+    label: string;
+    betterIsLower: boolean;
+    extract: (b: BranchSummary) => number;
+    /** A branch is considered to have data for this metric when the value is
+     *  meaningful — not just `> 0`, because zero is a real signal for some
+     *  metrics (eg "0 active alerts" = great). */
+    hasData: (b: BranchSummary, raw: number) => boolean;
+    format: (raw: number, hasData: boolean) => string;
+  }> = [
+    {
+      key: "ahi", label: "Academic Health Index",
+      betterIsLower: false,
+      extract: b => b.ahi,
+      hasData: (_, raw) => raw > 0,
+      format: (raw, has) => has ? `${raw}%` : "—",
+    },
+    {
+      key: "passRate", label: "Pass Rate",
+      betterIsLower: false,
+      extract: b => b.passRate,
+      hasData: (_, raw) => raw > 0,
+      format: (raw, has) => has ? `${raw}%` : "—",
+    },
+    {
+      key: "attendance", label: "Attendance",
+      betterIsLower: false,
+      extract: b => b.attendance,
+      hasData: (_, raw) => raw > 0,
+      format: (raw, has) => has ? `${raw}%` : "—",
+    },
+    {
+      key: "feeCollection", label: "Fee Collection",
+      betterIsLower: false,
+      extract: b => b.feeCollection,
+      hasData: (_, raw) => raw > 0,
+      format: (raw, has) => has ? `${raw}%` : "—",
+    },
+    {
+      // "Lower is better" — a branch with 0 alerts is the leader.
+      key: "activeAlerts", label: "At-Risk Students",
+      betterIsLower: true,
+      extract: b => b.activeAlerts,
+      // We want this metric to surface even when ALL branches have 0
+      // (because "everyone clean" is itself a useful comparison signal).
+      // Treat data as "available" whenever the branch has any students
+      // enrolled — otherwise an empty branch shows as the false-leader.
+      hasData: (b, _raw) => b.studentCount > 0,
+      format: (raw, has) => has ? `${raw}` : "—",
+    },
+    {
+      // Failed test entries — distinct from "at-risk" which is attendance-based.
+      // Lower is better; gated on actually having test results recorded.
+      key: "failedTestCount", label: "Test Failures",
+      betterIsLower: true,
+      extract: b => b.failedTestCount,
+      hasData: b => b.passRate > 0,
+      format: (raw, has) => has ? `${raw}` : "—",
+    },
+  ];
+
+  return metricDefs.map(def => {
+    // First pass — extract raw + hasData per branch
+    const stage = branches.map(b => {
+      const raw = def.extract(b);
+      const has = def.hasData(b, raw);
+      return { branch: b, raw, has };
+    });
+
+    // Sort branches WITH data to determine rank. For "lower is better" metrics,
+    // ascending; for higher-is-better, descending. Stable sort preserves
+    // declaration order for ties.
+    const ranked = [...stage]
+      .filter(s => s.has)
+      .sort((a, b) => def.betterIsLower ? a.raw - b.raw : b.raw - a.raw);
+
+    // Map branchId → 1-based rank
+    const rankMap = new Map<string, number>();
+    ranked.forEach((s, i) => rankMap.set(s.branch.id, i + 1));
+
+    const leaderId = ranked[0]?.branch.id || null;
+    const leaderRaw = ranked[0]?.raw ?? null;
+
+    const cells: ComparisonCell[] = stage.map(s => {
+      const rank = rankMap.get(s.branch.id) ?? null;
+      let deltaVsLeader: number | null = null;
+      if (s.has && leaderRaw != null) {
+        // Sign convention: positive means "ahead of leader" (impossible for
+        // non-leaders), negative means "behind leader". For lower-is-better
+        // metrics, flip so behind-the-leader is still negative.
+        const rawDelta = def.betterIsLower
+          ? leaderRaw - s.raw   // s.raw >= leaderRaw → delta <= 0
+          : s.raw - leaderRaw;  // s.raw <= leaderRaw → delta <= 0
+        deltaVsLeader = Math.round(rawDelta);
+      }
+      return {
+        branchId: s.branch.id,
+        branchName: s.branch.name,
+        branchColor: s.branch.color,
+        value: s.has ? s.raw : null,
+        display: def.format(s.raw, s.has),
+        rank,
+        isLeader: rank === 1,
+        deltaVsLeader,
+      };
+    });
+
+    return {
+      key: def.key,
+      label: def.label,
+      betterIsLower: def.betterIsLower,
+      cells,
+      leaderBranchId: leaderId,
+      hasAnyData: cells.some(c => c.value != null),
+    };
+  });
 }
 
 // ── Public: detail view ───────────────────────────────────────────────────────
