@@ -3,7 +3,8 @@
  * Powered by shared analyticsService snapshot.
  * Cross-synced with: academicsService, risksService, financeFees.
  */
-import { auth } from "./firebase";
+import { auth, db } from "./firebase";
+import { collection, onSnapshot } from "firebase/firestore";
 import {
   loadCoreSnapshot, invalidateCache,
   calculateAHI, calculatePassRate,
@@ -623,26 +624,68 @@ export async function fetchBranchDetail(branchId: string): Promise<BranchDetailD
 }
 
 // ── Real-time subscription (onSnapshot wrapper) ───────────────────────────────
+/**
+ * Hybrid live + polling subscription strategy:
+ *
+ *   1. Initial fetch — pulls full aggregated snapshot via `fetchBranchesComparison`
+ *      (heavy join across many collections; can't fit into a single onSnapshot).
+ *   2. Light onSnapshot on `schools/{uid}/branches` ONLY — fires immediately when
+ *      branch metadata (name, location, color) changes via the rename cascade
+ *      or any owner edit, triggering an immediate refetch + cache bust.
+ *   3. Background 60s poll — backstop for changes in OTHER collections
+ *      (students, attendance, fees, etc.) that don't have their own snapshot.
+ *
+ * Time-to-name-update: ~instant (onSnapshot latency, typically <2s).
+ * Previously: up to 60s (polling-only).
+ */
 export function subscribeBranchesComparison(
   onData: (d: BranchComparisonData) => void,
   onError: (e: Error) => void
 ): () => void {
   let cancelled = false;
+  let inflightRun = false;
   const uid = auth.currentUser?.uid;
   if (!uid) { onError(new Error("Not authenticated")); return () => {}; }
 
   const run = () => {
+    if (cancelled || inflightRun) return;
+    inflightRun = true;
     invalidateCache(`core:${uid}`);
     fetchBranchesComparison()
       .then(d => { if (!cancelled) onData(d); })
-      .catch(e => { if (!cancelled) onError(e as Error); });
+      .catch(e => { if (!cancelled) onError(e as Error); })
+      .finally(() => { inflightRun = false; });
   };
 
   run();
-  // Poll every 60s as lightweight real-time substitute (Firestore onSnapshot
-  // on multiple root collections would require composite listeners)
+
+  // ── Live branch snapshot — refetch on any branch doc change ──────────────
+  // This catches the rename cascade's branch-name update instantly. We
+  // skip the FIRST snapshot fire (initial fetch already did that data) by
+  // tracking the load state.
+  let snapInitialFired = false;
+  const branchesUnsub = onSnapshot(
+    collection(db, "schools", uid, "branches"),
+    () => {
+      if (!snapInitialFired) {
+        snapInitialFired = true;
+        return; // skip initial — `run()` above already covers it
+      }
+      run();
+    },
+    (err) => {
+      // Don't treat snapshot errors as fatal — polling still keeps page
+      // alive. Log so we know which path is degraded.
+      console.warn("[branchesService] live snapshot degraded, polling only:", err);
+    },
+  );
+
   const interval = setInterval(run, 60_000);
-  return () => { cancelled = true; clearInterval(interval); };
+  return () => {
+    cancelled = true;
+    clearInterval(interval);
+    branchesUnsub();
+  };
 }
 
 export function subscribeBranchDetail(
@@ -651,17 +694,40 @@ export function subscribeBranchDetail(
   onError: (e: Error) => void
 ): () => void {
   let cancelled = false;
+  let inflightRun = false;
   const uid = auth.currentUser?.uid;
   if (!uid) { onError(new Error("Not authenticated")); return () => {}; }
 
   const run = () => {
+    if (cancelled || inflightRun) return;
+    inflightRun = true;
     invalidateCache(`core:${uid}`);
     fetchBranchDetail(branchId)
       .then(d => { if (!cancelled) onData(d); })
-      .catch(e => { if (!cancelled) onError(e as Error); });
+      .catch(e => { if (!cancelled) onError(e as Error); })
+      .finally(() => { inflightRun = false; });
   };
 
   run();
+
+  // ── Live branch snapshot — refetch on any branch doc change ──────────────
+  let snapInitialFired = false;
+  const branchesUnsub = onSnapshot(
+    collection(db, "schools", uid, "branches"),
+    () => {
+      if (!snapInitialFired) {
+        snapInitialFired = true;
+        return;
+      }
+      run();
+    },
+    (err) => console.warn("[branchesService] detail live snapshot degraded:", err),
+  );
+
   const interval = setInterval(run, 60_000);
-  return () => { cancelled = true; clearInterval(interval); };
+  return () => {
+    cancelled = true;
+    clearInterval(interval);
+    branchesUnsub();
+  };
 }
