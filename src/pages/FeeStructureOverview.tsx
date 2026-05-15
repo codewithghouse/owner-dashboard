@@ -6,7 +6,7 @@ import { sendPrincipalNotificationEmail } from "@/lib/resend";
 import {
   Download, Loader2, Building2, DollarSign, Calendar, Filter,
   ChevronDown, FileSpreadsheet, AlertCircle, TrendingUp, X, Users,
-  Bell, Megaphone, Send, Layers,
+  Bell, Megaphone, Send, Layers, MessageCircle,
 } from "lucide-react";
 import {
   B1, T1, T3, T4, GREEN, RED, GOLD, VIOLET,
@@ -152,6 +152,110 @@ export default function FeeStructureOverview() {
       principals.find(p => p.branchId && p.branchId.toLowerCase() === branchName.toLowerCase()) ||
       null
     );
+  };
+
+  /* ── Send msg to parent — writes a principal_to_parent_notes doc directly
+   * addressed to the defaulter's parent. Looks up the student in the
+   * `students` collection (scoped by branchId + name + className) to get
+   * studentId + studentEmail, which the parent dashboard's reader requires
+   * via the dual-query pattern. The note appears in the parent's Principal
+   * Notes feed instantly via the real-time listener there.
+   *
+   * Per-row sending state keeps the spinner local to the clicked button so
+   * the rest of the table stays responsive.
+   */
+  const [msgSendingKey, setMsgSendingKey] = useState<string | null>(null);
+  const handleSendMsgToParent = async (
+    branchName: string,
+    d: StudentFeeRow & { branchName: string },
+  ) => {
+    const rowKey = `${branchName}::${d.studentName}::${d.className}::${d.rollNo || ""}`;
+    if (msgSendingKey) return;
+    const uid = auth.currentUser?.uid;
+    if (!uid) { toast.error("Not authenticated"); return; }
+    const principal = principalForBranch(branchName);
+    if (!principal) {
+      toast.error(`No principal assigned to "${branchName}". Assign one in Principal Management first.`);
+      return;
+    }
+    setMsgSendingKey(rowKey);
+    try {
+      // Resolve the student doc — need studentId + studentEmail so the
+      // parent's dual-key reader matches. Scope by branchId to avoid
+      // cross-branch collisions on common names.
+      const branchId = principal.branchId || "";
+      const studentsQ = branchId
+        ? query(
+            collection(db, "students"),
+            where("schoolId", "==", uid),
+            where("branchId", "==", branchId),
+          )
+        : query(collection(db, "students"), where("schoolId", "==", uid));
+      const sSnap = await getDocs(studentsQ);
+      const target = sSnap.docs.find(sd => {
+        const data = sd.data() as any;
+        const nameMatch = (data.name || "").toString().toLowerCase().trim() === d.studentName.toLowerCase().trim();
+        const classMatch = !d.className || (data.className || "").toString().toLowerCase().trim() === d.className.toLowerCase().trim();
+        return nameMatch && classMatch;
+      }) || sSnap.docs.find(sd => {
+        // Fallback — name-only match if className didn't line up.
+        const data = sd.data() as any;
+        return (data.name || "").toString().toLowerCase().trim() === d.studentName.toLowerCase().trim();
+      });
+
+      const studentId    = target?.id || "";
+      const studentEmail = ((target?.data() as any)?.email || "").toString().toLowerCase().trim();
+      const parentName   = (d.parentName || (target?.data() as any)?.parentName || "Parent").toString();
+
+      if (!studentId && !studentEmail) {
+        toast.error(`Couldn't find a student record for ${d.studentName}. Check Students Intelligence first.`);
+        return;
+      }
+
+      // Compose a polite-but-firm fee reminder. Includes the headline numbers
+      // and a clear ask. The parent sees this in their Principal Notes tab as
+      // a normal principal message.
+      const today = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+      const message =
+        `Dear Parent,\n\n` +
+        `This is a friendly reminder that the school fees for ${d.studentName}` +
+        `${d.className ? ` (Class ${d.className}${d.rollNo ? `, Roll ${d.rollNo}` : ""})` : ""} ` +
+        `are currently overdue.\n\n` +
+        `Pending balance: ₹ ${currency(d.pending)}\n` +
+        `Paid till date: ₹ ${currency(d.paid)}\n` +
+        `As on: ${today}\n\n` +
+        `Please clear the pending amount at your earliest convenience or contact the school office if you need help with a payment plan.\n\n` +
+        `— Principal, ${branchName}`;
+
+      await addDoc(collection(db, "principal_to_parent_notes"), {
+        // Identity / addressing
+        principalId:   principal.id,
+        principalName: principal.name || "Principal",
+        studentId:     studentId || "",
+        studentEmail:  studentEmail || "",
+        studentName:   d.studentName,
+        parentName,
+        className:     d.className || "",
+        schoolId:      uid,
+        branchId,
+        // Payload
+        subject: "Fee Reminder",
+        message,
+        from: "principal",
+        timestamp: serverTimestamp(),
+        read: false,
+        // Provenance — useful when auditing who triggered the auto-message
+        source: "owner_fee_defaulter_quick_send",
+        triggeredByOwnerUid: uid,
+      });
+
+      toast.success(`Fee reminder sent to ${parentName} (${d.studentName}'s parent).`);
+    } catch (err: any) {
+      console.error("[FeeStructure] send-msg-to-parent failed", err);
+      toast.error("Couldn't send message. Please try again.");
+    } finally {
+      setMsgSendingKey(null);
+    }
   };
 
   /* ── open notify modal (single or bulk) ─────────────────── */
@@ -564,13 +668,28 @@ export default function FeeStructureOverview() {
                                 {d.className}{d.rollNo ? ` · Roll ${d.rollNo}` : ""}
                               </p>
                             </div>
-                            <button
-                              onClick={() => openNotify("single", group.branchName, [d])}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-[10px] font-bold uppercase tracking-wider transition-all shrink-0"
-                              title="Notify principal"
-                            >
-                              <Bell className="w-3 h-3" /> Notify
-                            </button>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                onClick={() => openNotify("single", group.branchName, [d])}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-[10px] font-bold uppercase tracking-wider transition-all"
+                                title="Notify principal"
+                              >
+                                <Bell className="w-3 h-3" /> Notify
+                              </button>
+                              <button
+                                onClick={() => handleSendMsgToParent(group.branchName, d)}
+                                disabled={msgSendingKey === `${group.branchName}::${d.studentName}::${d.className}::${d.rollNo || ""}`}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-[10px] font-bold uppercase tracking-wider transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                                title="Send a fee reminder directly to the parent (appears in their Principal Notes)"
+                              >
+                                {msgSendingKey === `${group.branchName}::${d.studentName}::${d.className}::${d.rollNo || ""}` ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <MessageCircle className="w-3 h-3" />
+                                )}
+                                Send msg
+                              </button>
+                            </div>
                           </div>
                           <div className="grid grid-cols-2 gap-2">
                             <div className="rounded-lg bg-emerald-50 border border-emerald-100 px-2.5 py-1.5">
@@ -612,13 +731,28 @@ export default function FeeStructureOverview() {
                               <td className="py-2.5 px-5 text-xs font-extrabold text-emerald-600">₹ {currency(d.paid)}</td>
                               <td className="py-2.5 px-5 text-xs font-extrabold text-red-600">₹ {currency(d.pending)}</td>
                               <td className="py-2.5 px-5 text-right">
-                                <button
-                                  onClick={() => openNotify("single", group.branchName, [d])}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-[10px] font-bold uppercase tracking-wider transition-all"
-                                  title="Notify principal about this defaulter"
-                                >
-                                  <Bell className="w-3 h-3" /> Notify
-                                </button>
+                                <div className="inline-flex items-center gap-1.5">
+                                  <button
+                                    onClick={() => openNotify("single", group.branchName, [d])}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-[10px] font-bold uppercase tracking-wider transition-all"
+                                    title="Notify principal about this defaulter"
+                                  >
+                                    <Bell className="w-3 h-3" /> Notify
+                                  </button>
+                                  <button
+                                    onClick={() => handleSendMsgToParent(group.branchName, d)}
+                                    disabled={msgSendingKey === `${group.branchName}::${d.studentName}::${d.className}::${d.rollNo || ""}`}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-[10px] font-bold uppercase tracking-wider transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                                    title="Send a fee reminder directly to the parent (appears in their Principal Notes)"
+                                  >
+                                    {msgSendingKey === `${group.branchName}::${d.studentName}::${d.className}::${d.rollNo || ""}` ? (
+                                      <Loader2 className="w-3 h-3 animate-spin" />
+                                    ) : (
+                                      <MessageCircle className="w-3 h-3" />
+                                    )}
+                                    Send msg
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))}

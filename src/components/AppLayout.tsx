@@ -6,6 +6,7 @@ import {
   Menu, X, UserCog, LogOut, ShieldCheck, Bell,
   Clock, ShieldAlert, CheckCircle2, DollarSign as FeeIcon,
   Activity, Brain, ClipboardList, FileSpreadsheet, Trophy, Award,
+  MessageSquare,
 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import {
@@ -56,6 +57,7 @@ const navSections: { heading: string; items: { to: string; label: string; icon: 
       { to: "/teachers",            label: "Teacher Performance",  icon: GraduationCap },
       { to: "/teacher-leaderboard", label: "Teacher Leaderboard",  icon: Trophy },
       { to: "/principals",          label: "Principal Management", icon: UserCog },
+      { to: "/principal-notes",     label: "Principal Notes",      icon: MessageSquare },
       { to: "/deo",                 label: "DEO Management",       icon: ShieldCheck },
     ],
   },

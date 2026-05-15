@@ -32,6 +32,7 @@ const BranchesComparison   = lazy(() => import("@/pages/BranchesComparison"));
 const ReportsCenter        = lazy(() => import("@/pages/ReportsCenter"));
 const SettingsPage         = lazy(() => import("@/pages/SettingsPage"));
 const PrincipalManagement  = lazy(() => import("@/pages/PrincipalManagement"));
+const PrincipalNotes       = lazy(() => import("@/pages/PrincipalNotes"));
 const DEOManagement        = lazy(() => import("@/pages/DEOManagement"));
 const AuditLogPage         = lazy(() => import("@/pages/AuditLogPage"));
 const AIPredictorPage      = lazy(() => import("@/pages/AIPredictorPage"));
@@ -147,6 +148,7 @@ const App = () => {
                         <Route path="/branches/:id"          element={<BranchesComparison />} />
                         <Route path="/reports"               element={<ReportsCenter />} />
                         <Route path="/principals"            element={<PrincipalManagement />} />
+                        <Route path="/principal-notes"       element={<PrincipalNotes />} />
                         <Route path="/deo"                   element={<DEOManagement />} />
                         <Route path="/audit"                 element={<AuditLogPage />} />
                         <Route path="/ai-predictor"          element={<AIPredictorPage />} />
