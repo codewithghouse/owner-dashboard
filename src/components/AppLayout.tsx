@@ -9,6 +9,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   doc, getDoc, collection, query, where,
   onSnapshot, orderBy, limit
@@ -128,6 +129,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const bellRef                           = useRef<HTMLDivElement>(null);
   const location   = useLocation();
   const navigate   = useNavigate();
+  const isMobile   = useIsMobile();
 
   // ── Cmd+K / Ctrl+K global search shortcut ─────────────────────────────
   useEffect(() => {
@@ -289,8 +291,163 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         />
       )}
 
+      {/* Mobile Sidebar Drawer */}
+      <aside className={`
+        fixed inset-y-0 left-0 z-50 w-[300px] bg-white flex flex-col shrink-0
+        rounded-r-3xl shadow-[0_8px_48px_rgba(0,16,64,0.22)] transition-transform duration-300 ease-in-out lg:hidden
+        ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}
+      `}>
+        {/* ── Branded Header ── */}
+        <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid #f1f5f9", flexShrink: 0 }} className="safe-top">
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <img
+                src="/edullent-icon.png"
+                alt="Edullent"
+                style={{ width: 40, height: 40, borderRadius: 12, objectFit: "contain", boxShadow: "0 4px 12px rgba(0,16,64,0.18)" }}
+                draggable={false}
+              />
+              <div>
+                <p style={{ fontSize: 15, fontWeight: 800, color: "#1e294b", letterSpacing: "-0.3px", margin: 0, textTransform: "uppercase" }}>
+                  {getSchoolCode(schoolData?.schoolName) || "EDULLENT"}
+                </p>
+                <p style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", margin: "2px 0 0" }}>
+                  Owner Dashboard
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              aria-label="Close sidebar"
+              style={{ width: 32, height: 32, borderRadius: 8, border: "none", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#94a3b8" }}
+            >
+              <X style={{ width: 18, height: 18 }} />
+            </button>
+          </div>
+        </div>
+
+        {/* ── Nav Items ── */}
+        <nav style={{ flex: 1, overflowY: "auto", padding: "12px 12px", overscrollBehavior: "contain" }}>
+          {navSections.map((section, idx) => (
+            <div key={section.heading} style={{ marginTop: idx === 0 ? 0 : 20 }}>
+              <p style={{ fontSize: 10, fontWeight: 800, color: "#94a3b8", letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 6px", padding: "0 10px" }}>
+                {section.heading}
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                {section.items.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.to === "/"}
+                    onClick={() => setIsSidebarOpen(false)}
+                    style={({ isActive }) => ({
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "11px 14px",
+                      borderRadius: 12,
+                      fontSize: 14,
+                      fontWeight: isActive ? 700 : 500,
+                      color: isActive ? "#fff" : "#374151",
+                      background: isActive ? "#1e3a8a" : "transparent",
+                      textDecoration: "none",
+                      transition: "all 0.18s ease",
+                    })}
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <item.icon style={{ width: 18, height: 18, color: isActive ? "#fff" : "#6b7280", flexShrink: 0 }} />
+                        {item.label}
+                      </>
+                    )}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {/* Settings at bottom of nav */}
+          <div style={{ marginTop: 20, borderTop: "1px solid #f1f5f9", paddingTop: 12 }}>
+            <NavLink
+              to={settingsItem.to}
+              onClick={() => setIsSidebarOpen(false)}
+              style={({ isActive }) => ({
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                padding: "11px 14px",
+                borderRadius: 12,
+                fontSize: 14,
+                fontWeight: isActive ? 700 : 500,
+                color: isActive ? "#fff" : "#374151",
+                background: isActive ? "#1e3a8a" : "transparent",
+                textDecoration: "none",
+                transition: "all 0.18s ease",
+              })}
+            >
+              {({ isActive }) => (
+                <>
+                  <settingsItem.icon style={{ width: 18, height: 18, color: isActive ? "#fff" : "#6b7280", flexShrink: 0 }} />
+                  {settingsItem.label}
+                </>
+              )}
+            </NavLink>
+          </div>
+        </nav>
+
+        {/* ── User Info + Sign Out ── */}
+        <div style={{ borderTop: "1px solid #f1f5f9", padding: "14px 16px", flexShrink: 0, paddingBottom: "max(14px, env(safe-area-inset-bottom))" }}>
+          {/* User card */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+            <div style={{
+              width: 42, height: 42, borderRadius: "50%",
+              background: "linear-gradient(135deg, #1e294b 0%, #1e3a8a 100%)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 14, fontWeight: 800, color: "#fff", flexShrink: 0,
+              boxShadow: "0 4px 12px rgba(30,58,138,0.25)"
+            }}>
+              {getInitials(schoolData?.ownerName)}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {schoolData?.ownerName || "School Owner"}
+              </p>
+              <p style={{ fontSize: 10, fontWeight: 600, color: "#94a3b8", margin: "2px 0 0", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                {schoolData?.role || "Owner"}
+              </p>
+            </div>
+          </div>
+
+          {/* Sign Out */}
+          <button
+            onClick={handleLogout}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "10px 14px",
+              borderRadius: 12,
+              fontSize: 13,
+              fontWeight: 700,
+              color: "#ef4444",
+              background: "#fff5f5",
+              border: "none",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              transition: "background 0.15s ease",
+            }}
+          >
+            <LogOut style={{ width: 16, height: 16 }} />
+            Sign Out
+          </button>
+        </div>
+      </aside>
+
+
+
       {/* ── Top Header (floating) ─────────────────────────────────────── */}
-      <header className="min-h-14 lg:min-h-16 safe-top bg-white flex items-center justify-between px-4 lg:px-6 shrink-0 z-30 gap-4 mx-3 mt-3 rounded-2xl border border-slate-100 shadow-[0_4px_24px_rgba(0,16,64,.06)]">
+      <header className="dash-card min-h-14 lg:min-h-16 safe-top bg-white flex items-center justify-between px-4 lg:px-6 shrink-0 z-30 gap-4 mx-3 mt-3 rounded-2xl border border-slate-100 shadow-[0_4px_24px_rgba(0,16,64,.06)]">
         {/* Mobile menu button + School identifier */}
         <div className="flex items-center gap-3 min-w-0">
           <button
@@ -335,77 +492,136 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             {/* ── Notification panel ── */}
             {bellOpen && (
-              <div className="absolute right-0 top-12 w-80 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in slide-in-from-top-2 duration-200 z-50">
-                {/* Header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-50">
-                  <div>
-                    <h3 className="text-sm font-black text-[#1e293b]">Notifications</h3>
-                    {unreadCount > 0 && (
-                      <p className="text-[10px] text-slate-400 font-medium">{unreadCount} unread</p>
+              <>
+                {/* Full-screen backdrop — closes on tap outside */}
+                <div
+                  style={{
+                    position: "fixed",
+                    inset: 0,
+                    zIndex: 998,
+                    background: isMobile ? "rgba(0,0,0,0.18)" : "transparent",
+                  }}
+                  onClick={() => setBellOpen(false)}
+                />
+
+                {/* Panel */}
+                <div
+                  style={{
+                    position: isMobile ? "fixed" : "absolute",
+                    // Mobile: stretch edge-to-edge, 12px from each side, just below header
+                    ...(isMobile ? {
+                      left: 12,
+                      right: 12,
+                      top: 78,
+                      width: "auto",
+                    } : {
+                      // Desktop: drop down from bell button, right-aligned, fixed width
+                      right: 0,
+                      top: "calc(100% + 8px)",
+                      width: 340,
+                    }),
+                    zIndex: 999,
+                    background: "#fff",
+                    borderRadius: 20,
+                    boxShadow: "0 8px 32px rgba(15,23,42,0.14), 0 2px 8px rgba(15,23,42,0.06), 0 0 0 1px rgba(15,23,42,0.06)",
+                    overflow: "hidden",
+                    display: "flex",
+                    flexDirection: "column",
+                    maxHeight: isMobile ? "calc(100svh - 100px)" : 480,
+                  }}
+                >
+                  {/* Header */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #f1f5f9", flexShrink: 0 }}>
+                    <div>
+                      <p style={{ fontSize: 14, fontWeight: 800, color: "#1e293b", margin: 0 }}>Notifications</p>
+                      {unreadCount > 0 && (
+                        <p style={{ fontSize: 10, color: "#94a3b8", fontWeight: 500, margin: "2px 0 0" }}>{unreadCount} unread</p>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={markAllRead}
+                          style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 10px", borderRadius: 8, background: "#f8fafc", border: "none", fontSize: 10, fontWeight: 800, color: "#64748b", cursor: "pointer", fontFamily: "inherit", textTransform: "uppercase", letterSpacing: "0.06em" }}
+                        >
+                          <CheckCircle2 style={{ width: 12, height: 12 }} /> Mark all read
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setBellOpen(false)}
+                        style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 8, background: "#f8fafc", border: "none", cursor: "pointer", color: "#94a3b8" }}
+                        aria-label="Close"
+                      >
+                        <X style={{ width: 16, height: 16 }} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Items */}
+                  <div style={{ flex: 1, overflowY: "auto", overscrollBehavior: "contain" }}>
+                    {notifications.length === 0 ? (
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 20px", gap: 12 }}>
+                        <div style={{ width: 48, height: 48, borderRadius: 16, background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <Bell style={{ width: 22, height: 22, color: "#cbd5e1" }} />
+                        </div>
+                        <p style={{ fontSize: 13, fontWeight: 700, color: "#cbd5e1", margin: 0 }}>No notifications yet</p>
+                        <p style={{ fontSize: 11, color: "#e2e8f0", margin: 0 }}>You’re all caught up!</p>
+                      </div>
+                    ) : (
+                      notifications.map(n => (
+                        <button
+                          key={n.id}
+                          onClick={() => handleNotifClick(n)}
+                          style={{
+                            width: "100%",
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: 12,
+                            padding: "14px 20px",
+                            textAlign: "left",
+                            borderBottom: "1px solid #f8fafc",
+                            background: !n.read ? "rgba(239,246,255,0.6)" : "transparent",
+                            border: "none",
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                            transition: "background 0.15s ease",
+                          }}
+                        >
+                          <div style={{
+                            width: 36, height: 36, borderRadius: 10, flexShrink: 0, marginTop: 2,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            background: n.type === "deo_request" ? "#fffbeb" : n.type === "risk_alert" ? "#fff1f2" : "#eff6ff",
+                          }}>
+                            <NotifIcon type={n.type} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                              <p style={{ fontSize: 12, fontWeight: 800, color: "#1e293b", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.title}</p>
+                              {!n.read && <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#1e3a8a", flexShrink: 0 }} />}
+                            </div>
+                            <p style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500, margin: "3px 0 0", lineHeight: 1.5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{n.body}</p>
+                            <p style={{ fontSize: 10, color: "#cbd5e1", fontWeight: 700, margin: "4px 0 0", display: "flex", alignItems: "center", gap: 4 }}>
+                              <Clock style={{ width: 10, height: 10 }} /> {timeAgo(n.ts)}
+                            </p>
+                          </div>
+                        </button>
+                      ))
                     )}
                   </div>
-                  {unreadCount > 0 && (
-                    <button
-                      onClick={markAllRead}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-50 text-[10px] font-black text-slate-500 hover:bg-blue-50 hover:text-[#1e3a8a] transition-all uppercase tracking-wide"
-                    >
-                      <CheckCircle2 className="w-3 h-3" /> Mark all read
-                    </button>
-                  )}
-                </div>
 
-                {/* Items */}
-                <div className="max-h-[360px] overflow-y-auto">
-                  {notifications.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 gap-3">
-                      <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center">
-                        <Bell className="w-6 h-6 text-slate-200" />
-                      </div>
-                      <p className="text-xs font-bold text-slate-300">No notifications yet</p>
-                    </div>
-                  ) : (
-                    notifications.map(n => (
+                  {/* Footer */}
+                  {notifications.length > 0 && (
+                    <div style={{ padding: "12px 20px", borderTop: "1px solid #f1f5f9", flexShrink: 0 }}>
                       <button
-                        key={n.id}
-                        onClick={() => handleNotifClick(n)}
-                        className={`w-full flex items-start gap-3 px-5 py-4 text-left border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors ${!n.read ? "bg-blue-50/40" : ""}`}
+                        onClick={() => { setBellOpen(false); navigate("/risks"); }}
+                        style={{ width: "100%", textAlign: "center", fontSize: 11, fontWeight: 800, color: "#1e3a8a", background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit", textTransform: "uppercase", letterSpacing: "0.1em" }}
                       >
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
-                          n.type === "deo_request" ? "bg-amber-50" :
-                          n.type === "risk_alert"  ? "bg-rose-50"  :
-                          "bg-blue-50"
-                        }`}>
-                          <NotifIcon type={n.type} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-xs font-black text-[#1e293b] truncate">{n.title}</p>
-                            {!n.read && (
-                              <span className="w-2 h-2 rounded-full bg-[#1e3a8a] shrink-0" />
-                            )}
-                          </div>
-                          <p className="text-[11px] text-slate-400 font-medium mt-0.5 leading-relaxed line-clamp-2">{n.body}</p>
-                          <p className="text-[10px] text-slate-300 font-bold mt-1 flex items-center gap-1">
-                            <Clock className="w-2.5 h-2.5" /> {timeAgo(n.ts)}
-                          </p>
-                        </div>
+                        View all alerts →
                       </button>
-                    ))
+                    </div>
                   )}
                 </div>
-
-                {/* Footer */}
-                {notifications.length > 0 && (
-                  <div className="px-5 py-3 border-t border-slate-50">
-                    <button
-                      onClick={() => { setBellOpen(false); navigate("/risks"); }}
-                      className="w-full text-center text-[11px] font-black text-[#1e3a8a] hover:text-blue-700 transition-colors uppercase tracking-widest"
-                    >
-                      View all alerts →
-                    </button>
-                  </div>
-                )}
-              </div>
+              </>
             )}
           </div>
 
@@ -445,22 +661,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* ── Body: Sidebar + Page Content ─────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden min-h-0 min-w-0">
 
-      {/* Sidebar */}
-      <aside className={`
-        fixed inset-y-0 left-0 z-50 w-[280px] bg-white border border-slate-100 flex flex-col shrink-0
-        rounded-r-3xl shadow-[0_4px_24px_rgba(0,16,64,.06)]
-        transition-all duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-auto lg:my-3 lg:ml-3 lg:rounded-3xl
-        ${isSidebarOpen ? "translate-x-0 shadow-xl" : "-translate-x-full"}
-      `}>
-        <div className="flex items-center justify-end px-3 py-3 lg:hidden safe-top">
-          <button
-            className="p-2 text-slate-400 hover:text-[#1e3a8a] transition-colors"
-            onClick={() => setIsSidebarOpen(false)}
-            aria-label="Close sidebar"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+      {/* Desktop Sidebar */}
+      <aside className="
+        dash-card hidden lg:flex flex-col shrink-0 w-[280px] bg-white border border-slate-100
+        my-3 ml-3 rounded-3xl shadow-[0_4px_24px_rgba(0,16,64,.06)]
+      ">
         <nav className="flex-1 px-3 py-4 overflow-y-auto">
           {navSections.map((section, idx) => (
             <div key={section.heading} className={idx === 0 ? "" : "mt-5"}>
@@ -514,9 +719,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
+
       {/* Main */}
-      <main className="flex-1 overflow-y-auto overflow-x-hidden bg-[#EEF4FF] min-w-0">
-        <div className="p-4 lg:px-8 lg:pt-6 lg:pb-8 mb-[calc(5rem+env(safe-area-inset-bottom))] lg:mb-0 max-w-full">
+      <main className="flex-1 overflow-y-auto overflow-x-clip bg-[#EEF4FF] min-w-0 w-full">
+        <div className="p-4 lg:px-8 lg:pt-6 lg:pb-8 mb-[calc(5rem+env(safe-area-inset-bottom))] lg:mb-0 max-w-full box-border">
           {children}
         </div>
       </main>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { db, auth } from "@/lib/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
@@ -187,6 +187,19 @@ export default function FinanceFees() {
   const [loading,   setLoading]   = useState(true);
   const [search,    setSearch]    = useState("");
   const [branchFilter, setBranchFilter] = useState<string>("All");
+  const [branchDropdownOpen, setBranchDropdownOpen] = useState(false);
+  const branchDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (branchDropdownRef.current && !branchDropdownRef.current.contains(event.target as Node)) {
+        setBranchDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   // Click-to-filter from the Class Fee Breakdown grid. Stores the
   // normalised class key so "10B" / "Class 10" / "Grade 10" all match.
   const [selectedClassKey, setSelectedClassKey] = useState<string>("All");
@@ -777,7 +790,7 @@ export default function FinanceFees() {
   return (
     <>
       <DashGlobalStyles />
-      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap: isMobile ? 16 : 24 }}>
+      <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", gap: isMobile ? 16 : 24, overflowX:"hidden", maxWidth:"100%", boxSizing:"border-box" }}>
 
       <PageHead
         icon={Wallet}
@@ -790,25 +803,97 @@ export default function FinanceFees() {
                 <Filter size={12}/> Branch
               </div>
             )}
-            <div style={{ position:"relative", width: isMobile ? "100%" : "auto" }}>
-              <Building2 size={13} color={T4} style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}/>
-              <select
-                value={branchFilter}
-                onChange={e => setBranchFilter(e.target.value)}
+            <div ref={branchDropdownRef} style={{ position:"relative", width: isMobile ? "100%" : "auto" }}>
+              <button
+                onClick={() => setBranchDropdownOpen(!branchDropdownOpen)}
                 style={{
-                  appearance:"none", padding: isMobile ? "10px 34px 10px 34px" : "10px 34px 10px 34px",
-                  borderRadius:12, border:"0.5px solid rgba(0,85,255,.12)",
-                  background:"#fff", boxShadow:SHADOW_SM,
-                  fontSize:12, fontWeight:700, color:T3,
-                  outline:"none", fontFamily:"inherit", cursor:"pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "10px 34px 10px 34px",
+                  borderRadius: 12,
+                  border: "0.5px solid rgba(0,85,255,.12)",
+                  background: "#fff",
+                  boxShadow: SHADOW_SM,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: T3,
+                  outline: "none",
+                  fontFamily: "inherit",
+                  cursor: "pointer",
                   width: isMobile ? "100%" : "auto",
                   minWidth: isMobile ? 0 : 160,
+                  textAlign: "left",
                 }}
               >
-                <option value="All">All Branches</option>
-                {branchNames.map(b => <option key={b} value={b}>{b}</option>)}
-              </select>
-              <ChevronDown size={13} color={T4} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}/>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Building2 size={13} color={T4} strokeWidth={2.5} />
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {branchFilter === "All" ? "All Branches" : branchFilter}
+                  </span>
+                </div>
+                <ChevronDown size={13} color={T4} style={{ marginLeft: 8 }} />
+              </button>
+
+              {branchDropdownOpen && (
+                <div
+                  className="dash-card"
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 6px)",
+                    right: 0,
+                    left: isMobile ? 0 : "auto",
+                    zIndex: 50,
+                    minWidth: 220,
+                    background: "#fff",
+                    border: "1px solid rgba(0,85,255,.08)",
+                    borderRadius: 14,
+                    boxShadow: "0 10px 30px rgba(0, 16, 64, 0.12)",
+                    overflow: "hidden",
+                    padding: "4px 0",
+                  }}
+                >
+                  {[
+                    { value: "All", label: "All Branches" },
+                    ...branchNames.map(b => ({ value: b, label: b }))
+                  ].map(opt => {
+                    const active = branchFilter === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        onClick={() => {
+                          setBranchFilter(opt.value);
+                          setBranchDropdownOpen(false);
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "10px 16px",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: active ? B1 : T1,
+                          background: active ? "rgba(0,85,255,.06)" : "transparent",
+                          border: "none",
+                          textAlign: "left",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          transition: "background 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!active) e.currentTarget.style.background = "rgba(0,85,255,.03)";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!active) e.currentTarget.style.background = "transparent";
+                        }}
+                      >
+                        <span>{opt.label}</span>
+                        {active && <CheckCircle size={12} color={B1} strokeWidth={2.5} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         }

@@ -416,10 +416,10 @@ button {
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
-    /* Root horizontal-overflow guard — prevents stray wide elements (charts,
-       grids, fixed-width hero strips) from creating a horizontal scroll
-       that breaks mobile layout. */
-    overflow-x: hidden;
+    /* Root horizontal-overflow guard — use `clip` not `hidden` so that
+       3D-transformed children (perspective / tilt cards) cannot create
+       a scroll-able overflow region on mobile. */
+    overflow-x: clip;
     max-width: 100vw;
   }
 
@@ -432,15 +432,20 @@ button {
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior-y: none;
     text-rendering: optimizeLegibility;
-    overflow-x: hidden;
+    overflow-x: clip;
     max-width: 100vw;
+    /* Containment: browser layout engine clips overflow before paint */
+    contain: paint;
   }
 
   /* Belt-and-suspenders: the React mount node also clips overflow so
      transformed children (tilt/3D effects) cannot push the viewport wider
-     than the screen on mobile. */
+     than the screen on mobile.
+     NOTE: `overflow-x: clip` is intentionally used (not `hidden`) because
+     `clip` also clips positioned / transformed descendants that escape a
+     `hidden` boundary via 3D-transform stacking contexts. */
   #root {
-    overflow-x: hidden;
+    overflow-x: clip;
     max-width: 100vw;
   }
 
@@ -589,3 +594,63 @@ main > div,
 
 /* Stat number hover scale removed — was causing text blur on Windows
    sub-pixel rendering. Card translate3d lift is enough motion. */
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE OVERFLOW CONTAINMENT (critical — prevents horizontal scroll)
+   These rules stop 3D transforms, perspective containers, and wide
+   content from escaping the viewport on mobile devices.
+   ═══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 1023px) {
+  /* Disable 3D perspective on all grid containers on mobile.
+     Perspective is what allows translate3d children to visually
+     escape an overflow:hidden/clip boundary in WebKit/Blink. */
+  [class*="[perspective"] {
+    perspective: none !important;
+    transform-style: flat !important;
+  }
+
+  /* Prevent grid children from overflowing their cell.
+     Without min-width: 0, a grid child can be wider than its column
+     and push sibling columns (and the whole grid) off-screen. */
+  .grid > *,
+  [class*="grid-cols"] > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* Main scroll container must clip, not scroll, horizontally */
+  main {
+    overflow-x: clip !important;
+    max-width: 100vw;
+  }
+
+  /* Inner page wrapper — prevent padding/margin from adding to width */
+  main > div {
+    overflow-x: clip;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Disable translate3d lift on mobile — touch devices don't hover,
+     and the lift animation can cause flicker / layout jank on tap */
+  .dash3d:hover,
+  .dash-tile:hover,
+  .dash-card:hover {
+    transform: none !important;
+  }
+
+  /* Active press feedback instead of hover lift */
+  .dash3d:active,
+  .dash-tile:active {
+    transform: scale(0.98) !important;
+    transition: transform 0.1s ease !important;
+  }
+
+  /* Chart containers must never overflow their parent */
+  .recharts-wrapper,
+  .recharts-responsive-container {
+    max-width: 100% !important;
+    overflow: hidden !important;
+  }
+}

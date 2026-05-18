@@ -15,7 +15,7 @@ interface Props {
 const LeaderboardPanel: React.FC<Props> = ({
   network, branches, insights, selectedId, onSelect, isMobile,
 }) => {
-  const pad = isMobile ? "28px 16px 32px" : "32px 24px 32px";
+  const pad = isMobile ? "16px 0px 24px" : "32px 24px 32px";
 
   return (
     <div style={{

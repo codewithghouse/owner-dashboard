@@ -55,7 +55,7 @@ const DetailPanel: React.FC<Props> = ({ branch, insight, network, onBack, isMobi
 
   const trendUp = branch.trend === "up";
   const trendFlat = branch.trend === "same";
-  const pad = isMobile ? "20px 16px 36px" : "32px 28px 40px";
+  const pad = isMobile ? "16px 0px 24px" : "32px 28px 40px";
   const style = insight?.style;
   const headerGradient = style?.headerGradient
     || "linear-gradient(135deg, #001A66 0%, #0055FF 100%)";

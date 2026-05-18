@@ -327,8 +327,8 @@ export default function ReportsCenter() {
             {/* Header */}
             <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 md:gap-6 mb-6 md:mb-8">
               <div className="min-w-0">
-                <h2 className="text-base md:text-2xl font-black text-[#111827] tracking-tight mb-1 md:mb-2 truncate uppercase">{reportTitle}</h2>
-                <p className="text-slate-400 text-[9px] md:text-sm font-bold uppercase tracking-tight opacity-70 truncate">Generated on {(reportData as any).generatedOn}</p>
+                <h2 className="text-base md:text-2xl font-black text-[#111827] tracking-tight mb-1 md:mb-2 uppercase leading-tight break-words">{reportTitle}</h2>
+                <p className="text-slate-400 text-[9px] md:text-sm font-bold uppercase tracking-tight opacity-70">Generated on {(reportData as any).generatedOn}</p>
               </div>
               <div className="flex items-center gap-2 md:gap-3 w-full lg:w-auto">
                 <Button variant="outline" onClick={printReport} className="flex-1 lg:flex-none h-10 px-3 md:px-4 rounded-xl border-slate-200 text-[10px] md:text-xs font-black text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-1.5 md:gap-2 uppercase tracking-widest">
@@ -341,15 +341,40 @@ export default function ReportsCenter() {
             </div>
 
             {/* Tabs */}
-            <div className="flex items-center gap-1.5 md:gap-3 mb-6 md:mb-10 overflow-x-auto pb-1 -mx-1 px-1" style={{ WebkitOverflowScrolling: "touch" }}>
+            <div
+              className="no-scrollbar"
+              style={{
+                display: "flex",
+                gap: isMobile ? 6 : 12,
+                marginBottom: isMobile ? 24 : 40,
+                overflowX: "auto",
+                paddingBottom: 2,
+                WebkitOverflowScrolling: "touch",
+                scrollSnapType: "x mandatory",
+              }}
+            >
               {(["Preview", "Schedule", "Share", "Settings"] as const).map(tab => (
                 <button
                   key={tab}
                   type="button"
                   onClick={() => setActiveTab(tab)}
-                  className={`whitespace-nowrap px-3.5 md:px-8 py-2 md:py-2.5 rounded-lg md:rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
-                    activeTab === tab ? "bg-[#1e3a8a] text-white shadow-sm" : "bg-white text-slate-500 hover:bg-slate-50 border border-slate-100"
-                  }`}
+                  style={{
+                    flexShrink: 0,
+                    scrollSnapAlign: "start",
+                    padding: isMobile ? "8px 14px" : "10px 32px",
+                    borderRadius: isMobile ? 10 : 12,
+                    fontSize: isMobile ? 10 : 12,
+                    fontWeight: 800,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    border: activeTab === tab ? "none" : "1px solid #e2e8f0",
+                    background: activeTab === tab ? "#1e3a8a" : "#fff",
+                    color: activeTab === tab ? "#fff" : "#64748b",
+                    boxShadow: activeTab === tab ? "0 2px 8px rgba(30,58,138,0.25)" : "none",
+                    transition: "all 0.2s ease",
+                  }}
                 >
                   {tab}
                 </button>

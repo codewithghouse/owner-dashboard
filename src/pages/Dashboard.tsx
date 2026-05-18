@@ -573,21 +573,41 @@ export default function Dashboard() {
       };
 
       const risksUnsub = onSnapshot(
-        query(collection(db, "risks"), where("schoolId", "==", uid), orderBy("createdAt", "desc"), limit(ALERT_QUERY_LIMIT)),
-        snap => { risksAlerts = snap.docs.map(d => ({ id: d.id, ...d.data() as any })); mergeAndSet(); },
+        query(collection(db, "risks"), where("schoolId", "==", uid)),
+        snap => {
+          risksAlerts = snap.docs
+            .map(d => ({ id: d.id, ...d.data() as any }))
+            .sort((a, b) => {
+              const ta = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ?? 0) * 1000 || 0;
+              const tb = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ?? 0) * 1000 || 0;
+              return tb - ta;
+            })
+            .slice(0, ALERT_QUERY_LIMIT);
+          mergeAndSet();
+        },
         () => {
           // Permission-denied fallback: try the legacy `discipline` collection.
           // Capture the unsub so we don't leak on cleanup.
           disciplineFallbackUnsub = onSnapshot(
-            query(collection(db, "discipline"), where("schoolId", "==", uid), orderBy("createdAt", "desc"), limit(ALERT_QUERY_LIMIT)),
-            s => { risksAlerts = s.docs.map(d => ({ id: d.id, ...d.data() as any })); mergeAndSet(); },
+            query(collection(db, "discipline"), where("schoolId", "==", uid)),
+            s => {
+              risksAlerts = s.docs
+                .map(d => ({ id: d.id, ...d.data() as any }))
+                .sort((a, b) => {
+                  const ta = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ?? 0) * 1000 || 0;
+                  const tb = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ?? 0) * 1000 || 0;
+                  return tb - ta;
+                })
+                .slice(0, ALERT_QUERY_LIMIT);
+              mergeAndSet();
+            },
             err => console.warn("[Dashboard/discipline-fallback]", err.code),
           );
         },
       );
 
       const incidentsUnsub = onSnapshot(
-        query(collection(db, "incidents"), where("schoolId", "==", uid), orderBy("createdAt", "desc"), limit(ALERT_QUERY_LIMIT)),
+        query(collection(db, "incidents"), where("schoolId", "==", uid)),
         snap => {
           incidentAlerts = snap.docs
             .map(d => ({ id: d.id, ...d.data() as any }))
@@ -611,7 +631,13 @@ export default function Dashboard() {
                 // up to the red treatment; everything else stays as warning.
                 severity: (sev === "critical" || sev === "high") ? "critical" : "warning",
               };
-            });
+            })
+            .sort((a, b) => {
+              const ta = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ?? 0) * 1000 || 0;
+              const tb = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ?? 0) * 1000 || 0;
+              return tb - ta;
+            })
+            .slice(0, ALERT_QUERY_LIMIT);
           mergeAndSet();
         },
         err => console.warn("[Dashboard/incidents]", err.code),
@@ -689,16 +715,11 @@ export default function Dashboard() {
 
   return (
     <div
+      className="pb-8"
       style={{
         fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-        background: "#EEF4FF",
-        minHeight: "100vh",
-        // Mobile: no negative margin (was breaking layout into narrow right column).
-        margin: isMobile ? 0 : "-32px -32px 0",
-        padding: isMobile ? "8px 0 32px" : "24px 32px 40px",
-        width: "100%",
-        maxWidth: "100%",
         overflowX: "hidden",
+        maxWidth: "100%",
         boxSizing: "border-box",
       }}
     >
@@ -770,7 +791,7 @@ export default function Dashboard() {
               zIndex: 1,
             }}
           >
-            <div style={{ display: "flex", alignItems: "flex-start", gap: isMobile ? 12 : 16, flex: 1, minWidth: isMobile ? 0 : 300 }}>
+            <div className="flex items-start gap-3 md:gap-4 flex-1 min-w-0 md:min-w-[300px]">
               <div
                 style={{
                   width: isMobile ? 44 : 52,
@@ -795,7 +816,7 @@ export default function Dashboard() {
                 </p>
               </div>
             </div>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", width: isMobile ? "100%" : "auto" }}>
+            <div className="flex gap-[10px] flex-wrap w-full md:w-auto">
               <button
                 onClick={() => navigate("/branches")}
                 style={{
@@ -809,10 +830,9 @@ export default function Dashboard() {
                   textTransform: "uppercase",
                   border: "none",
                   cursor: "pointer",
-                  boxShadow: "0 4px 12px rgba(0,0,0,.18)",
                   fontFamily: "inherit",
-                  flex: isMobile ? 1 : "0 0 auto",
                 }}
+                className="flex-1 md:flex-none"
               >
                 Add First Branch
               </button>
@@ -828,24 +848,16 @@ export default function Dashboard() {
                   letterSpacing: "0.06em",
                   textTransform: "uppercase",
                   border: "0.5px solid rgba(255,255,255,.22)",
-                  cursor: "pointer",
                   fontFamily: "inherit",
-                  flex: isMobile ? 1 : "0 0 auto",
                 }}
+                className="flex-1 md:flex-none"
               >
                 Invite Principal
               </button>
             </div>
           </div>
           <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)",
-              gap: 12,
-              marginTop: isMobile ? 18 : 24,
-              position: "relative",
-              zIndex: 1,
-            }}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mt-4 md:mt-6 relative z-10"
           >
             {[
               { step: "1", label: "Add Branches",      href: "/branches" },
@@ -936,8 +948,8 @@ export default function Dashboard() {
               pointerEvents: "none",
             }}
           />
-          <div style={{ display: "flex", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: isMobile ? 14 : 24, flexWrap: "wrap", position: "relative", zIndex: 1 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 12 : 16 }}>
+          <div className="flex flex-wrap items-stretch md:items-center justify-between gap-3 md:gap-6 relative z-10">
+            <div className="flex items-center gap-3 md:gap-4">
               <div
                 style={{
                   width: isMobile ? 46 : 54,
@@ -964,16 +976,7 @@ export default function Dashboard() {
             </div>
 
             <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(3, 1fr)",
-                gap: 1,
-                background: "rgba(255,255,255,.12)",
-                borderRadius: 14,
-                overflow: "hidden",
-                minWidth: isMobile ? 0 : 340,
-                width: isMobile ? "100%" : "auto",
-              }}
+              className="grid grid-cols-3 gap-[1px] bg-white/10 rounded-xl overflow-hidden w-full md:w-auto md:min-w-[340px] mt-4 sm:mt-0"
             >
               {[
                 { v: branches.length, l: "Branches", c: "#fff", href: "/branches" },
@@ -1001,7 +1004,7 @@ export default function Dashboard() {
       )}
 
       {/* ── Bright Stat Grid (4 cards) ───────────────────── */}
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : isTablet ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: isMobile ? 10 : 14, marginBottom: isMobile ? 16 : 20, perspective: "1200px" }}>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-4 lg:mb-5 lg:[perspective:1200px]">
         {[
           {
             title: "Academic Health Index",
@@ -1094,7 +1097,7 @@ export default function Dashboard() {
               <DecoIcon size={isMobile ? 48 : 64} strokeWidth={2} />
             </div>
             {/* Solid icon badge — top-left */}
-            <div style={{ width: isMobile ? 36 : 44, height: isMobile ? 36 : 44, borderRadius: isMobile ? 10 : 12, display: "flex", alignItems: "center", justifyContent: "center", background: s.accent, marginBottom: isMobile ? 10 : 14, boxShadow: `0 4px 12px ${s.accent}33`, position: "relative", zIndex: 1 }}>
+            <div className="w-9 h-9 md:w-11 md:h-11 rounded-[10px] md:rounded-xl flex items-center justify-center mb-2.5 md:mb-3.5 relative z-10" style={{ background: s.accent, boxShadow: `0 4px 12px ${s.accent}33` }}>
               {s.icon}
             </div>
             <div style={{ fontSize: isMobile ? 9 : 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: s.lblColor, marginBottom: isMobile ? 6 : 8, position: "relative", zIndex: 1 }}>
@@ -1120,10 +1123,10 @@ export default function Dashboard() {
       </div>
 
       {/* ── Middle Row ───────────────────────────────────── */}
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : isTablet ? "repeat(2, 1fr)" : "repeat(12, 1fr)", gap: isMobile ? 12 : 14, marginBottom: isMobile ? 16 : 20, perspective: "1200px" }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3 lg:gap-4 mb-4 lg:mb-5 lg:[perspective:1200px]">
 
         {/* Branch Overview */}
-        <div {...tilt3D} onClick={() => navigate("/branches")} role="button" tabIndex={0} style={{ gridColumn: isMobile ? "span 1" : isTablet ? "span 1" : "span 4", background: "#fff", borderRadius: isMobile ? 20 : 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: isMobile ? "18px 18px" : "22px 24px", cursor: "pointer", ...tilt3DStyle }}>
+        <div {...tilt3D} onClick={() => navigate("/branches")} role="button" tabIndex={0} className="col-span-1 lg:col-span-4 p-4 md:p-6 bg-white border border-blue-500/10 shadow-lg cursor-pointer rounded-2xl md:rounded-3xl" style={{ ...tilt3DStyle }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
             <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: 0 }}>Branch Overview</h3>
             {branches.length > 0 && (
@@ -1173,7 +1176,7 @@ export default function Dashboard() {
         </div>
 
         {/* Risk Distribution */}
-        <div {...tilt3D} onClick={() => navigate("/risks")} role="button" tabIndex={0} style={{ gridColumn: isMobile ? "span 1" : isTablet ? "span 1" : "span 4", background: "#fff", borderRadius: isMobile ? 20 : 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: isMobile ? "18px 18px" : "22px 24px", cursor: "pointer", ...tilt3DStyle }}>
+        <div {...tilt3D} onClick={() => navigate("/risks")} role="button" tabIndex={0} className="col-span-1 lg:col-span-4 p-4 md:p-6 bg-white border border-blue-500/10 shadow-lg cursor-pointer rounded-2xl md:rounded-3xl" style={{ ...tilt3DStyle }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
             <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: 0 }}>Risk Distribution</h3>
             {branches.length > 0 && (
@@ -1236,7 +1239,7 @@ export default function Dashboard() {
         </div>
 
         {/* Revenue Trend — sourced from /api Finance & Fees data (collected + pending) */}
-        <div {...tilt3D} onClick={() => navigate("/finance")} role="button" tabIndex={0} style={{ gridColumn: isMobile ? "span 1" : isTablet ? "span 2" : "span 4", background: "#fff", borderRadius: isMobile ? 20 : 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: isMobile ? "18px 18px" : "22px 24px", cursor: "pointer", ...tilt3DStyle }}>
+        <div {...tilt3D} onClick={() => navigate("/finance")} role="button" tabIndex={0} className="col-span-1 md:col-span-2 lg:col-span-4 p-4 md:p-6 bg-white border border-blue-500/10 shadow-lg cursor-pointer rounded-2xl md:rounded-3xl" style={{ ...tilt3DStyle }}>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 8, margin: "0 0 14px 0" }}>
             <div>
               <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: 0 }}>Revenue Trend</h3>
@@ -1306,10 +1309,10 @@ export default function Dashboard() {
       </div>
 
       {/* ── Bottom Row ───────────────────────────────────── */}
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 12 : 14, marginBottom: isMobile ? 16 : 20, perspective: "1200px" }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-5 lg:[perspective:1200px]">
 
         {/* Critical Alerts */}
-        <div {...tilt3D} onClick={() => navigate("/risks")} role="button" tabIndex={0} style={{ background: "#fff", borderRadius: isMobile ? 20 : 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: isMobile ? "18px 18px" : "22px 24px", cursor: "pointer", ...tilt3DStyle }}>
+        <div {...tilt3D} onClick={() => navigate("/risks")} role="button" tabIndex={0} className="p-4 md:p-6 bg-white border border-blue-500/10 shadow-lg cursor-pointer rounded-2xl md:rounded-3xl" style={{ ...tilt3DStyle }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
             <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: 0 }}>Critical Alerts</h3>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1383,9 +1386,9 @@ export default function Dashboard() {
         {/* Quick Actions — only buttons that actually do something land here.
              Message Branches & Schedule Meeting were removed (dead navigations
              with no feature behind them). Re-add when the features ship. */}
-        <div {...tilt3D} style={{ background: "#fff", borderRadius: isMobile ? 20 : 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: isMobile ? "18px 18px" : "22px 24px", ...tilt3DStyle }}>
+        <div {...tilt3D} className="p-4 md:p-6 bg-white border border-blue-500/10 shadow-lg rounded-2xl md:rounded-3xl" style={{ ...tilt3DStyle }}>
           <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: "0 0 16px 0" }}>Quick Actions</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: isMobile ? 10 : 12 }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
               onClick={() => navigate("/reports")}
               style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 12, padding: isMobile ? 14 : 18, borderRadius: 16, background: GRAD_PRIMARY, color: "#fff", border: "none", boxShadow: SHADOW_BTN, cursor: "pointer", textAlign: "left", fontFamily: "inherit", position: "relative", overflow: "hidden" }}
@@ -1411,7 +1414,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Improvement Timeline ─────────────────────────── */}
-      <div {...tilt3D} onClick={() => navigate("/academics")} role="button" tabIndex={0} style={{ background: "#fff", borderRadius: isMobile ? 20 : 24, border: "0.5px solid rgba(0,85,255,.10)", boxShadow: SHADOW_LG, padding: isMobile ? "18px 18px" : "22px 24px", marginBottom: isMobile ? 16 : 20, perspective: "1200px", cursor: "pointer", ...tilt3DStyle }}>
+      <div {...tilt3D} onClick={() => navigate("/academics")} role="button" tabIndex={0} className="p-4 md:p-6 bg-white border border-blue-500/10 shadow-lg cursor-pointer rounded-2xl md:rounded-3xl mb-4 md:mb-5" style={{ ...tilt3DStyle }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
           <div>
             <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: 0 }}>School Improvement Timeline</h3>

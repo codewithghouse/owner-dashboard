@@ -110,7 +110,7 @@ const OwnerDashboard: React.FC = () => {
   // Desktop (≥1024px) — analytics-style layout.
   if (isDesktop && data) {
     return (
-      <div style={{ margin: "-40px" }}>
+      <div style={{ margin: "-24px -32px 0" }}>
         <OwnerDashboardDesktop
           data={data}
           selectedId={selectedId}
@@ -125,7 +125,6 @@ const OwnerDashboard: React.FC = () => {
   if (isMobile) {
     return (
       <div style={{
-        margin: "-16px -16px -80px",
         background: T.pageBg, fontFamily: FONT, minHeight: "calc(100vh - 64px)",
       }}>
         {mobileScreen === "list" && (
@@ -148,11 +147,11 @@ const OwnerDashboard: React.FC = () => {
   const panelHeight = "calc(100vh - 80px)";
   return (
     <div style={{
-      margin: "-40px", background: T.pageBg, display: "flex",
+      background: T.pageBg, display: "flex",
       fontFamily: FONT, height: panelHeight,
     }}>
       <div style={{
-        width: 380, flexShrink: 0, height: "100%",
+        width: 340, flexShrink: 0, height: "100%",
         overflowY: "auto", borderRight: T.BORDER,
       }}>
         <LeaderboardPanel

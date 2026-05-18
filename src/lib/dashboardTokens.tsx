@@ -86,7 +86,9 @@ export function usePageShellStyle(): React.CSSProperties {
     boxSizing: "border-box",
     width: "100%",
     maxWidth: "100%",
-    overflowX: "hidden",
+    // Use `clip` not `hidden` — clip also contains 3D-transformed children
+    // that escape an overflow:hidden boundary via stacking context promotion.
+    overflowX: "clip",
   };
 }
 

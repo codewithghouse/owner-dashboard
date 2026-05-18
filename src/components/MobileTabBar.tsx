@@ -29,7 +29,7 @@ export default function MobileTabBar({ onMoreClick, hidden }: Props) {
     <nav
       aria-label="Primary"
       className={`
-        lg:hidden fixed bottom-0 inset-x-0 z-40
+        lg:hidden fixed bottom-0 inset-x-0 z-30
         bg-white/95 backdrop-blur-xl border-t border-slate-200/70
         shadow-[0_-4px_24px_rgba(0,16,64,.06)]
         transition-transform duration-200
