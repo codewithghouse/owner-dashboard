@@ -39,6 +39,7 @@ const AIPredictorPage      = lazy(() => import("@/pages/AIPredictorPage"));
 const TeacherLeaderboard   = lazy(() => import("@/pages/TeacherLeaderboard"));
 const OwnerDashboard       = lazy(() => import("@/pages/owner/OwnerDashboard"));
 const ParentPortal         = lazy(() => import("@/pages/ParentPortal"));
+const Help                 = lazy(() => import("@/pages/Help"));
 const NotFound             = lazy(() => import("@/pages/NotFound"));
 
 const RouteFallback = () => (
@@ -154,6 +155,7 @@ const App = () => {
                         <Route path="/ai-predictor"          element={<AIPredictorPage />} />
                         <Route path="/teacher-leaderboard"   element={<TeacherLeaderboard />} />
                         <Route path="/branch-leaderboard"    element={<OwnerDashboard />} />
+                        <Route path="/help"                  element={<Help />} />
                         <Route path="/settings"              element={<SettingsPage />} />
                         <Route path="*"                      element={<NotFound />} />
                       </Routes>

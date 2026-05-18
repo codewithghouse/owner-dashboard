@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
-  DollarSign, AlertTriangle, GitBranch, FileText, Settings,
+  DollarSign, AlertTriangle, GitBranch, FileText, Settings, LifeBuoy,
   Menu, X, UserCog, LogOut, ShieldCheck, Bell,
   Clock, ShieldAlert, CheckCircle2, DollarSign as FeeIcon,
   Activity, Brain, ClipboardList, FileSpreadsheet, Trophy, Award,
@@ -75,6 +75,12 @@ const navSections: { heading: string; items: { to: string; label: string; icon: 
     items: [
       { to: "/reports", label: "Reports Center", icon: FileText },
       { to: "/audit",   label: "Activity Log",   icon: Activity },
+    ],
+  },
+  {
+    heading: "Support",
+    items: [
+      { to: "/help", label: "Help & Support", icon: LifeBuoy },
     ],
   },
 ];
