@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Printer, MessageSquare, AlertCircle, Loader2, ChevronLeft, ChevronRight, CheckCircle2, FileText, BookOpen, Calendar, TrendingUp, BarChart3, Activity, Star, Lightbulb } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, Radar } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { tilt3D, tilt3DStyle } from "@/lib/use3DTilt";
+import { SubjectMasteryRadar } from "@/components/SubjectMasteryRadar";
 import { toast } from "sonner";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
@@ -655,14 +656,8 @@ const StudentProfile = () => {
 
           <Card icon={BookOpen} accent="#7c3aed" staticTilt={exporting} title="Subject Mastery" action={<DetailLink />}>
             {radarData.length >= 3 && (
-              <div style={{ height: 180, marginBottom: 12 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
-                    <PolarGrid stroke={T.s2} />
-                    <PolarAngleAxis dataKey="subject" tick={{ fill: T.ink3, fontSize: 10 }} />
-                    <Radar dataKey="score" stroke={T.blue} fill={T.blue} fillOpacity={0.15} strokeWidth={2} />
-                  </RadarChart>
-                </ResponsiveContainer>
+              <div style={{ marginBottom: 12 }}>
+                <SubjectMasteryRadar data={radarData} color={T.blue} height={200} />
               </div>
             )}
             {subEntries.map(([sub, sc]) => (
