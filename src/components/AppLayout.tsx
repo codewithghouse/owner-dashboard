@@ -297,9 +297,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      {/* Mobile Sidebar Drawer */}
+      {/* Mobile Sidebar Drawer — `dash-card` opts out of the global
+          .bg-white[rounded-]:not(.dash-card) rule that overrides `fixed`
+          with `position: relative`, which would otherwise push the header
+          and content below the viewport on mobile (blank dashboard). */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-[300px] bg-white flex flex-col shrink-0
+        dash-card fixed inset-y-0 left-0 z-50 w-[300px] bg-white flex flex-col shrink-0
         rounded-r-3xl shadow-[0_8px_48px_rgba(0,16,64,0.22)] transition-transform duration-300 ease-in-out lg:hidden
         ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}
       `}>
