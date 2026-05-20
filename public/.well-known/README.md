@@ -25,7 +25,7 @@ opens this PWA fullscreen WITHOUT a Chrome URL bar.
    `REPLACE_WITH_YOUR_APP_SIGNING_FINGERPRINT_FROM_PLAY_CONSOLE`).
 
 5. Deploy. Verify at:
-   `https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://YOUR_DOMAIN&relation=delegate_permission/common.handle_all_urls`
+   `https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://owner.edullent.com&relation=delegate_permission/common.handle_all_urls`
 
 ## Package name
 

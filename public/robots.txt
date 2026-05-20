@@ -29,4 +29,4 @@ Disallow: /parent-portal
 Disallow: /api/
 
 # Sitemap (uncomment + create public/sitemap.xml when you have marketing pages).
-# Sitemap: https://owner-dashboard-blue.vercel.app/sitemap.xml
+# Sitemap: https://owner.edullent.com/sitemap.xml

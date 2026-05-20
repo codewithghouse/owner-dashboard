@@ -28,7 +28,7 @@ bubblewrap doctor
 From this directory (`owner-dashboard/bubblewrap/`):
 
 ```bash
-bubblewrap init --manifest=https://owner-dashboard-blue.vercel.app/manifest.webmanifest
+bubblewrap init --manifest=https://owner.edullent.com/manifest.webmanifest
 ```
 
 When prompted:
@@ -73,7 +73,7 @@ owner-dashboard/public/.well-known/assetlinks.json
 After deploy:
 
 ```bash
-curl "https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://owner-dashboard-blue.vercel.app&relation=delegate_permission/common.handle_all_urls"
+curl "https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://owner.edullent.com&relation=delegate_permission/common.handle_all_urls"
 ```
 
 Response should include your `package_name` + fingerprint. If empty, fingerprint mismatch — TWA will show the Chrome URL bar.
@@ -100,7 +100,7 @@ Open the app. URL bar should be **invisible** (proof: assetlinks.json is reachab
    - **Feature graphic:** 1024×500 (create separately)
    - **Phone screenshots:** 4–8 captures
    - **Tablet screenshots:** 4–8 captures
-   - **Privacy Policy URL:** `https://owner-dashboard-blue.vercel.app/privacy`
+   - **Privacy Policy URL:** `https://owner.edullent.com/privacy`
 4. App content:
    - **Data safety:** Declare every item from privacy policy (student names, attendance, marks, parent emails, etc.) as collected + shared with Firebase + needed for app functionality. Do NOT declare ads/analytics if you aren't using them.
    - **Target audience:** Schools and educators only

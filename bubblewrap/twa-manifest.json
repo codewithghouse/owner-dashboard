@@ -1,6 +1,6 @@
 {
   "packageId": "com.edullent.owner",
-  "host": "owner-dashboard-blue.vercel.app",
+  "host": "owner.edullent.com",
   "name": "Edullent — Owner",
   "launcherName": "Edullent",
   "display": "standalone",
@@ -13,31 +13,31 @@
   "backgroundColor": "#EEF4FF",
   "enableNotifications": false,
   "startUrl": "/?source=twa",
-  "iconUrl": "https://owner-dashboard-blue.vercel.app/icons/icon-512x512.png",
-  "maskableIconUrl": "https://owner-dashboard-blue.vercel.app/icons/icon-512-maskable.png",
+  "iconUrl": "https://owner.edullent.com/icons/icon-512x512.png",
+  "maskableIconUrl": "https://owner.edullent.com/icons/icon-512-maskable.png",
   "monochromeIconUrl": null,
   "shortcuts": [
     {
       "name": "Dashboard",
       "shortName": "Home",
       "url": "/?source=shortcut",
-      "iconUrl": "https://owner-dashboard-blue.vercel.app/icons/icon-96x96.png"
+      "iconUrl": "https://owner.edullent.com/icons/icon-96x96.png"
     },
     {
       "name": "Branches",
       "shortName": "Branches",
       "url": "/branches?source=shortcut",
-      "iconUrl": "https://owner-dashboard-blue.vercel.app/icons/icon-96x96.png"
+      "iconUrl": "https://owner.edullent.com/icons/icon-96x96.png"
     },
     {
       "name": "Finance",
       "shortName": "Finance",
       "url": "/finance?source=shortcut",
-      "iconUrl": "https://owner-dashboard-blue.vercel.app/icons/icon-96x96.png"
+      "iconUrl": "https://owner.edullent.com/icons/icon-96x96.png"
     }
   ],
   "generatorApp": "bubblewrap-cli",
-  "webManifestUrl": "https://owner-dashboard-blue.vercel.app/manifest.webmanifest",
+  "webManifestUrl": "https://owner.edullent.com/manifest.webmanifest",
   "fallbackType": "customtabs",
   "features": {
     "playBilling": {
@@ -50,7 +50,7 @@
   "enableSiteSettingsShortcut": true,
   "isChromeOSOnly": false,
   "isMetaQuest": false,
-  "fullScopeUrl": "https://owner-dashboard-blue.vercel.app/",
+  "fullScopeUrl": "https://owner.edullent.com/",
   "minSdkVersion": 23,
   "appVersionName": "1.0.0",
   "appVersion": 1

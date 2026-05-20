@@ -23,7 +23,7 @@ export default defineConfig(({ mode }) => {
       // through to this proxy so the local dev server doesn't 404.
       proxy: {
         "/api": {
-          target: "https://owner-dashboard-blue.vercel.app",
+          target: "https://owner.edullent.com",
           changeOrigin: true,
           secure: true,
         },
