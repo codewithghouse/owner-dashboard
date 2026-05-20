@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="display_override">
+    
+      
+        <item>standalone</item>
+      
+    
+      
+        <item>minimal-ui</item>
+      
+    
+    </string-array>
+    <bool name="enableNotification">true</bool>
+    <bool name="enableSiteSettingsShortcut">true</bool>
+    <color name="backgroundColor">#EEF4FF</color>
+    <color name="colorPrimary">#1E3A8A</color>
+    <color name="colorPrimaryDark">#000000</color>
+    <color name="navigationColor">#000000</color>
+    <color name="navigationColorDark">#000000</color>
+    <color name="navigationDividerColor">#000000</color>
+    <color name="navigationDividerColorDark">#000000</color>
+    <color name="shortcut_background">#F5F5F5</color>
+    <integer name="splashScreenFadeOutDuration">300</integer>
+    <string name="appName" translatable="false">Edullent Owner</string>
+    <string name="assetStatements">
+    [{
+        \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+        \"target\": {
+            \"namespace\": \"web\",
+            \"site\": \"https://owner.edullent.com\"
+        }
+    }]
+    
+  </string>
+    <string name="fallbackType" translatable="false">customtabs</string>
+    <string name="fullScopeUrl" translatable="false">https://owner.edullent.com/</string>
+    <string name="generatorApp" translatable="false">bubblewrap-cli</string>
+    <string name="hostName" translatable="false">owner.edullent.com</string>
+    <string name="launchUrl" translatable="false">https://owner.edullent.com/?source=pwa</string>
+    <string name="launcherName" translatable="false">Edullent Own</string>
+    <string name="orientation" translatable="false">any</string>
+    <string name="providerAuthority" translatable="false">com.edullent.owner.twa.fileprovider</string>
+    <string name="shortcut_name_0" translatable="false">Dashboard</string>
+    <string name="shortcut_name_1" translatable="false">Branches</string>
+    <string name="shortcut_name_2" translatable="false">Finance</string>
+    <string name="shortcut_short_name_0" translatable="false">Home</string>
+    <string name="shortcut_short_name_1" translatable="false">Branches</string>
+    <string name="shortcut_short_name_2" translatable="false">Finance</string>
+    <string name="webManifestUrl" translatable="false">https://owner.edullent.com/manifest.webmanifest</string>
+</resources>

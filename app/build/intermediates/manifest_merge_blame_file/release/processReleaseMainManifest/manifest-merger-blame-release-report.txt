@@ -1,0 +1,397 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<!--
+3    Copyright 2019 Google Inc. All Rights Reserved.
+4
+5     Licensed under the Apache License, Version 2.0 (the "License");
+6     you may not use this file except in compliance with the License.
+7     You may obtain a copy of the License at
+8
+9         http://www.apache.org/licenses/LICENSE-2.0
+10
+11     Unless required by applicable law or agreed to in writing, software
+12     distributed under the License is distributed on an "AS IS" BASIS,
+13     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+14     See the License for the specific language governing permissions and
+15     limitations under the License.
+16-->
+17<!--
+18 The "package" attribute is rewritten by the Gradle build with the value of applicationId.
+19     It is still required here, as it is used to derive paths, for instance when referring
+20     to an Activity by ".MyActivity" instead of the full name. If more Activities are added to the
+21     application, the package attribute will need to reflect the correct path in order to use
+22     the abbreviated format.
+23-->
+24<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+25    package="com.edullent.owner.twa"
+26    android:versionCode="5"
+27    android:versionName="5" >
+28
+29    <uses-sdk
+30        android:minSdkVersion="21"
+31        android:targetSdkVersion="35" />
+32
+33    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+33-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:26:9-80
+33-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:26:26-78
+34
+35    <queries>
+35-->[com.google.androidbrowserhelper:androidbrowserhelper:2.6.2] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\5053e02be90783e54992393be394bb70\transformed\androidbrowserhelper-2.6.2\AndroidManifest.xml:22:5-30:15
+36        <intent>
+36-->[com.google.androidbrowserhelper:androidbrowserhelper:2.6.2] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\5053e02be90783e54992393be394bb70\transformed\androidbrowserhelper-2.6.2\AndroidManifest.xml:23:9-29:18
+37            <action android:name="android.intent.action.VIEW" />
+37-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:155:17-68
+37-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:155:25-66
+38
+39            <category android:name="android.intent.category.BROWSABLE" />
+39-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:157:17-77
+39-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:157:27-75
+40
+41            <data android:scheme="https" />
+41-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:158:17-161:19
+41-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:158:23-45
+42        </intent>
+43    </queries>
+44
+45    <permission
+45-->[androidx.core:core:1.13.0] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\a5429f7b20c607b890f08b5283ad4ec0\transformed\core-1.13.0\AndroidManifest.xml:22:5-24:47
+46        android:name="com.edullent.owner.twa.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+46-->[androidx.core:core:1.13.0] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\a5429f7b20c607b890f08b5283ad4ec0\transformed\core-1.13.0\AndroidManifest.xml:23:9-81
+47        android:protectionLevel="signature" />
+47-->[androidx.core:core:1.13.0] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\a5429f7b20c607b890f08b5283ad4ec0\transformed\core-1.13.0\AndroidManifest.xml:24:9-44
+48
+49    <uses-permission android:name="com.edullent.owner.twa.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+49-->[androidx.core:core:1.13.0] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\a5429f7b20c607b890f08b5283ad4ec0\transformed\core-1.13.0\AndroidManifest.xml:26:5-97
+49-->[androidx.core:core:1.13.0] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\a5429f7b20c607b890f08b5283ad4ec0\transformed\core-1.13.0\AndroidManifest.xml:26:22-94
+50
+51    <application
+51-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:35:5-206:19
+52        android:name="com.edullent.owner.twa.Application"
+52-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:36:9-35
+53        android:allowBackup="true"
+53-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:37:9-35
+54        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+54-->[androidx.core:core:1.13.0] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\a5429f7b20c607b890f08b5283ad4ec0\transformed\core-1.13.0\AndroidManifest.xml:28:18-86
+55        android:extractNativeLibs="true"
+56        android:icon="@mipmap/ic_launcher"
+56-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:38:9-43
+57        android:label="@string/appName"
+57-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:39:9-40
+58        android:manageSpaceActivity="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
+58-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:41:9-105
+59        android:supportsRtl="true"
+59-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:43:9-35
+60        android:theme="@android:style/Theme.Translucent.NoTitleBar" >
+60-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:44:9-68
+61        <meta-data
+61-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:46:9-48:58
+62            android:name="asset_statements"
+62-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:47:13-44
+63            android:resource="@string/assetStatements" />
+63-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:48:13-55
+64        <meta-data
+64-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:51:13-53:58
+65            android:name="web_manifest_url"
+65-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:52:17-48
+66            android:value="@string/webManifestUrl" />
+66-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:53:17-55
+67        <meta-data
+67-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:56:9-58:52
+68            android:name="twa_generator"
+68-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:57:13-41
+69            android:value="@string/generatorApp" />
+69-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:58:13-49
+70
+71        <activity
+71-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:65:13-76:24
+72            android:name="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
+72-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:65:23-104
+73            android:enabled="true"
+73-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:67:17-39
+74            android:excludeFromRecents="true"
+74-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:68:17-50
+75            android:exported="false" >
+75-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:66:17-41
+76            <meta-data
+76-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:69:17-71:57
+77                android:name="android.support.customtabs.trusted.MANAGE_SPACE_URL"
+77-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:70:21-87
+78                android:value="@string/launchUrl" />
+78-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:71:21-54
+79
+80            <intent-filter>
+80-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:72:17-75:33
+81                <action android:name="android.intent.action.APPLICATION_PREFERENCES" />
+81-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:73:21-92
+81-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:73:29-89
+82
+83                <category android:name="android.intent.category.DEFAULT" />
+83-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:74:21-80
+83-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:74:31-77
+84            </intent-filter>
+85        </activity>
+86        <activity
+86-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:79:9-167:20
+87            android:name="com.edullent.owner.twa.LauncherActivity"
+87-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:79:19-50
+88            android:alwaysRetainTaskState="true"
+88-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:80:13-49
+89            android:exported="true"
+89-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:82:13-36
+90            android:label="@string/launcherName" >
+90-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:81:13-49
+91            <meta-data
+91-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:83:13-84:53
+92                android:name="android.support.customtabs.trusted.DEFAULT_URL"
+92-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:83:24-85
+93                android:value="@string/launchUrl" />
+93-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:84:17-50
+94            <meta-data
+94-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:86:13-88:58
+95                android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR"
+95-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:87:17-83
+96                android:resource="@color/colorPrimary" />
+96-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:88:17-55
+97            <meta-data
+97-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:92:13-94:62
+98                android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR_DARK"
+98-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:93:17-88
+99                android:resource="@color/colorPrimaryDark" />
+99-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:94:17-59
+100            <meta-data
+100-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:96:13-98:61
+101                android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR"
+101-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:97:17-87
+102                android:resource="@color/navigationColor" />
+102-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:98:17-58
+103            <meta-data
+103-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:100:13-102:65
+104                android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR_DARK"
+104-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:101:17-92
+105                android:resource="@color/navigationColorDark" />
+105-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:102:17-62
+106            <meta-data
+106-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:104:13-106:68
+107                android:name="androix.browser.trusted.NAVIGATION_BAR_DIVIDER_COLOR"
+107-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:105:17-84
+108                android:resource="@color/navigationDividerColor" />
+108-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:106:17-65
+109            <meta-data
+109-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:108:13-110:72
+110                android:name="androix.browser.trusted.NAVIGATION_BAR_DIVIDER_COLOR_DARK"
+110-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:109:17-89
+111                android:resource="@color/navigationDividerColorDark" />
+111-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:110:17-69
+112            <meta-data
+112-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:112:13-113:54
+113                android:name="android.support.customtabs.trusted.SPLASH_IMAGE_DRAWABLE"
+113-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:112:24-95
+114                android:resource="@drawable/splash" />
+114-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:113:17-52
+115            <meta-data
+115-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:115:13-116:60
+116                android:name="android.support.customtabs.trusted.SPLASH_SCREEN_BACKGROUND_COLOR"
+116-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:115:24-104
+117                android:resource="@color/backgroundColor" />
+117-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:116:17-58
+118            <meta-data
+118-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:118:13-119:71
+119                android:name="android.support.customtabs.trusted.SPLASH_SCREEN_FADE_OUT_DURATION"
+119-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:118:24-105
+120                android:value="@integer/splashScreenFadeOutDuration" />
+120-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:119:17-69
+121            <meta-data
+121-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:121:13-122:60
+122                android:name="android.support.customtabs.trusted.FILE_PROVIDER_AUTHORITY"
+122-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:121:24-97
+123                android:value="@string/providerAuthority" />
+123-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:122:17-58
+124            <meta-data
+124-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:124:13-97
+125                android:name="android.app.shortcuts"
+125-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:124:24-60
+126                android:resource="@xml/shortcuts" />
+126-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:124:61-94
+127            <meta-data
+127-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:126:13-127:56
+128                android:name="android.support.customtabs.trusted.FALLBACK_STRATEGY"
+128-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:126:24-91
+129                android:value="@string/fallbackType" />
+129-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:127:17-53
+130            <meta-data
+130-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:132:13-133:45
+131                android:name="android.support.customtabs.trusted.DISPLAY_MODE"
+131-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:132:24-86
+132                android:value="immersive" />
+132-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:133:17-42
+133            <meta-data
+133-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:136:13-137:54
+134                android:name="android.support.customtabs.trusted.SCREEN_ORIENTATION"
+134-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:136:24-92
+135                android:value="@string/orientation" />
+135-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:137:17-52
+136            <meta-data
+136-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:142:17-144:66
+137                android:name="android.support.customtabs.trusted.DISPLAY_OVERRIDE"
+137-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:143:21-87
+138                android:resource="@array/display_override" />
+138-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:144:21-63
+139
+140            <intent-filter>
+140-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:149:13-152:29
+141                <action android:name="android.intent.action.MAIN" />
+141-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:150:17-69
+141-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:150:25-66
+142
+143                <category android:name="android.intent.category.LAUNCHER" />
+143-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:151:17-77
+143-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:151:27-74
+144            </intent-filter>
+145            <intent-filter android:autoVerify="true" >
+145-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:154:13-162:29
+145-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:154:28-53
+146                <action android:name="android.intent.action.VIEW" />
+146-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:155:17-68
+146-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:155:25-66
+147
+148                <category android:name="android.intent.category.DEFAULT" />
+148-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:74:21-80
+148-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:74:31-77
+149                <category android:name="android.intent.category.BROWSABLE" />
+149-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:157:17-77
+149-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:157:27-75
+150
+151                <data
+151-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:158:17-161:19
+152                    android:host="@string/hostName"
+152-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:159:21-52
+153                    android:scheme="https" />
+153-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:158:23-45
+154            </intent-filter>
+155        </activity>
+156        <activity android:name="com.google.androidbrowserhelper.trusted.FocusActivity" />
+156-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:169:9-90
+156-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:169:19-87
+157        <activity
+157-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:171:9-172:62
+158            android:name="com.google.androidbrowserhelper.trusted.WebViewFallbackActivity"
+158-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:171:19-97
+159            android:configChanges="orientation|screenSize" />
+159-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:172:13-59
+160
+161        <provider
+161-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:174:9-182:20
+162            android:name="androidx.core.content.FileProvider"
+162-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:175:13-62
+163            android:authorities="@string/providerAuthority"
+163-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:176:13-60
+164            android:exported="false"
+164-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:178:13-37
+165            android:grantUriPermissions="true" >
+165-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:177:13-47
+166            <meta-data
+166-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:179:13-181:53
+167                android:name="android.support.FILE_PROVIDER_PATHS"
+167-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:180:17-67
+168                android:resource="@xml/filepaths" />
+168-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:181:17-50
+169        </provider>
+170
+171        <service
+171-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:184:9-199:19
+172            android:name="com.edullent.owner.twa.DelegationService"
+172-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:185:13-46
+173            android:enabled="@bool/enableNotification"
+173-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:186:13-55
+174            android:exported="@bool/enableNotification" >
+174-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:187:13-56
+175            <meta-data
+175-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:190:17-192:73
+176                android:name="android.support.customtabs.trusted.SMALL_ICON"
+176-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:191:21-81
+177                android:resource="@drawable/ic_notification_icon" />
+177-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:192:21-70
+178
+179            <intent-filter>
+179-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:195:13-198:29
+180                <action android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE" />
+180-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:196:17-105
+180-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:196:25-103
+181
+182                <category android:name="android.intent.category.DEFAULT" />
+182-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:74:21-80
+182-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:74:31-77
+183            </intent-filter>
+184        </service>
+185
+186        <activity android:name="com.google.androidbrowserhelper.trusted.NotificationPermissionRequestActivity" />
+186-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:202:13-118
+186-->C:\dev\school-work\school-work\owner-dashboard\app\src\main\AndroidManifest.xml:202:23-115
+187
+188        <provider
+188-->[androidx.emoji2:emoji2:1.3.0] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\5cb7738f5242d8c4e38c8ffa2b265b31\transformed\emoji2-1.3.0\AndroidManifest.xml:24:9-32:20
+189            android:name="androidx.startup.InitializationProvider"
+189-->[androidx.emoji2:emoji2:1.3.0] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\5cb7738f5242d8c4e38c8ffa2b265b31\transformed\emoji2-1.3.0\AndroidManifest.xml:25:13-67
+190            android:authorities="com.edullent.owner.twa.androidx-startup"
+190-->[androidx.emoji2:emoji2:1.3.0] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\5cb7738f5242d8c4e38c8ffa2b265b31\transformed\emoji2-1.3.0\AndroidManifest.xml:26:13-68
+191            android:exported="false" >
+191-->[androidx.emoji2:emoji2:1.3.0] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\5cb7738f5242d8c4e38c8ffa2b265b31\transformed\emoji2-1.3.0\AndroidManifest.xml:27:13-37
+192            <meta-data
+192-->[androidx.emoji2:emoji2:1.3.0] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\5cb7738f5242d8c4e38c8ffa2b265b31\transformed\emoji2-1.3.0\AndroidManifest.xml:29:13-31:52
+193                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+193-->[androidx.emoji2:emoji2:1.3.0] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\5cb7738f5242d8c4e38c8ffa2b265b31\transformed\emoji2-1.3.0\AndroidManifest.xml:30:17-75
+194                android:value="androidx.startup" />
+194-->[androidx.emoji2:emoji2:1.3.0] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\5cb7738f5242d8c4e38c8ffa2b265b31\transformed\emoji2-1.3.0\AndroidManifest.xml:31:17-49
+195            <meta-data
+195-->[androidx.lifecycle:lifecycle-process:2.6.2] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\4bc52031417e9743197e36b704fe409f\transformed\lifecycle-process-2.6.2\AndroidManifest.xml:29:13-31:52
+196                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+196-->[androidx.lifecycle:lifecycle-process:2.6.2] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\4bc52031417e9743197e36b704fe409f\transformed\lifecycle-process-2.6.2\AndroidManifest.xml:30:17-78
+197                android:value="androidx.startup" />
+197-->[androidx.lifecycle:lifecycle-process:2.6.2] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\4bc52031417e9743197e36b704fe409f\transformed\lifecycle-process-2.6.2\AndroidManifest.xml:31:17-49
+198            <meta-data
+198-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\bb4a0d32d1b17a1dcea0cf71d2bde5e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:29:13-31:52
+199                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+199-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\bb4a0d32d1b17a1dcea0cf71d2bde5e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:30:17-85
+200                android:value="androidx.startup" />
+200-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\bb4a0d32d1b17a1dcea0cf71d2bde5e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:31:17-49
+201        </provider>
+202
+203        <receiver
+203-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\bb4a0d32d1b17a1dcea0cf71d2bde5e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:34:9-52:20
+204            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+204-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\bb4a0d32d1b17a1dcea0cf71d2bde5e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:35:13-76
+205            android:directBootAware="false"
+205-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\bb4a0d32d1b17a1dcea0cf71d2bde5e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:36:13-44
+206            android:enabled="true"
+206-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\bb4a0d32d1b17a1dcea0cf71d2bde5e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:37:13-35
+207            android:exported="true"
+207-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\bb4a0d32d1b17a1dcea0cf71d2bde5e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:38:13-36
+208            android:permission="android.permission.DUMP" >
+208-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\bb4a0d32d1b17a1dcea0cf71d2bde5e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:39:13-57
+209            <intent-filter>
+209-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\bb4a0d32d1b17a1dcea0cf71d2bde5e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:40:13-42:29
+210                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+210-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\bb4a0d32d1b17a1dcea0cf71d2bde5e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:41:17-91
+210-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\bb4a0d32d1b17a1dcea0cf71d2bde5e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:41:25-88
+211            </intent-filter>
+212            <intent-filter>
+212-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\bb4a0d32d1b17a1dcea0cf71d2bde5e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:43:13-45:29
+213                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+213-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\bb4a0d32d1b17a1dcea0cf71d2bde5e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:44:17-85
+213-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\bb4a0d32d1b17a1dcea0cf71d2bde5e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:44:25-82
+214            </intent-filter>
+215            <intent-filter>
+215-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\bb4a0d32d1b17a1dcea0cf71d2bde5e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:46:13-48:29
+216                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+216-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\bb4a0d32d1b17a1dcea0cf71d2bde5e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:47:17-88
+216-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\bb4a0d32d1b17a1dcea0cf71d2bde5e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:47:25-85
+217            </intent-filter>
+218            <intent-filter>
+218-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\bb4a0d32d1b17a1dcea0cf71d2bde5e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:49:13-51:29
+219                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+219-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\bb4a0d32d1b17a1dcea0cf71d2bde5e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:50:17-95
+219-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\ASUS\.gradle\caches\8.11.1\transforms\bb4a0d32d1b17a1dcea0cf71d2bde5e0\transformed\profileinstaller-1.3.1\AndroidManifest.xml:50:25-92
+220            </intent-filter>
+221        </receiver>
+222    </application>
+223
+224</manifest>
