@@ -3,6 +3,59 @@
 @tailwind utilities;
 
 /* ═══════════════════════════════════════════════════════════════
+   TWA / MOBILE-FIRST UX BASELINE
+   Locks pinch-zoom, kills the iOS double-tap zoom delay, removes
+   the Android grey tap-highlight flash, disables overscroll bounce
+   (so the app feels native inside a TWA wrapper), and protects
+   selection: chrome (buttons/nav/links) is unselectable, but
+   actual content (paragraphs, headings, .selectable) stays
+   user-copyable.
+
+   Pair lock: viewport meta in index.html is set to
+   user-scalable=no + max/min-scale=1.0 so this stays the floor,
+   not just the default.
+   ═══════════════════════════════════════════════════════════════ */
+html,
+body {
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+
+* {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+a,
+nav,
+.nav-item,
+[role="button"] {
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+span:not(.no-select),
+.selectable {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* ═══════════════════════════════════════════════════════════════
    APPLE-STYLE TYPOGRAPHY SYSTEM (global)
    Font: SF Pro Display (end-to-end)
    Weight: 400 (end-to-end — no hierarchy weights)
