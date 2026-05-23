@@ -886,6 +886,53 @@ export default function SettingsPage() {
           { label:"Risk Thresholds", value: `${settings.thresholds.attendanceCritical}% / ${settings.thresholds.attendanceWarning}%`, sub: `${settings.thresholds.feeOverdueDays}d fee window` },
         ]}
       />
+
+      {/* Danger zone — Play Store data-deletion compliance surface. The
+          actual self-serve form lives at the public /delete-account route
+          so logged-out users (and Play reviewers) can reach it too. */}
+      <div
+        style={{
+          marginTop: 18,
+          background: "#fff",
+          borderRadius: 16,
+          padding: "20px 22px",
+          border: "1px solid rgba(220,38,38,0.20)",
+          borderLeft: "3px solid #DC2626",
+          boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 8px 32px rgba(0,16,64,0.06)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <AlertCircle size={16} color="#DC2626" />
+          <h3 style={{ fontSize: 13, fontWeight: 800, color: "#7F1D1D", margin: 0, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            Danger Zone
+          </h3>
+        </div>
+        <p style={{ fontSize: 13, color: "#475569", lineHeight: 1.6, margin: "0 0 14px" }}>
+          Permanently delete your Edullent Owner account and all associated
+          school data. Processed manually within 7 business days. This
+          action cannot be undone.
+        </p>
+        <a
+          href="/delete-account"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "10px 18px",
+            borderRadius: 10,
+            background: "linear-gradient(135deg, #DC2626, #EF4444)",
+            color: "#fff",
+            fontSize: 12,
+            fontWeight: 800,
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+            textDecoration: "none",
+            boxShadow: "0 6px 18px rgba(220,38,38,0.22)",
+          }}
+        >
+          <Trash2 size={14} /> Delete Account
+        </a>
+      </div>
       </div>
     </>
   );

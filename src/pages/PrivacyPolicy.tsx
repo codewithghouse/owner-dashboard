@@ -186,6 +186,10 @@ export default function PrivacyPolicy() {
           by emailing <a href="mailto:edullentofficial@gmail.com">edullentofficial@gmail.com</a>
           from the address associated with your account. We respond within 30
           days. Schools may self-serve most of these via the dashboard (Settings).
+          For full account deletion (account credentials + school records),
+          use the self-serve form at{" "}
+          <a href="/delete-account"><strong>edullent.com/delete-account</strong></a>{" "}
+          — requests are processed within 7 business days.
         </Section>
 
         <Section title="Changes">

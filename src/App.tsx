@@ -41,6 +41,7 @@ const OwnerDashboard       = lazy(() => import("@/pages/owner/OwnerDashboard"));
 const ParentPortal         = lazy(() => import("@/pages/ParentPortal"));
 const Help                 = lazy(() => import("@/pages/Help"));
 const PrivacyPolicy        = lazy(() => import("@/pages/PrivacyPolicy"));
+const DeleteAccount        = lazy(() => import("@/pages/DeleteAccount"));
 const NotFound             = lazy(() => import("@/pages/NotFound"));
 
 const RouteFallback = () => (
@@ -123,6 +124,11 @@ const App = () => {
             {/* /privacy MUST stay public — Google Play Store TWA submission
                 requires a publicly reachable privacy policy URL. */}
             <Route path="/privacy" element={<Suspense fallback={<RouteFallback />}><PrivacyPolicy /></Suspense>} />
+            {/* /delete-account MUST stay public — Google Play Store data
+                deletion policy (effective Dec 2023) requires a publicly
+                reachable URL where users (including logged-out and Play
+                reviewers) can request account + data deletion. */}
+            <Route path="/delete-account" element={<Suspense fallback={<RouteFallback />}><DeleteAccount /></Suspense>} />
 
             {/* ── Auth-gated routes ──────────────────────────────────── */}
             {!user ? (
