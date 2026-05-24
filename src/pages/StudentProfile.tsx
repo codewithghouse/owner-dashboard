@@ -595,10 +595,24 @@ const StudentProfile = () => {
       }}
     >
 
-      {/* ═══ TOP BAR ══════════════════════════════════════════════════════════ */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <button onClick={() => navigate("/students")} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: `1px solid ${T.bdr}`, background: T.white, color: T.ink2, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
-          <ArrowLeft size={14} /> RETURN
+      {/* ═══ TOP BAR ══════════════════════════════════════════════════════════
+           Mobile: icon-only buttons (44px tap target) — labels hidden so the
+           row never overflows. Desktop: full labels. */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: isMobile ? 16 : 24, gap: 8 }}>
+        <button
+          type="button"
+          onClick={() => navigate("/students")}
+          aria-label="Back to students"
+          style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: isMobile ? "10px 12px" : "8px 16px",
+            borderRadius: 10, border: `1px solid ${T.bdr}`, background: T.white,
+            color: T.ink2, fontSize: 13, fontWeight: 500, cursor: "pointer",
+            touchAction: "manipulation", minHeight: 44,
+          }}
+        >
+          <ArrowLeft size={isMobile ? 16 : 14} />
+          {!isMobile && "RETURN"}
         </button>
         <div style={{ display: "flex", gap: 8 }}>
           {/* Visual-snapshot export — captures the live profile DOM and
@@ -606,13 +620,15 @@ const StudentProfile = () => {
               + capture so user can't double-click. The spinner replaces the
               icon so the click feels acknowledged. */}
           <button
+            type="button"
             onClick={handleExport}
             disabled={exporting}
+            aria-label={exporting ? "Exporting" : "Export"}
             style={{
               display: "flex",
               alignItems: "center",
               gap: 6,
-              padding: "8px 16px",
+              padding: isMobile ? "10px 12px" : "8px 16px",
               borderRadius: 10,
               border: `1px solid ${T.bdr}`,
               background: T.white,
@@ -621,19 +637,33 @@ const StudentProfile = () => {
               fontWeight: 500,
               cursor: exporting ? "wait" : "pointer",
               opacity: exporting ? 0.6 : 1,
+              touchAction: "manipulation",
+              minHeight: 44,
             }}
           >
             {exporting
-              ? <Loader2 size={13} className="animate-spin" />
-              : <Printer size={13} />}
-            {exporting ? "EXPORTING…" : "EXPORT"}
+              ? <Loader2 size={isMobile ? 16 : 13} className="animate-spin" />
+              : <Printer size={isMobile ? 16 : 13} />}
+            {!isMobile && (exporting ? "EXPORTING…" : "EXPORT")}
           </button>
           {/* Was labeled "CONTACT" but navigated to /reports — misleading. Now
               the label matches the destination (Reports Center), and the icon
               reflects the action. If a real parent-contact flow ships later,
               swap navigate("/reports") for the new route. */}
-          <button onClick={() => navigate("/reports")} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: "none", background: T.blue, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-            <FileText size={13} /> REPORTS
+          <button
+            type="button"
+            onClick={() => navigate("/reports")}
+            aria-label="Reports"
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: isMobile ? "10px 14px" : "8px 16px",
+              borderRadius: 10, border: "none", background: T.blue, color: "#fff",
+              fontSize: 12, fontWeight: 600, cursor: "pointer",
+              touchAction: "manipulation", minHeight: 44,
+            }}
+          >
+            <FileText size={isMobile ? 16 : 13} />
+            {!isMobile && "REPORTS"}
           </button>
         </div>
       </div>
@@ -711,14 +741,23 @@ const StudentProfile = () => {
           </Card>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 20 }}>
-          <div style={{ width: 140, height: 140, borderRadius: "50%", border: `4px solid ${T.blue}`, background: T.blBg, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16, boxShadow: "0 8px 30px rgba(59,91,219,0.15)" }}>
-            <span style={{ fontSize: 42, fontWeight: 800, color: T.blue }}>{initials}</span>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: isMobile ? 4 : 20 }}>
+          <div style={{
+            width: isMobile ? 112 : 140,
+            height: isMobile ? 112 : 140,
+            borderRadius: "50%",
+            border: `${isMobile ? 3 : 4}px solid ${T.blue}`,
+            background: T.blBg,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            marginBottom: isMobile ? 12 : 16,
+            boxShadow: "0 8px 30px rgba(59,91,219,0.15)",
+          }}>
+            <span style={{ fontSize: isMobile ? 34 : 42, fontWeight: 800, color: T.blue }}>{initials}</span>
           </div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: T.ink, textAlign: "center", marginBottom: 4 }}>{student.name}</h2>
+          <h2 style={{ fontSize: isMobile ? 18 : 20, fontWeight: 700, color: T.ink, textAlign: "center", marginBottom: 4 }}>{student.name}</h2>
           <p style={{ fontSize: 12, color: T.ink3, textAlign: "center", marginBottom: 4 }}>{student.className || student.class || "—"}</p>
           <p style={{ fontSize: 11, color: T.ink3, textAlign: "center", marginBottom: 12 }}>Roll: {student.rollNo || student.roll || "—"} · ID: {(student.id || "").slice(0, 6).toUpperCase()}</p>
-          <div style={{ display: "flex", gap: 6 }}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
             <span style={{ padding: "4px 12px", borderRadius: 20, background: T.glBg, color: T.grn, fontSize: 10, fontWeight: 600 }}>ACTIVE</span>
             <span style={{ padding: "4px 12px", borderRadius: 20, background: riskColor === T.grn ? T.glBg : riskColor === T.amb ? T.alBg : T.rlBg, color: riskColor, fontSize: 10, fontWeight: 600 }}>{riskLevel}</span>
           </div>
@@ -902,9 +941,16 @@ const StudentProfile = () => {
               );
             })}
           </div>
-          <div style={{ display: "flex", gap: 14, marginTop: 12, justifyContent: "center" }}>
+          <div style={{
+            display: isMobile ? "grid" : "flex",
+            gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : undefined,
+            gap: isMobile ? 8 : 14,
+            marginTop: 12,
+            justifyContent: "center",
+            rowGap: isMobile ? 6 : undefined,
+          }}>
             {[{ c: T.grn, l: "Present" }, { c: T.amb, l: "Late" }, { c: T.red, l: "Absent" }, { c: "#7B3FF4", l: "Holiday" }, { c: T.s2, l: "Weekend" }, { c: "transparent", l: "No Data" }].map(x => (
-              <div key={x.l} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <div key={x.l} style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: isMobile ? "center" : undefined }}>
                 <div style={{ width: 8, height: 8, borderRadius: 2, background: x.c, border: x.c === "transparent" ? `1px solid ${T.s2}` : "none" }} />
                 <span style={{ fontSize: 10, color: T.ink3 }}>{x.l}</span>
               </div>
@@ -1006,27 +1052,29 @@ const StudentProfile = () => {
               </ResponsiveContainer>
             </div>
           )}
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-            <thead>
-              <tr>{["SUBJECT", "DATE", "SCORE"].map(h => <th key={h} style={{ textAlign: "left", padding: "6px 8px", fontSize: 10, color: T.ink3, fontWeight: 600, borderBottom: `1px solid ${T.s2}` }}>{h}</th>)}</tr>
-            </thead>
-            <tbody>
-              {scoreHistory.map(t => {
-                const d = toDate(t.timestamp || t.createdAt);
-                /* Truncate with ellipsis indicator so user sees there's more to
-                   the subject name. Plain `.slice(0, 20)` chopped silently. */
-                const rawSubject = t.subject || t.subjectName || "TEST";
-                const subject = rawSubject.length > 20 ? `${rawSubject.slice(0, 19)}…` : rawSubject;
-                return (
-                  <tr key={t.id} style={{ borderBottom: `1px solid ${T.s2}` }}>
-                    <td style={{ padding: "8px", color: T.ink }} title={rawSubject}>{subject}</td>
-                    <td style={{ padding: "8px", color: T.ink3 }}>{d ? d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }).toUpperCase() : "—"}</td>
-                    <td style={{ padding: "8px", fontWeight: 600, color: T.blue }}>{Number(t.percentage ?? t.score ?? 0)}%</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", margin: isMobile ? "0 -2px" : 0 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: isMobile ? 280 : 0 }}>
+              <thead>
+                <tr>{["SUBJECT", "DATE", "SCORE"].map(h => <th key={h} style={{ textAlign: "left", padding: "6px 8px", fontSize: 10, color: T.ink3, fontWeight: 600, borderBottom: `1px solid ${T.s2}`, whiteSpace: "nowrap" }}>{h}</th>)}</tr>
+              </thead>
+              <tbody>
+                {scoreHistory.map(t => {
+                  const d = toDate(t.timestamp || t.createdAt);
+                  /* Truncate with ellipsis indicator so user sees there's more to
+                     the subject name. Plain `.slice(0, 20)` chopped silently. */
+                  const rawSubject = t.subject || t.subjectName || "TEST";
+                  const subject = rawSubject.length > 20 ? `${rawSubject.slice(0, 19)}…` : rawSubject;
+                  return (
+                    <tr key={t.id} style={{ borderBottom: `1px solid ${T.s2}` }}>
+                      <td style={{ padding: "8px", color: T.ink }} title={rawSubject}>{subject}</td>
+                      <td style={{ padding: "8px", color: T.ink3, whiteSpace: "nowrap" }}>{d ? d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }).toUpperCase() : "—"}</td>
+                      <td style={{ padding: "8px", fontWeight: 600, color: T.blue, whiteSpace: "nowrap" }}>{Number(t.percentage ?? t.score ?? 0)}%</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </Card>
       </div>
 
@@ -1035,7 +1083,7 @@ const StudentProfile = () => {
            see the same picture parents and principal see. Single Firestore
            source of truth across all 4 dashboards. */}
       {(studentRatings.length > 0 || improvementAreas.length > 0) && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 14 : 20, marginBottom: 20 }}>
           {/* Teacher Ratings */}
           <Card icon={Star} accent="#FFAA00" staticTilt={exporting} title={`Teacher Ratings · ${studentRatings.length}`} action={<DetailLink />}>
             {studentRatings.length === 0 ? (
@@ -1143,15 +1191,39 @@ const StudentProfile = () => {
         </div>
       )}
 
-      {/* ═══ BOTTOM STATUS BAR ═══ */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 20px", background: T.white, border: `1px solid ${T.bdr}`, borderRadius: 12, fontSize: 10, color: T.ink3 }}>
-        <span>★ PARENT ENGAGEMENT: {Math.min(100, parentNotes.length * 20)}%</span>
-        <span>★ Status: Active</span>
-        <span>★ Data: Live</span>
-        <span>★ Secured</span>
-        <span>★ STUDENT ID: {(student.id || "").slice(0, 8).toUpperCase()}</span>
-        <span style={{ color: T.blue, fontWeight: 600 }}>{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
-      </div>
+      {/* ═══ BOTTOM STATUS BAR ═══
+           Mobile: 2-column grid of compact chips so nothing overflows. Desktop:
+           single row with space-between as before. Items reordered so the
+           most-glanced (clock, engagement, ID) lead on mobile. */}
+      {isMobile ? (
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(2, 1fr)",
+          gap: 6,
+          padding: "10px 12px",
+          background: T.white,
+          border: `1px solid ${T.bdr}`,
+          borderRadius: 12,
+          fontSize: 10,
+          color: T.ink3,
+        }}>
+          <span style={{ color: T.blue, fontWeight: 700, gridColumn: "1 / -1", textAlign: "center", fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
+            {now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+          </span>
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>★ Engagement: {Math.min(100, parentNotes.length * 20)}%</span>
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "right" }}>★ ID: {(student.id || "").slice(0, 8).toUpperCase()}</span>
+          <span>★ Active · Live · Secured</span>
+        </div>
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 20px", background: T.white, border: `1px solid ${T.bdr}`, borderRadius: 12, fontSize: 10, color: T.ink3, flexWrap: "wrap", gap: 8 }}>
+          <span>★ PARENT ENGAGEMENT: {Math.min(100, parentNotes.length * 20)}%</span>
+          <span>★ Status: Active</span>
+          <span>★ Data: Live</span>
+          <span>★ Secured</span>
+          <span>★ STUDENT ID: {(student.id || "").slice(0, 8).toUpperCase()}</span>
+          <span style={{ color: T.blue, fontWeight: 600 }}>{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+        </div>
+      )}
     </div>
   );
 };

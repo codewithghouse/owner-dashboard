@@ -326,11 +326,33 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </div>
             </div>
             <button
-              onClick={() => setIsSidebarOpen(false)}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsSidebarOpen(false);
+              }}
               aria-label="Close sidebar"
-              style={{ width: 32, height: 32, borderRadius: 8, border: "none", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#94a3b8" }}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 10,
+                border: "none",
+                background: "#f1f5f9",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                color: "#475569",
+                touchAction: "manipulation",
+                position: "relative",
+                zIndex: 2,
+                pointerEvents: "auto",
+                WebkitTapHighlightColor: "rgba(0,0,0,0.06)",
+                flexShrink: 0,
+                marginLeft: 8,
+              }}
             >
-              <X style={{ width: 18, height: 18 }} />
+              <X style={{ width: 20, height: 20, pointerEvents: "none" }} />
             </button>
           </div>
         </div>
