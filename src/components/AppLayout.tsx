@@ -327,8 +327,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
+              onPointerUp={() => {
+                // PointerUp fires before click on touch devices and is more
+                // reliable than onClick when an ancestor has transform /
+                // backdrop-filter / will-change creating a new stacking
+                // context that confuses Android Chrome's hit testing.
+                setIsSidebarOpen(false);
+              }}
+              onClick={() => {
+                // Desktop / fallback path. No stopPropagation — bubbling to
+                // backdrop is harmless (backdrop's handler also closes), and
+                // stopPropagation has been known to break React 18+ synthetic
+                // event delegation in some edge cases.
                 setIsSidebarOpen(false);
               }}
               aria-label="Close sidebar"
@@ -347,9 +357,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 position: "relative",
                 zIndex: 2,
                 pointerEvents: "auto",
-                WebkitTapHighlightColor: "rgba(0,0,0,0.06)",
+                WebkitTapHighlightColor: "rgba(59,91,219,0.18)",
                 flexShrink: 0,
                 marginLeft: 8,
+                /* Hint to the browser that this element is interactive — some
+                   Android Chrome builds skip hit-testing on un-hinted elements
+                   inside fixed-positioned containers with transitions. */
+                isolation: "isolate",
               }}
             >
               <X style={{ width: 20, height: 20, pointerEvents: "none" }} />

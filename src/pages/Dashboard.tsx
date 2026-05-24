@@ -907,8 +907,14 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── Dark Hero Banner (AHI) ────────────────────────── */}
-      {!isFreshSchool && (
+      {/* ── Dark Hero Banner (AHI) ──────────────────────────
+           Hidden on mobile because the next KPI card already shows the
+           same AHI score + delta + trend — the banner duplicates that
+           number on a narrow screen and feels like a stray dark layer.
+           Desktop keeps it because the wider canvas can afford the
+           marketing-style hero treatment. Tap-target preserved on mobile
+           via the KPI card's onClick (same `/academics` destination). */}
+      {!isFreshSchool && !isMobile && (
         <div
           {...tilt3D}
           onClick={() => navigate("/academics")}
