@@ -594,9 +594,14 @@ export default function ReportsCenter() {
                         <button
                           type="button"
                           onClick={() => setting.set(!setting.val)}
-                          className={`w-11 h-6 rounded-full relative transition-all duration-300 shrink-0 cursor-pointer ${setting.val ? "bg-[#1e3a8a]" : "bg-slate-200"}`}
+                          aria-pressed={setting.val}
+                          className={`relative inline-flex items-center h-6 w-11 rounded-full shrink-0 cursor-pointer p-0 border-0 transition-colors duration-300 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[#1e3a8a]/40 ${setting.val ? "bg-[#1e3a8a]" : "bg-slate-300"}`}
                         >
-                          <div className={`w-5 h-5 rounded-full bg-white absolute top-0.5 shadow transition-all duration-300 ${setting.val ? "translate-x-5" : "translate-x-0.5"}`} />
+                          <span
+                            aria-hidden="true"
+                            className="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-md ring-0 transition-transform duration-300 ease-in-out will-change-transform"
+                            style={{ transform: setting.val ? "translateX(22px)" : "translateX(2px)" }}
+                          />
                         </button>
                       </div>
                     ))}
