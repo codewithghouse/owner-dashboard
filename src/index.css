@@ -655,6 +655,19 @@ a[class*="bg-primary"] {
 }
 button:active, a:active { transform: scale(0.97) !important; }
 
+/* Mobile sidebar floating close (X) button.
+   Always rendered so it can animate in/out with the sidebar's translateX
+   slide (instead of unmounting and reappearing instantly). The two
+   modifier classes set the transform with !important so the global
+   `button:active { transform: scale(.97) }` rule cannot override the
+   slide position. */
+.mobile-sidebar-close--open {
+  transform: translateX(0) !important;
+}
+.mobile-sidebar-close--closed {
+  transform: translateX(-300px) !important;
+}
+
 /* ── Page fade-in ─────────────────────────────────────────────── */
 @keyframes ownerFadeSlideIn {
   from { opacity: 0; transform: translateY(12px); }
@@ -663,6 +676,22 @@ button:active, a:active { transform: scale(0.97) !important; }
 main > div,
 [class*="animate-in"] {
   animation: ownerFadeSlideIn 0.4s ease-out;
+}
+
+/* Mobile: drop the translateY portion of the entrance animation. The
+   compositor keeps the animated layer rasterized after a transform, and
+   on high-DPI phones that residual GPU layer renders text at sub-pixel
+   offsets — visible as a soft blur across the whole page. Pure opacity
+   fade-in avoids the layer creation entirely and keeps text crisp. */
+@media (max-width: 1023px) {
+  @keyframes ownerFadeInOpacity {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  main > div,
+  [class*="animate-in"] {
+    animation: ownerFadeInOpacity 0.3s ease-out !important;
+  }
 }
 
 /* Stat number hover scale removed — was causing text blur on Windows

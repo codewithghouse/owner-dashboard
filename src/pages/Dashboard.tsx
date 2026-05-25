@@ -1181,24 +1181,35 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Risk Distribution */}
-        <div {...tilt3D} onClick={() => navigate("/risks")} role="button" tabIndex={0} className="col-span-1 lg:col-span-4 p-4 md:p-6 bg-white border border-blue-500/10 shadow-lg cursor-pointer rounded-2xl md:rounded-3xl" style={{ ...tilt3DStyle }}>
+        {/* Risk Distribution — tilt3D removed: its transform+backface-hidden
+            combo creates a containing block that breaks the native <select>
+            dropdown positioning (opens upward + shakes). Navigation moved
+            from full-card onClick to an explicit View All button so the
+            select can be interacted with without bubbling to navigate. */}
+        <div className="col-span-1 lg:col-span-4 p-4 md:p-6 bg-white border border-blue-500/10 shadow-lg rounded-2xl md:rounded-3xl">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
             <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: 0 }}>Risk Distribution</h3>
-            {branches.length > 0 && (
-              <select
-                value={selectedRiskBranch}
-                onChange={(e) => setSelectedRiskBranch(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                aria-label="Filter risk distribution by branch"
-                style={{ fontSize: 11, fontWeight: 700, color: T3, background: "#fff", border: "0.5px solid rgba(0,85,255,.14)", borderRadius: 10, padding: "6px 10px", outline: "none", cursor: "pointer", fontFamily: "inherit", boxShadow: SHADOW_SM }}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {branches.length > 0 && (
+                <select
+                  value={selectedRiskBranch}
+                  onChange={(e) => setSelectedRiskBranch(e.target.value)}
+                  aria-label="Filter risk distribution by branch"
+                  style={{ fontSize: 11, fontWeight: 700, color: T3, background: "#fff", border: "0.5px solid rgba(0,85,255,.14)", borderRadius: 10, padding: "6px 10px", outline: "none", cursor: "pointer", fontFamily: "inherit", boxShadow: SHADOW_SM }}
+                >
+                  <option value="all">All Branches</option>
+                  {branches.map(b => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              )}
+              <button
+                onClick={() => navigate("/risks")}
+                style={{ fontSize: 11, fontWeight: 700, color: B1, background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.06em", textTransform: "uppercase" }}
               >
-                <option value="all">All Branches</option>
-                {branches.map(b => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </select>
-            )}
+                View All →
+              </button>
+            </div>
           </div>
           {riskTotalCount === 0 ? (
             <div style={{ height: 220, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, borderRadius: 18, border: "0.5px dashed rgba(0,85,255,.2)", background: "rgba(0,200,83,.03)" }}>
@@ -1317,15 +1328,16 @@ export default function Dashboard() {
       {/* ── Bottom Row ───────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-5 lg:[perspective:1200px]">
 
-        {/* Critical Alerts */}
-        <div {...tilt3D} onClick={() => navigate("/risks")} role="button" tabIndex={0} className="p-4 md:p-6 bg-white border border-blue-500/10 shadow-lg cursor-pointer rounded-2xl md:rounded-3xl" style={{ ...tilt3DStyle }}>
+        {/* Critical Alerts — tilt3D removed for same dropdown-positioning
+            reason as Risk Distribution above. View All button handles
+            navigation explicitly. */}
+        <div className="p-4 md:p-6 bg-white border border-blue-500/10 shadow-lg rounded-2xl md:rounded-3xl">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
             <h3 style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: "-0.2px", margin: 0 }}>Critical Alerts</h3>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <select
                 value={selectedAlertBranch}
                 onChange={(e) => setSelectedAlertBranch(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
                 style={{ fontSize: 11, fontWeight: 700, color: T3, background: "#fff", border: "0.5px solid rgba(0,85,255,.14)", borderRadius: 10, padding: "6px 10px", outline: "none", cursor: "pointer", fontFamily: "inherit", boxShadow: SHADOW_SM }}
               >
                 <option value="all">All Branches</option>
@@ -1334,7 +1346,7 @@ export default function Dashboard() {
                 ))}
               </select>
               <button
-                onClick={(e) => { e.stopPropagation(); navigate("/risks"); }}
+                onClick={() => navigate("/risks")}
                 style={{ fontSize: 11, fontWeight: 700, color: B1, background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.06em", textTransform: "uppercase" }}
               >
                 View All →
