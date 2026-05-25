@@ -233,10 +233,13 @@ export function StatTile({
           {delta === "up" ? "▲" : "▼"}
         </div>
       )}
-      <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:700, color:"#94A3B8", letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 6px 0", position:"relative", zIndex:1 }}>{label}</p>
+      {/* Darkened text colors: pastel card backgrounds (GRAD_BLUE/GREEN/etc)
+          made #94A3B8 / #64748B read as washed-out. Bumped each one step
+          darker on the slate scale for proper contrast on mobile. */}
+      <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:800, color:"#475569", letterSpacing:"0.10em", textTransform:"uppercase", margin:"0 0 6px 0", position:"relative", zIndex:1 }}>{label}</p>
       <p style={{ fontSize: isMobile ? 22 : 30, fontWeight:800, color:"#0F172A", letterSpacing:"-0.6px", margin:0, lineHeight:1.1, position:"relative", zIndex:1 }}>{value}</p>
       {sub && (
-        <p style={{ fontSize: isMobile ? 10 : 11, fontWeight:600, color:"#64748B", margin:"6px 0 0 0", position:"relative", zIndex:1 }}>{sub}</p>
+        <p style={{ fontSize: isMobile ? 10 : 11, fontWeight:700, color:"#334155", margin:"6px 0 0 0", position:"relative", zIndex:1 }}>{sub}</p>
       )}
     </div>
   );

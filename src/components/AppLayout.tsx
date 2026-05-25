@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
@@ -297,6 +298,41 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         />
       )}
 
+      {/* Floating close (X) button — rendered via React Portal directly
+          into document.body. Zero CSS class dependencies, everything
+          inline so no global rule (.dash-card, button:active scale,
+          tilt3D containing blocks) can interfere. Mounted whenever the
+          mobile/tablet sidebar can show (< lg breakpoint = 1024px). */}
+      {createPortal(
+        <button
+          type="button"
+          onClick={() => setIsSidebarOpen(false)}
+          aria-label="Close sidebar"
+          style={{
+            position: "fixed",
+            top: "max(env(safe-area-inset-top), 18px)",
+            left: 240,
+            width: 44,
+            height: 44,
+            zIndex: 2147483647,
+            border: "none",
+            borderRadius: 10,
+            background: "#f1f5f9",
+            color: "#334155",
+            display: isSidebarOpen ? "inline-flex" : "none",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            touchAction: "manipulation",
+            WebkitTapHighlightColor: "rgba(59,91,219,0.18)",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+          }}
+        >
+          <X size={20} strokeWidth={2.25} />
+        </button>,
+        document.body
+      )}
+
       {/* Mobile Sidebar Drawer — `dash-card` opts out of the global
           .bg-white[rounded-]:not(.dash-card) rule that overrides `fixed`
           with `position: relative`, which would otherwise push the header
@@ -325,49 +361,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onPointerUp={() => {
-                // PointerUp fires before click on touch devices and is more
-                // reliable than onClick when an ancestor has transform /
-                // backdrop-filter / will-change creating a new stacking
-                // context that confuses Android Chrome's hit testing.
-                setIsSidebarOpen(false);
-              }}
-              onClick={() => {
-                // Desktop / fallback path. No stopPropagation — bubbling to
-                // backdrop is harmless (backdrop's handler also closes), and
-                // stopPropagation has been known to break React 18+ synthetic
-                // event delegation in some edge cases.
-                setIsSidebarOpen(false);
-              }}
-              aria-label="Close sidebar"
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 10,
-                border: "none",
-                background: "#f1f5f9",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                color: "#475569",
-                touchAction: "manipulation",
-                position: "relative",
-                zIndex: 2,
-                pointerEvents: "auto",
-                WebkitTapHighlightColor: "rgba(59,91,219,0.18)",
-                flexShrink: 0,
-                marginLeft: 8,
-                /* Hint to the browser that this element is interactive — some
-                   Android Chrome builds skip hit-testing on un-hinted elements
-                   inside fixed-positioned containers with transitions. */
-                isolation: "isolate",
-              }}
-            >
-              <X style={{ width: 20, height: 20, pointerEvents: "none" }} />
-            </button>
+            {/* Spacer reserves layout space for the X button. The actual
+                button is rendered OUTSIDE the <aside> at z-9999 to bypass
+                this sidebar's transition + stacking context, which kept
+                eating the click on mobile despite multiple attempts. */}
+            <div style={{ width: 44, height: 44, flexShrink: 0, marginLeft: 8 }} aria-hidden="true" />
           </div>
         </div>
 
