@@ -7,8 +7,8 @@ import {
 } from "firebase/storage";
 import {
   User, Mail, Phone, MapPin, Building2,
-  Bell, BellOff, Clock, Calendar, DollarSign, MessageCircle,
-  Globe, Save, Loader2, CheckCircle2, AlertCircle,
+  Bell, BellOff, Clock, Calendar, DollarSign,
+  Save, Loader2, CheckCircle2, AlertCircle,
   Camera, Upload, Trash2, Image, Download, FileText, Activity,
   Settings as SettingsIcon, Sparkles,
 } from "lucide-react";
@@ -93,18 +93,22 @@ const CURRENCY_OPTIONS    = ["INR (₹)", "USD ($)", "EUR (€)", "GBP (£)", "A
 const LANGUAGE_OPTIONS    = ["English", "Hindi", "Arabic", "French", "Spanish"];
 
 // ── Toggle ────────────────────────────────────────────────────────────────────
+// iOS-style toggle. Uses flex centering + transform translateX for symmetric
+// thumb positioning and GPU-accelerated smooth motion. `p-0 border-0` kills
+// browser default <button> padding/border that otherwise shifts the thumb.
 const Toggle = ({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) => (
   <button
     type="button"
     onClick={() => onChange(!value)}
-    className={`w-12 h-6 rounded-full relative transition-all duration-300 shrink-0 ${
-      value ? "bg-[#1e3a8a] shadow-lg shadow-blue-900/20" : "bg-slate-200"
+    aria-pressed={value}
+    className={`relative inline-flex items-center h-6 w-12 rounded-full shrink-0 cursor-pointer p-0 border-0 transition-colors duration-300 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[#1e3a8a]/40 ${
+      value ? "bg-[#1e3a8a] shadow-md shadow-blue-900/20" : "bg-slate-300"
     }`}
   >
-    <div
-      className={`w-5 h-5 rounded-full bg-white absolute top-0.5 transition-all duration-300 shadow-sm ${
-        value ? "translate-x-6" : "translate-x-0.5"
-      }`}
+    <span
+      aria-hidden="true"
+      className="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-md transition-transform duration-300 ease-in-out will-change-transform"
+      style={{ transform: value ? "translateX(26px)" : "translateX(2px)" }}
     />
   </button>
 );
@@ -565,51 +569,6 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* ── Section 2: Preferences ───────────────────────────────────────── */}
-      <div className="dash3d bg-white rounded-2xl md:rounded-[32px] border border-slate-100 p-5 md:p-8 lg:p-10" style={{ boxShadow: SHADOW_SM }}>
-        <h3 className="text-[11px] md:text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-5 md:mb-8">System Preferences</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-          <Field label="Timezone" icon={Clock}>
-            <select
-              value={settings.timezone}
-              onChange={e => set("timezone", e.target.value)}
-              className="w-full h-12 px-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-semibold text-[#1e293b] outline-none focus:border-blue-300 focus:bg-white transition-all appearance-none"
-            >
-              {TIMEZONE_OPTIONS.map(tz => <option key={tz}>{tz}</option>)}
-            </select>
-          </Field>
-
-          <Field label="Date Format" icon={Calendar}>
-            <select
-              value={settings.dateFormat}
-              onChange={e => set("dateFormat", e.target.value)}
-              className="w-full h-12 px-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-semibold text-[#1e293b] outline-none focus:border-blue-300 focus:bg-white transition-all appearance-none"
-            >
-              {DATE_FORMAT_OPTIONS.map(f => <option key={f}>{f}</option>)}
-            </select>
-          </Field>
-
-          <Field label="Currency" icon={DollarSign}>
-            <select
-              value={settings.currency}
-              onChange={e => set("currency", e.target.value)}
-              className="w-full h-12 px-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-semibold text-[#1e293b] outline-none focus:border-blue-300 focus:bg-white transition-all appearance-none"
-            >
-              {CURRENCY_OPTIONS.map(c => <option key={c}>{c}</option>)}
-            </select>
-          </Field>
-
-          <Field label="Language" icon={Globe}>
-            <select
-              value={settings.language}
-              onChange={e => set("language", e.target.value)}
-              className="w-full h-12 px-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-semibold text-[#1e293b] outline-none focus:border-blue-300 focus:bg-white transition-all appearance-none"
-            >
-              {LANGUAGE_OPTIONS.map(l => <option key={l}>{l}</option>)}
-            </select>
-          </Field>
-        </div>
-      </div>
 
       {/* ── Section 3: Notifications ─────────────────────────────────────── */}
       <div className="dash3d bg-white rounded-2xl md:rounded-[32px] border border-slate-100 p-5 md:p-8 lg:p-10" style={{ boxShadow: SHADOW_SM }}>
@@ -667,43 +626,6 @@ export default function SettingsPage() {
           ))}
         </div>
 
-        {/* WhatsApp notifications subsection */}
-        <div className="mt-5 md:mt-6 pt-5 md:pt-6 border-t border-slate-100 space-y-4">
-          <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <MessageCircle className="w-4 h-4 text-green-500 shrink-0" />
-            <p className="text-[11px] md:text-xs font-black text-slate-500 uppercase tracking-widest">WhatsApp Notifications</p>
-            <span className="text-[9px] font-black bg-green-50 text-green-600 border border-green-200 px-2 py-0.5 rounded-full whitespace-nowrap">
-              India — 95% open rate
-            </span>
-          </div>
-          <div>
-            <label className="block text-[11px] md:text-xs font-black text-slate-400 uppercase tracking-widest mb-1.5">
-              Your WhatsApp Number
-            </label>
-            <input
-              value={settings.whatsappPhone}
-              onChange={e => set("whatsappPhone" as any, e.target.value)}
-              placeholder="+91 98765 43210"
-              className="w-full md:max-w-xs px-4 py-2.5 rounded-xl border border-slate-200 text-[13px] md:text-sm font-medium text-[#1e294b] outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/10"
-            />
-            <p className="text-[10px] text-slate-400 mt-1">Include country code. Used for WhatsApp alerts below.</p>
-          </div>
-          {(["whatsappAlerts", "whatsappDigest"] as const).map(key => {
-            const meta = {
-              whatsappAlerts: { label: "Critical Alerts via WhatsApp",  desc: "Instant WhatsApp when critical risk alerts trigger" },
-              whatsappDigest: { label: "Weekly Digest via WhatsApp",    desc: "Monday AHI summary + top 3 action items on WhatsApp" },
-            }[key];
-            return (
-              <div key={key} className="flex items-center justify-between gap-3 md:gap-4 py-3 border-b border-slate-50 last:border-0">
-                <div className="min-w-0 flex-1">
-                  <p className="text-[13px] md:text-sm font-black text-[#1e293b]">{meta.label}</p>
-                  <p className="text-[10px] md:text-[11px] text-slate-400 font-medium mt-0.5">{meta.desc}</p>
-                </div>
-                <Toggle value={settings.notifications[key]} onChange={v => setNotif(key, v)} />
-              </div>
-            );
-          })}
-        </div>
       </div>
 
       {/* ── Section 4: Data Export ───────────────────────────────────────── */}
@@ -788,9 +710,9 @@ export default function SettingsPage() {
                   ...prev,
                   thresholds: { ...prev.thresholds, attendanceCritical: Math.min(90, Math.max(30, parseInt(e.target.value) || 65)) }
                 }))}
-                className="w-full h-12 rounded-xl bg-slate-50 border border-slate-100 px-4 text-sm font-bold text-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-100 focus:border-rose-200 transition-all"
+                className="w-full h-12 rounded-xl bg-slate-50 border border-slate-100 pl-4 pr-14 text-sm font-bold text-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-100 focus:border-rose-200 transition-all"
               />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">%</span>
+              <span className="pointer-events-none absolute right-8 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">%</span>
             </div>
           </div>
           <div className="space-y-3">
@@ -807,9 +729,9 @@ export default function SettingsPage() {
                   ...prev,
                   thresholds: { ...prev.thresholds, attendanceWarning: Math.min(95, Math.max(50, parseInt(e.target.value) || 80)) }
                 }))}
-                className="w-full h-12 rounded-xl bg-slate-50 border border-slate-100 px-4 text-sm font-bold text-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-200 transition-all"
+                className="w-full h-12 rounded-xl bg-slate-50 border border-slate-100 pl-4 pr-14 text-sm font-bold text-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-200 transition-all"
               />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">%</span>
+              <span className="pointer-events-none absolute right-8 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">%</span>
             </div>
           </div>
           <div className="space-y-3">
@@ -826,9 +748,9 @@ export default function SettingsPage() {
                   ...prev,
                   thresholds: { ...prev.thresholds, feeOverdueDays: Math.min(90, Math.max(7, parseInt(e.target.value) || 30)) }
                 }))}
-                className="w-full h-12 rounded-xl bg-slate-50 border border-slate-100 px-4 text-sm font-bold text-[#1e3a8a] focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-200 transition-all"
+                className="w-full h-12 rounded-xl bg-slate-50 border border-slate-100 pl-4 pr-20 text-sm font-bold text-[#1e3a8a] focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-200 transition-all"
               />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">days</span>
+              <span className="pointer-events-none absolute right-8 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">days</span>
             </div>
           </div>
         </div>

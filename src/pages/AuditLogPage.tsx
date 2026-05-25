@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import {
   B1, T1, T3, T4, GREEN, RED, GOLD, VIOLET,
   GRAD_PRIMARY, GRAD_BLUE, GRAD_GREEN, GRAD_VIOLET, GRAD_GOLD, GRAD_RED, GRAD_ORANGE,
+  GRAD_ACCENTS,
   SHADOW_SM, SHADOW_BTN, usePageShellStyle,
   DashGlobalStyles, PageHead, StatTile, DarkHero, Card3D, AIInsightCard,
 } from "@/lib/dashboardTokens";
@@ -190,6 +191,12 @@ export default function AuditLogPage() {
           {FILTERS.map(opt => {
             const active = filter === opt.value;
             const Icon = opt.icon;
+            /* Each filter has a pastel `grad` matching its StatTile (e.g.
+               GRAD_GREEN for principals). White text on those pastels is
+               unreadable — use the matching solid accent from GRAD_ACCENTS
+               as the active background instead. GRAD_PRIMARY (Exports) is
+               already dark, so it falls through unchanged. */
+            const activeBg = opt.grad === GRAD_PRIMARY ? GRAD_PRIMARY : (GRAD_ACCENTS[opt.grad] || GRAD_PRIMARY);
             return (
               <button
                 key={opt.value}
@@ -198,7 +205,7 @@ export default function AuditLogPage() {
                 style={{
                   display:"inline-flex", alignItems:"center", gap: isMobile ? 5 : 6,
                   padding: isMobile ? "8px 12px" : "9px 16px", borderRadius: isMobile ? 999 : 12,
-                  background: active ? opt.grad : "#fff",
+                  background: active ? activeBg : "#fff",
                   color: active ? "#fff" : T3,
                   fontSize: isMobile ? 10 : 11, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
                   border: active ? "none" : "0.5px solid rgba(0,85,255,.12)",
