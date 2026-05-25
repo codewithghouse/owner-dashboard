@@ -716,14 +716,14 @@ export default function PrincipalManagement() {
             {filteredBranches.map(branch => {
               /* Match by branchId for stale-rename safety; fall back to name only as last resort. */
               const assignedPrincipal = principalsForBranch(branch).find(p => p.status === 'Active' || p.status === 'Invited');
-              const statusConf = getStatusConfig(branch.status);
+              // Older branch docs predate the status field — treat them as Active
+              // so the pill is never blank.
+              const branchStatus = branch.status || 'Active';
+              const statusConf = getStatusConfig(branchStatus);
               return (
                 <div
                   key={branch.id}
-                  onClick={() => navigate(`/branches/${branch.id}`)}
-                  role="button"
-                  tabIndex={0}
-                  className="dash3d clickable-card bg-white rounded-2xl md:rounded-[2rem] border border-slate-100 overflow-hidden group"
+                  className="dash3d bg-white rounded-2xl md:rounded-[2rem] border border-slate-100 overflow-hidden group"
                   style={{ boxShadow: SHADOW_SM }}
                 >
                   {/* Branch Header Strip */}
@@ -743,7 +743,7 @@ export default function PrincipalManagement() {
                         </div>
                       </div>
                       <span className={`px-2.5 md:px-3 py-1 rounded-lg text-[8px] md:text-[9px] font-black uppercase tracking-widest shrink-0 ${statusConf.bg} ${statusConf.text} ${statusConf.border} border`}>
-                        {branch.status}
+                        {branchStatus}
                       </span>
                     </div>
 
@@ -765,7 +765,12 @@ export default function PrincipalManagement() {
                     </div>
 
                     {/* Assigned Principal */}
-                    <div className={`p-3 md:p-4 rounded-xl md:rounded-2xl border ${assignedPrincipal ? 'bg-[#f0fdf4] border-emerald-100' : 'bg-[#fef2f2] border-rose-100'}`}>
+                    <div
+                      onClick={!assignedPrincipal ? () => handleReassignPrincipal(branch.name, branch.color) : undefined}
+                      role={!assignedPrincipal ? 'button' : undefined}
+                      tabIndex={!assignedPrincipal ? 0 : undefined}
+                      className={`p-3 md:p-4 rounded-xl md:rounded-2xl border ${assignedPrincipal ? 'bg-[#f0fdf4] border-emerald-100' : 'bg-[#fef2f2] border-rose-100 cursor-pointer hover:bg-rose-50 transition-colors'}`}
+                    >
                       {assignedPrincipal ? (
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2.5 md:gap-3 min-w-0 flex-1">
@@ -792,7 +797,7 @@ export default function PrincipalManagement() {
                             </div>
                           </div>
                           <button
-                            onClick={() => handleReassignPrincipal(branch.name, branch.color)}
+                            onClick={(e) => { e.stopPropagation(); handleReassignPrincipal(branch.name, branch.color); }}
                             className="px-3 md:px-4 py-1.5 rounded-lg bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 transition-colors shrink-0"
                           >
                             Assign
