@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   Users,
   GraduationCap,
+  UserCog,
   DollarSign,
   Menu,
 } from "lucide-react";
@@ -18,10 +19,11 @@ interface Props {
 
 export default function MobileTabBar({ onMoreClick, hidden }: Props) {
   const tabs: Tab[] = [
-    { kind: "link",   to: "/",                   label: "Home",     icon: LayoutDashboard, end: true },
-    { kind: "link",   to: "/students",           label: "Students", icon: Users },
-    { kind: "link",   to: "/teachers-directory", label: "Teachers", icon: GraduationCap },
-    { kind: "link",   to: "/finance",            label: "Finance",  icon: DollarSign },
+    { kind: "link",   to: "/",                   label: "Home",       icon: LayoutDashboard, end: true },
+    { kind: "link",   to: "/students",           label: "Students",   icon: Users },
+    { kind: "link",   to: "/teachers-directory", label: "Teachers",   icon: GraduationCap },
+    { kind: "link",   to: "/principals",         label: "Principals", icon: UserCog },
+    { kind: "link",   to: "/finance",            label: "Finance",    icon: DollarSign },
     { kind: "action", label: "More", icon: Menu, onClick: onMoreClick },
   ];
 

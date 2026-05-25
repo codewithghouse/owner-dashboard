@@ -742,9 +742,17 @@ main > div,
     transform: none !important;
   }
 
-  /* Active press feedback instead of hover lift */
-  .dash3d:active,
-  .dash-tile:active {
+  /* Active press feedback instead of hover lift.
+     IMPORTANT: only scale when the card itself is the press target.
+     Without :not(:has(...)), :active propagates from any clicked child
+     up to ancestor .dash3d / .dash-tile, so pressing a filter chip or
+     a <select> inside a Card3D would visibly shrink the whole card —
+     creating a "line" artifact at the bottom edge and breaking native
+     dropdown positioning. Scoping with :has(button/input/select:active)
+     keeps the press feedback on standalone clickable cards while
+     leaving container cards calm when their children are tapped. */
+  .dash3d:active:not(:has(button:active, input:active, select:active, a:active)),
+  .dash-tile:active:not(:has(button:active, input:active, select:active, a:active)) {
     transform: scale(0.98) !important;
     transition: transform 0.1s ease !important;
   }

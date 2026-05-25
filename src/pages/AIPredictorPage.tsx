@@ -356,7 +356,7 @@ export default function AIPredictorPage() {
                 ))}
               </select>
             )}
-            <div style={{
+            <div className="no-scrollbar" style={{
               display:"flex",
               gap: isMobile ? 5 : 6,
               flexWrap: isMobile ? "nowrap" : "wrap",
