@@ -182,14 +182,99 @@ export function buildRiskFactors({
   return factors;
 }
 
-export function buildRecommendation(level: RiskLevel, factors: string[]): string {
-  if (level === "Critical")
-    return "Urgent: Schedule parent meeting + principal intervention + personalised tutoring plan.";
-  if (level === "High")
-    return "Schedule parent meeting + assign extra tutoring sessions this month.";
-  if (level === "Watch")
-    return "Monitor closely. Send progress update to parents and check in weekly.";
-  return "Student is on track. Continue regular check-ins.";
+// 60 recommendation variants split across the 4 risk levels (15 each).
+// Picked deterministically by hashing the studentId so the same student
+// always sees the same text on refresh (AI-like stability) while neighbouring
+// students see distinct phrasing (no "every Watch student says the same thing"
+// problem the screenshot 2026-05-26 surfaced).
+const RECOMMENDATION_POOLS: Record<RiskLevel, string[]> = {
+  Critical: [
+    "Urgent: Schedule parent meeting + principal intervention + personalised tutoring plan.",
+    "Immediate parent conference required. Pair student with a peer tutor and start daily check-ins.",
+    "Convene a case review with class teacher, counsellor, and principal within 48 hours.",
+    "Trigger Tier-3 academic support — 1:1 remedial sessions, weekly parent calls, attendance lock.",
+    "Escalate to principal. Build a 30-day recovery plan with clear weekly milestones.",
+    "Bring parents on board this week. Assign a faculty mentor and rework the study schedule.",
+    "Initiate intensive remediation: daily after-school tutoring + parent SMS updates.",
+    "Failing-this-semester risk is severe. Pull student into the Academic Support Program immediately.",
+    "Personalised intervention plan needed. Loop in subject teachers and counsellor by Friday.",
+    "Schedule a home visit + diagnostic test to surface root cause. Daily progress logging.",
+    "Hold a formal parent-teacher conference. Set non-negotiable attendance and homework targets.",
+    "Trajectory is failing. Activate full-stack support — tutoring, counselling, parent engagement.",
+    "Flag for principal review. Open a grade-retention conversation with parents this week.",
+    "Pair with two strong-performing classmates as study partners; review daily progress logs.",
+    "Critical case — assign a dedicated mentor and reduce extra-curricular load this term.",
+  ],
+  High: [
+    "Schedule parent meeting + assign extra tutoring sessions this month.",
+    "Add to the at-risk roster for fortnightly review with class teacher.",
+    "Begin weekly remedial classes; share progress reports with parents every Sunday.",
+    "Pair with a top-performing classmate for peer tutoring twice a week.",
+    "Set up a meeting with parents to align on a structured study routine at home.",
+    "Run a diagnostic test to identify weak topics, then assign targeted practice.",
+    "Move into the focused-support batch. Counsellor check-in within 7 days.",
+    "Increase classroom seating proximity to teacher; daily homework verification.",
+    "Send weekly progress SMS to parents; offer make-up sessions after school.",
+    "Build a subject-wise improvement plan with the class teacher this week.",
+    "Assign extra worksheets and review them in class within 48 hours.",
+    "Enrol in the school's Saturday remedial programme; track attendance there too.",
+    "Speak to parents about reducing home distractions — phone use, social calendar.",
+    "Bring in a subject-specific tutor for the two weakest subjects.",
+    "Track score-by-score for the next 4 tests; re-evaluate after that window.",
+  ],
+  Watch: [
+    "Monitor closely. Send progress update to parents and check in weekly.",
+    "Light follow-up — call parents this week, share encouragement and one concrete tip.",
+    "Add to the monthly review list. Watch for any further dip in the next 2 tests.",
+    "Offer optional after-school study time. Track engagement, not just marks.",
+    "Touch base informally — a short 1:1 conversation often surfaces what scores don't.",
+    "Keep an eye on attendance and recent quiz scores; intervene only if the trend worsens.",
+    "Nudge parents — recommend 30 mins of additional revision at home daily.",
+    "Class teacher should chat 1:1 with the student to understand any stress points.",
+    "Recognise small wins publicly to build momentum; reassess in 2 weeks.",
+    "Schedule a check-in during the PT meeting next month. No urgent action yet.",
+    "Encourage the student to join a study group with stronger classmates.",
+    "Confirm whether sleep or attendance habits are the underlying drag here.",
+    "Recommend the school counsellor for a routine wellness conversation.",
+    "Suggest revising the weakest topics during a weekend self-study hour.",
+    "Watch closely but avoid over-flagging — student likely just needs steady momentum.",
+  ],
+  Safe: [
+    "Student is on track. Continue regular check-ins.",
+    "Performance is healthy — maintain current routine and recognise consistency.",
+    "Doing well. Could be moved into a peer-tutoring role to help weaker classmates.",
+    "Steady progress — no intervention required. Mention positively in next PT meeting.",
+    "On a strong trajectory. Check if student is ready for advanced challenges.",
+    "Maintain. Consider nominating for the school's enrichment programme.",
+    "Healthy academic profile — keep a light eye but no flags right now.",
+    "Stable performer. Encourage participation in inter-school competitions.",
+    "On track this term. Praise effort visibly to sustain motivation.",
+    "No concerns. Use as a positive example in classroom feedback.",
+    "Performing well. Consider stretch goals — Olympiad, project work, leadership.",
+    "Doing fine. A routine PT meeting note is sufficient.",
+    "Solid attendance and scores. Set personal-best goals to keep momentum.",
+    "Continue current path. Share a quick appreciation note with parents.",
+    "Track casually for any signs of plateau; otherwise let the student lead.",
+  ],
+};
+
+function hashStudentId(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) {
+    h = ((h << 5) - h) + id.charCodeAt(i);
+    h |= 0;
+  }
+  return Math.abs(h);
+}
+
+export function buildRecommendation(
+  level: RiskLevel,
+  _factors: string[],
+  studentId?: string,
+): string {
+  const pool = RECOMMENDATION_POOLS[level] ?? RECOMMENDATION_POOLS.Safe;
+  if (!studentId) return pool[0];
+  return pool[hashStudentId(studentId) % pool.length];
 }
 
 // ── Main fetch + compute ──────────────────────────────────────────────────────
@@ -502,7 +587,7 @@ export async function fetchAllPredictions(opts: { force?: boolean } = {}): Promi
         attendance, avgScore, scoreTrend, feeDefaulted, recentScores,
         hasAttendanceData, hasScoreData, hasTrendData,
       });
-      const recommendation = buildRecommendation(riskLevel, riskFactors);
+      const recommendation = buildRecommendation(riskLevel, riskFactors, sid);
 
       predictions.push({
         studentId: sid,

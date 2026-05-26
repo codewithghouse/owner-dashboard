@@ -457,11 +457,21 @@ export default function AIPredictorPage() {
                 <div
                   key={p.studentId}
                   className="dash-card"
+                  onClick={() => setExpanded(isExpanded ? null : p.studentId)}
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={isExpanded}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setExpanded(isExpanded ? null : p.studentId);
+                    }
+                  }}
                   style={{
                     background:"#fff", borderRadius: isMobile ? 14 : 18,
                     border:`0.5px solid ${tier.color}33`,
                     boxShadow:SHADOW_SM, overflow:"hidden",
-                    position:"relative",
+                    position:"relative", cursor:"pointer",
                   }}
                 >
                   <div style={{ position:"absolute", left:0, top:0, bottom:0, width: isMobile ? 3 : 4, background:tier.solidGrad }}/>
@@ -500,7 +510,7 @@ export default function AIPredictorPage() {
                             {copiedId === p.studentId ? <Check size={14} color={GREEN}/> : <Share2 size={13} color={T3}/>}
                           </button>
                           <button
-                            onClick={() => setExpanded(isExpanded ? null : p.studentId)}
+                            onClick={(e) => { e.stopPropagation(); setExpanded(isExpanded ? null : p.studentId); }}
                             aria-label={isExpanded ? "Collapse" : "Expand"}
                             className="dash-btn"
                             style={{
@@ -639,7 +649,8 @@ export default function AIPredictorPage() {
                         {copiedId === p.studentId ? <Check size={14} color={GREEN}/> : <Share2 size={13} color={T3}/>}
                       </button>
                       <button
-                        onClick={() => setExpanded(isExpanded ? null : p.studentId)}
+                        onClick={(e) => { e.stopPropagation(); setExpanded(isExpanded ? null : p.studentId); }}
+                        aria-label={isExpanded ? "Collapse" : "Expand"}
                         className="dash-btn"
                         style={{
                           width:34, height:34, borderRadius:10,
@@ -654,13 +665,18 @@ export default function AIPredictorPage() {
                   </div>
                   )}
 
-                  {/* Expanded Detail */}
+                  {/* Expanded Detail — clicks inside don't bubble to the
+                       card-level toggle so users can interact with chips,
+                       the parent-link button, etc. without collapsing the
+                       panel. To collapse: click the chevron. */}
                   {isExpanded && (
                     <div
+                      onClick={(e) => e.stopPropagation()}
                       style={{
                         borderTop:`0.5px solid ${tier.color}22`,
                         background:tier.bg, padding: isMobile ? "14px 14px 14px 16px" : "16px 22px",
                         display:"flex", flexDirection:"column", gap: isMobile ? 12 : 14,
+                        cursor:"default",
                       }}
                     >
                       <div>
@@ -695,14 +711,29 @@ export default function AIPredictorPage() {
                             paddingBottom: isMobile ? 2 : 0,
                           }}>
                             {[...p.recentScores].reverse().map((s, i) => {
-                              const scoreGrad = s >= 75 ? GRAD_GREEN : s >= 50 ? GRAD_GOLD : GRAD_RED;
+                              // Saturated solid gradients so white text reads.
+                              // The pale GRAD_* tokens are for stat-tile
+                              // backgrounds where text is dark — they killed
+                              // contrast on these score chips (2026-05-26 fix).
+                              const scoreGrad = s >= 75
+                                ? "linear-gradient(135deg,#10B981 0%,#059669 100%)"
+                                : s >= 50
+                                ? "linear-gradient(135deg,#F59E0B 0%,#D97706 100%)"
+                                : "linear-gradient(135deg,#FF3355 0%,#DC2626 100%)";
+                              const scoreShadow = s >= 75
+                                ? "0 4px 12px rgba(16,185,129,.30)"
+                                : s >= 50
+                                ? "0 4px 12px rgba(245,158,11,.30)"
+                                : "0 4px 12px rgba(255,51,85,.30)";
                               return (
                                 <div key={i} style={{ textAlign:"center", flexShrink:0 }}>
                                   <div style={{
-                                    width: isMobile ? 36 : 40, height: isMobile ? 36 : 40, borderRadius: isMobile ? 11 : 12, background:scoreGrad,
+                                    width: isMobile ? 38 : 42, height: isMobile ? 38 : 42, borderRadius: isMobile ? 11 : 12, background:scoreGrad,
                                     display:"flex", alignItems:"center", justifyContent:"center",
-                                    color:"#fff", fontSize: isMobile ? 11 : 12, fontWeight:800,
-                                    boxShadow:"0 4px 10px rgba(0,0,0,.12)",
+                                    color:"#fff", fontSize: isMobile ? 13 : 14, fontWeight:800,
+                                    letterSpacing:"-0.2px",
+                                    boxShadow: scoreShadow,
+                                    textShadow:"0 1px 2px rgba(0,0,0,.18)",
                                   }}>
                                     {s}
                                   </div>
