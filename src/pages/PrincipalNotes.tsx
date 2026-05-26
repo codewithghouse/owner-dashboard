@@ -20,6 +20,7 @@ import {
   doc, updateDoc, orderBy,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import {
   Send, Loader2, MessageSquare, Search, Mail, ShieldCheck, ChevronLeft,
@@ -52,6 +53,7 @@ interface NoteDoc {
 }
 
 const PrincipalNotes = () => {
+  const isMobile = useIsMobile();
   const [principals, setPrincipals] = useState<PrincipalRow[]>([]);
   const [notes, setNotes] = useState<NoteDoc[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -305,16 +307,24 @@ const PrincipalNotes = () => {
         </div>
       </div>
 
-      {/* ── Two-panel chat layout ── */}
+      {/* ── Two-panel chat layout ──
+          Desktop: side-by-side (list 320px | chat 1fr).
+          Mobile: single column, toggle between list and chat based on
+          whether a principal is selected. The chat header already has a
+          ChevronLeft back button that clears selectedId, so going back
+          to the list works out of the box. */}
       <div style={{
-        display: "grid", gridTemplateColumns: "320px 1fr", gap: 16,
+        display: "grid",
+        gridTemplateColumns: isMobile ? "1fr" : "320px 1fr",
+        gap: isMobile ? 0 : 16,
         minHeight: "calc(100vh - 240px)",
       }}>
 
         {/* Left — principal list */}
         <div style={{
           background: T.CARD, borderRadius: 18, border: T.BDR, boxShadow: T.SH,
-          display: "flex", flexDirection: "column", overflow: "hidden",
+          display: (isMobile && selectedPrincipal) ? "none" : "flex",
+          flexDirection: "column", overflow: "hidden",
         }}>
           <div style={{ padding: "14px 14px 10px", borderBottom: T.BDR }}>
             <div style={{ position: "relative" }}>
@@ -406,10 +416,11 @@ const PrincipalNotes = () => {
           </div>
         </div>
 
-        {/* Right — chat thread */}
+        {/* Right — chat thread (hidden on mobile until a principal is selected). */}
         <div style={{
           background: T.CARD, borderRadius: 18, border: T.BDR, boxShadow: T.SH,
-          display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0,
+          display: (isMobile && !selectedPrincipal) ? "none" : "flex",
+          flexDirection: "column", overflow: "hidden", minWidth: 0,
         }}>
           {!selectedPrincipal ? (
             <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 40, textAlign: "center", color: T.T3 }}>
