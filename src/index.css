@@ -309,6 +309,19 @@ select.settings-select {
   padding-right: 38px;
 }
 
+/* TeachersDirectory filter tab pills (By Branch / By Class / Top Performers /
+   Needs Attention). Inline fontWeight:800 is wiped by the universal
+   `* { font-weight: 400 !important }` rule, so inactive labels render in a
+   hairline weight at 10–11px ALL-CAPS — looks blurry and low-contrast on
+   white. Force a readable weight + darker ink with class-level !important. */
+.td-tab,
+.td-tab__count {
+  font-weight: 800 !important;
+}
+.td-tab--inactive {
+  color: #1B2A55 !important;
+}
+
 /* Buttons consistent vertical padding */
 button {
   line-height: 1.4;

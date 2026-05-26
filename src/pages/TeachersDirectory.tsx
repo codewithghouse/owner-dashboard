@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import { db, auth } from "@/lib/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import {
@@ -75,6 +76,142 @@ function parseScoreValue(data: any): number | null {
 }
 
 type TabKey = "branch" | "class" | "top" | "defaulter";
+
+/* ── PortalSelect ─────────────────────────────────────────
+   Native <select> with appearance:none breaks positioning when an ancestor
+   has CSS transforms (the page-level ownerFadeSlideIn animation creates a
+   containing block, so Chromium opens the popup upward / off-screen).
+   This is a custom dropdown that renders its menu via createPortal to
+   document.body, so it escapes every ancestor transform. */
+function PortalSelect({
+  value,
+  options,
+  onChange,
+  leftIcon,
+  formatLabel,
+  fontSize = 12,
+}: {
+  value: string;
+  options: string[];
+  onChange: (v: string) => void;
+  leftIcon: React.ReactNode;
+  formatLabel?: (v: string) => string;
+  fontSize?: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const [rect, setRect] = useState<{ top: number; left: number; width: number; openUp: boolean } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const label = formatLabel ? formatLabel(value) : value;
+
+  const measure = () => {
+    const el = triggerRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const menuHeight = Math.min(options.length * 40 + 12, 280);
+    const spaceBelow = window.innerHeight - r.bottom;
+    const openUp = spaceBelow < menuHeight + 16 && r.top > menuHeight + 16;
+    setRect({ top: openUp ? r.top - 6 : r.bottom + 6, left: r.left, width: r.width, openUp });
+  };
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    measure();
+    const onScrollOrResize = () => measure();
+    window.addEventListener("scroll", onScrollOrResize, true);
+    window.addEventListener("resize", onScrollOrResize);
+    return () => {
+      window.removeEventListener("scroll", onScrollOrResize, true);
+      window.removeEventListener("resize", onScrollOrResize);
+    };
+  }, [open, options.length]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (triggerRef.current?.contains(t)) return;
+      if (menuRef.current?.contains(t)) return;
+      setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDocDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        style={{
+          width: "100%", display: "flex", alignItems: "center", gap: 8,
+          padding: "10px 36px 10px 36px", borderRadius: 12, position: "relative",
+          border: "0.5px solid rgba(0,85,255,.14)", background: "#F5F9FF",
+          fontSize, color: T3, outline: "none", fontFamily: "inherit",
+          cursor: "pointer", textAlign: "left",
+        }}
+        className="td-tab"
+      >
+        <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", pointerEvents: "none" }}>
+          {leftIcon}
+        </span>
+        <span style={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
+        <ChevronDown
+          size={14} color={T4}
+          style={{ position: "absolute", right: 12, top: "50%", transform: `translateY(-50%) rotate(${open ? 180 : 0}deg)`, transition: "transform .15s", pointerEvents: "none" }}
+        />
+      </button>
+      {open && rect && createPortal(
+        <div
+          ref={menuRef}
+          style={{
+            position: "fixed",
+            top: rect.openUp ? undefined : rect.top,
+            bottom: rect.openUp ? window.innerHeight - rect.top : undefined,
+            left: rect.left, width: rect.width,
+            background: "#fff", borderRadius: 12,
+            border: "0.5px solid rgba(0,85,255,.14)",
+            boxShadow: "0 12px 32px rgba(0,30,90,.18), 0 2px 6px rgba(0,30,90,.08)",
+            maxHeight: 280, overflowY: "auto",
+            zIndex: 9999, padding: 6,
+          }}
+        >
+          {options.map(opt => {
+            const selected = opt === value;
+            return (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => { onChange(opt); setOpen(false); }}
+                style={{
+                  width: "100%", textAlign: "left",
+                  padding: "9px 12px", borderRadius: 8, border: "none",
+                  background: selected ? "rgba(0,85,255,.10)" : "transparent",
+                  color: selected ? B1 : T1,
+                  fontSize, fontFamily: "inherit", cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 8,
+                }}
+                className="td-tab"
+                onMouseEnter={e => { if (!selected) (e.currentTarget as HTMLButtonElement).style.background = "rgba(0,85,255,.05)"; }}
+                onMouseLeave={e => { if (!selected) (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
+              >
+                {formatLabel ? formatLabel(opt) : opt}
+              </button>
+            );
+          })}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
 
 /* ══════════════════════════════════════════════════════ */
 export default function TeachersDirectory() {
@@ -638,36 +775,20 @@ export default function TeachersDirectory() {
                 }}
               />
             </div>
-            <div style={{ position:"relative" }}>
-              <Building2 size={14} color={T4} style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}/>
-              <select
-                value={branchFilter}
-                onChange={e=>setBranchFilter(e.target.value)}
-                style={{
-                  width:"100%", appearance:"none", padding:"10px 36px 10px 36px", borderRadius:12,
-                  border:"0.5px solid rgba(0,85,255,.14)", background:"#F5F9FF",
-                  fontSize:12, fontWeight:700, color:T3, outline:"none", fontFamily:"inherit", cursor:"pointer",
-                }}
-              >
-                {branchList.map(b => <option key={b} value={b}>{b === "All" ? "All Branches" : b}</option>)}
-              </select>
-              <ChevronDown size={14} color={T4} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}/>
-            </div>
-            <div style={{ position:"relative" }}>
-              <BookOpen size={14} color={T4} style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}/>
-              <select
-                value={classFilter}
-                onChange={e=>setClassFilter(e.target.value)}
-                style={{
-                  width:"100%", appearance:"none", padding:"10px 36px 10px 36px", borderRadius:12,
-                  border:"0.5px solid rgba(0,85,255,.14)", background:"#F5F9FF",
-                  fontSize:12, fontWeight:700, color:T3, outline:"none", fontFamily:"inherit", cursor:"pointer",
-                }}
-              >
-                {classList.map(c => <option key={c} value={c}>{c === "All" ? "All Classes" : c}</option>)}
-              </select>
-              <ChevronDown size={14} color={T4} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}/>
-            </div>
+            <PortalSelect
+              value={branchFilter}
+              options={branchList}
+              onChange={setBranchFilter}
+              leftIcon={<Building2 size={14} color={T4}/>}
+              formatLabel={(b) => b === "All" ? "All Branches" : b}
+            />
+            <PortalSelect
+              value={classFilter}
+              options={classList}
+              onChange={setClassFilter}
+              leftIcon={<BookOpen size={14} color={T4}/>}
+              formatLabel={(c) => c === "All" ? "All Classes" : c}
+            />
           </div>
         </Card3D>
 
@@ -695,22 +816,22 @@ export default function TeachersDirectory() {
                 <button
                   key={t.key}
                   onClick={()=>{ setTab(t.key); setExpanded(new Set()); }}
-                  className="dash-btn"
+                  className={`dash-btn td-tab${active ? "" : " td-tab--inactive"}`}
                   style={{
                     display:"inline-flex", alignItems:"center", gap: isMobile ? 6 : 8,
-                    padding: isMobile ? "8px 12px" : "10px 16px", borderRadius:12,
+                    padding: isMobile ? "9px 13px" : "10px 16px", borderRadius:12,
                     background: active ? GRAD_PRIMARY : "transparent",
-                    color: active ? "#fff" : "#33457A",
-                    fontSize: isMobile ? 10 : 11, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
+                    color: active ? "#fff" : "#1B2A55",
+                    fontSize: isMobile ? 11 : 11, letterSpacing:"0.06em", textTransform:"uppercase",
                     border:"none", cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap",
                     boxShadow: active ? SHADOW_BTN : "none",
                     flexShrink:0,
                   }}
                 >
-                  <t.icon size={isMobile ? 12 : 14} strokeWidth={2.4} color={active ? "#fff" : "#33457A"}/>
+                  <t.icon size={isMobile ? 13 : 14} strokeWidth={2.6} color={active ? "#fff" : "#1B2A55"}/>
                   <span>{t.label}</span>
-                  <span style={{
-                    fontSize:10, fontWeight:800, padding:"2px 7px", borderRadius:999,
+                  <span className="td-tab__count" style={{
+                    fontSize:10, padding:"2px 7px", borderRadius:999,
                     background: active ? "rgba(255,255,255,.3)" : "rgba(0,85,255,.10)",
                     color: active ? "#fff" : "#0044CC",
                   }}>
