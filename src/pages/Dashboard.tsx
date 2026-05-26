@@ -315,7 +315,11 @@ export default function Dashboard() {
           const tier: "low" | "mid" | "crit" = avg >= 75 ? "low" : avg >= 50 ? "mid" : "crit";
           ensure("all")[tier]++;
           const bid = studentBranch.get(sid);
-          if (bid) ensure(bid)[tier]++;
+          // Orphan students (no branchId on any of their score docs) get
+          // routed to the synthetic "_unassigned" bucket — surfaces in the
+          // dropdown as "Unassigned" so the founder can drill into them
+          // instead of them only contributing silently to the "all" total.
+          ensure(bid || "_unassigned")[tier]++;
         });
         setRiskByBranch(riskMap);
 
@@ -696,14 +700,49 @@ export default function Dashboard() {
     [alerts]
   );
 
+  // Detect orphan-branchId rows (alerts whose branchId doesn't map to any
+  // canonical branch). Surface them under a virtual "Unassigned" option in
+  // both branch dropdowns so the founder can drill into orphan data instead
+  // of it staying invisible behind "All Branches". Matches the
+  // AcademicsOverview + AIPredictor pattern (2026-05-26 audit).
+  const UNASSIGNED = "_unassigned";
+  const validBranchIds = useMemo(() => new Set(branches.map(b => b.id)), [branches]);
+  const isOrphanBranch = (bid: string | undefined): boolean =>
+    !bid || !validBranchIds.has(bid);
+  const hasUnassignedAlerts = useMemo(
+    () => alerts.some(a => isOrphanBranch(a.branchId)),
+    [alerts, validBranchIds]  // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const hasUnassignedRisks = useMemo(
+    () => Array.from(riskByBranch.keys()).some(k => k !== "all" && k !== UNASSIGNED && !validBranchIds.has(k))
+       || riskByBranch.has(UNASSIGNED),
+    [riskByBranch, validBranchIds]
+  );
+  const branchesWithUnassignedAlerts = useMemo(
+    () => hasUnassignedAlerts
+      ? [...branches, { id: UNASSIGNED, name: "Unassigned" }]
+      : branches,
+    [branches, hasUnassignedAlerts]
+  );
+  const branchesWithUnassignedRisks = useMemo(
+    () => hasUnassignedRisks
+      ? [...branches, { id: UNASSIGNED, name: "Unassigned" }]
+      : branches,
+    [branches, hasUnassignedRisks]
+  );
+
   // Branch-aware filtering — alert.branchId is the only correct key. Compare
-  // against selectedAlertBranch ("all" | branchId). schoolId is owner-scoped and
-  // never matches a branch id, so it isn't part of the filter.
+  // against selectedAlertBranch ("all" | branchId | "_unassigned"). schoolId
+  // is owner-scoped and never matches a branch id, so it isn't part of the
+  // filter. Selecting Unassigned matches any alert whose branchId is empty
+  // or doesn't appear in the canonical branches list.
   const filteredAlerts = useMemo(
     () => selectedAlertBranch === "all"
       ? alerts
-      : alerts.filter(a => a.branchId === selectedAlertBranch),
-    [alerts, selectedAlertBranch],
+      : selectedAlertBranch === UNASSIGNED
+        ? alerts.filter(a => isOrphanBranch(a.branchId))
+        : alerts.filter(a => a.branchId === selectedAlertBranch),
+    [alerts, selectedAlertBranch, validBranchIds]  // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   // Fresh school detection — only the absence of branches matters. A school
@@ -1198,7 +1237,7 @@ export default function Dashboard() {
                   style={{ fontSize: 11, fontWeight: 700, color: T3, background: "#fff", border: "0.5px solid rgba(0,85,255,.14)", borderRadius: 10, padding: "6px 10px", outline: "none", cursor: "pointer", fontFamily: "inherit", boxShadow: SHADOW_SM }}
                 >
                   <option value="all">All Branches</option>
-                  {branches.map(b => (
+                  {branchesWithUnassignedRisks.map(b => (
                     <option key={b.id} value={b.id}>{b.name}</option>
                   ))}
                 </select>
@@ -1341,7 +1380,7 @@ export default function Dashboard() {
                 style={{ fontSize: 11, fontWeight: 700, color: T3, background: "#fff", border: "0.5px solid rgba(0,85,255,.14)", borderRadius: 10, padding: "6px 10px", outline: "none", cursor: "pointer", fontFamily: "inherit", boxShadow: SHADOW_SM }}
               >
                 <option value="all">All Branches</option>
-                {branches.map(b => (
+                {branchesWithUnassignedAlerts.map(b => (
                   <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
               </select>

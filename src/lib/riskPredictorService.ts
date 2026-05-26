@@ -452,13 +452,26 @@ export async function fetchAllPredictions(opts: { force?: boolean } = {}): Promi
       return formatDate(ms);
     };
     const scoreMap = new Map<string, { score: number; ts: number; dateStr: string }[]>();
+    // Defensive percentage parsing. Real-world test_score / gradebook_scores
+    // docs sometimes carry corrupt values: raw marks pasted into the
+    // `percentage` field (e.g. 5000000000), scientific-notation strings
+    // ("5e+12"), or string-typed numbers with extra zeros
+    // ("50.0000000000000"). Before this guard, those values flowed
+    // verbatim into `recentScores` — the UI chip rendered "5000000000…"
+    // overflowing its 40px box, AND avgScore math summed billions,
+    // classifying healthy students as Critical (2026-05-26 screenshot).
+    // Now: NaN/negative → drop the entry; > 100 → clamp to 100 (assume
+    // raw marks for a 100-point test); always round to integer so the
+    // chip stays ≤3 chars wide.
     [scoresSnap, gradebookSnap].forEach(snap => {
       snap.docs.forEach((d: any) => {
         const data = d.data() as any;
         const rawSid = data.studentId || data.studentEmail || "";
         const sid  = canonicalKey(rawSid);
-        const pct  = parseFloat(data.percentage ?? data.score ?? "");
-        if (!sid || isNaN(pct)) return;
+        let pct  = parseFloat(data.percentage ?? data.score ?? "");
+        if (!sid || isNaN(pct) || pct < 0) return;
+        if (pct > 100) pct = 100;
+        pct = Math.round(pct);
         if (!scoreMap.has(sid)) scoreMap.set(sid, []);
         scoreMap.get(sid)!.push({ score: pct, ts: tsOf(data), dateStr: dateOf(data) });
       });
@@ -533,10 +546,18 @@ export async function fetchAllPredictions(opts: { force?: boolean } = {}): Promi
          "branchId" into prediction → parent_tokens snapshots, breaking
          every cross_dashboard_linking_rule consumer downstream. Now: empty
          string when truly unmapped, so consumers can detect-and-flag
-         instead of running queries against a bogus branch. The display
-         `branch` name still falls back to schoolName for the UI. */
+         instead of running queries against a bogus branch.
+
+         Display `branch` falls back to schoolName, then to "Unassigned"
+         (was "—"). The em-dash was treated as "no branch" by the page's
+         dropdown builder (line ~113 of AIPredictorPage) and silently
+         dropped these students from the branch filter, so an orphan
+         student would only ever appear under "All" — never reachable by
+         a specific filter, and never visible if the user drilled into
+         any one branch. Matches the AcademicsOverview "Unassigned"
+         virtual-branch pattern (2026-05-26). */
       const branchId = String(e.branchId || "");
-      const branch   = (branchId && branchMap.get(branchId)) || e.schoolName || "—";
+      const branch   = (branchId && branchMap.get(branchId)) || e.schoolName || "Unassigned";
 
       const scores  = scoreMap.get(sid) || [];
       const recentSlice      = scores.slice(0, 5);                       // newest first

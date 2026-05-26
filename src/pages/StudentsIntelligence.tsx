@@ -128,6 +128,13 @@ export default function StudentsIntelligence() {
   const [branches,   setBranches]   = useState<Map<string,string>>(new Map());
   // heatRaw: branchName → grade → {p, t}
   const [heatRaw,    setHeatRaw]    = useState<Map<string, Map<string,{p:number;t:number}>>>(new Map());
+  // studentIds whose score / attendance docs carry an orphan branchId
+  // (empty, or not present in the canonical branches subcollection). Drives
+  // the virtual "Unassigned" entry in the branch filter — even when the
+  // student's enrollment IS clean, this surfaces them so the founder can
+  // audit data hygiene across all three sources (matches AcademicsOverview
+  // behaviour, 2026-05-26).
+  const [orphanStudentIds, setOrphanStudentIds] = useState<Set<string>>(new Set());
   const [loading,    setLoading]    = useState(true);
 
   /* ── UI state ───────────────────────────────────── */
@@ -223,12 +230,31 @@ export default function StudentsIntelligence() {
 
         const enrollments = enrollSnap.docs.map(d => ({ _eid: d.id, ...d.data() as any }));
 
+        // Track students whose score OR attendance docs have an orphan
+        // branchId (missing, or not in branchMap). Used to surface a
+        // virtual "Unassigned" option in the page filter dropdown even
+        // when enrolments are clean.
+        const orphanIds = new Set<string>();
+        const isOrphanBid = (bid: any): boolean => {
+          if (!bid || typeof bid !== "string") return true;
+          return !branchMap.has(bid);
+        };
+        // Orphan enrolment also flags the student so "Unassigned" filter
+        // picks up enrolment-orphan students too.
+        enrollments.forEach(e => {
+          const sid = e.studentId || e.studentEmail || e._eid;
+          if (!sid) return;
+          if (isOrphanBid(e.branchId)) orphanIds.add(sid);
+        });
+
         const scoreMap = new Map<string, number[]>();
         scoresSnap.docs.forEach(d => {
           const data = d.data() as any;
           const key  = data.studentId || data.studentEmail || "";
           const pct  = parseFloat(data.percentage ?? data.score ?? "");
-          if (key && !isNaN(pct)) {
+          if (!key) return;
+          if (isOrphanBid(data.branchId)) orphanIds.add(key);
+          if (!isNaN(pct)) {
             if (!scoreMap.has(key)) scoreMap.set(key, []);
             scoreMap.get(key)!.push(pct);
           }
@@ -257,6 +283,7 @@ export default function StudentsIntelligence() {
           const data    = d.data() as any;
           const sid     = data.studentId || data.studentEmail || "";
           if (!sid) return;
+          if (isOrphanBid(data.branchId)) orphanIds.add(sid);
 
           if (!attMap.has(sid)) attMap.set(sid, {p:0,t:0});
           const cur = attMap.get(sid)!;
@@ -318,7 +345,13 @@ export default function StudentsIntelligence() {
             name:        e.studentName || e.name || "Unknown",
             grade:       normalizeGrade(e.grade || e.class || e.className || "") || "—",
             schoolId:    e.schoolId || "",
-            branch:      branchMap.get(e.branchId) || e.schoolName || "—",
+            // Orphan enrollments (no branchId AND no schoolName) get
+            // routed to "Unassigned" so they show up in the page filter
+            // dropdown — earlier the em-dash sentinel was excluded by
+            // the dropdown builder and these students were unreachable
+            // unless "All" was selected. Matches the AcademicsOverview +
+            // AIPredictor pattern (2026-05-26).
+            branch:      branchMap.get(e.branchId) || e.schoolName || "Unassigned",
             score:       avgScore,
             attendance:  attPct,
             incidents,
@@ -344,6 +377,7 @@ export default function StudentsIntelligence() {
         const enriched = [...enrichedMap.values()];
         enriched.sort((a,b)=>(a.name||"").localeCompare(b.name||""));
         setStudents(enriched);
+        setOrphanStudentIds(orphanIds);
       } catch(e) {
         console.error(e);
       }
@@ -358,8 +392,17 @@ export default function StudentsIntelligence() {
    * branch in the page-head dropdown filters the entire page coherently
    * (no more "card shows X but table shows Y" confusion). */
   const branchScopedStudents = useMemo(
-    () => pageBranch === "All" ? students : students.filter(s => s.branch === pageBranch),
-    [students, pageBranch],
+    () => {
+      if (pageBranch === "All") return students;
+      if (pageBranch === "Unassigned") {
+        // Match by orphan-data set (covers students whose enrolment is
+        // clean but whose score/attendance docs lack a canonical branchId)
+        // PLUS any student whose enrolment itself resolved to "Unassigned".
+        return students.filter(s => orphanStudentIds.has(s.id) || s.branch === "Unassigned");
+      }
+      return students.filter(s => s.branch === pageBranch);
+    },
+    [students, pageBranch, orphanStudentIds],
   );
 
   /* ── derived stats (all branch-scoped) ─────────── */
@@ -435,9 +478,21 @@ export default function StudentsIntelligence() {
   }, [students]);
 
   /* ── branch list for dropdowns — from branches subcollection ── */
-  const branchList = useMemo(() =>
-    ["All", ...[...branches.values()].filter(Boolean).sort()],
-  [branches]);
+  // Union of canonical branches (subcollection) + any branch label that
+  // appears on a student row + a virtual "Unassigned" entry whenever the
+  // page has detected orphan-branchId data in scores/attendance (mirrors
+  // the AcademicsOverview audit). Selecting "Unassigned" filters to
+  // students whose own enrolment is orphan OR who have score/attendance
+  // docs without a canonical branchId — surfaces them for cleanup even
+  // when their enrolment was tagged correctly.
+  const branchList = useMemo(() => {
+    const set = new Set<string>();
+    branches.forEach(name => { if (name) set.add(name); });
+    students.forEach(s => { if (s.branch && s.branch !== "—" && s.branch !== "Unassigned") set.add(s.branch); });
+    const list = ["All", ...[...set].sort()];
+    if (orphanStudentIds.size > 0) list.push("Unassigned");
+    return list;
+  }, [branches, students, orphanStudentIds]);
 
   /* ── attendance heatmap — branch-scoped via pageBranch ── */
   const heatmapGrades = useMemo(() => {

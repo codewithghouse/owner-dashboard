@@ -711,18 +711,26 @@ export default function AIPredictorPage() {
                             paddingBottom: isMobile ? 2 : 0,
                           }}>
                             {[...p.recentScores].reverse().map((s, i) => {
+                              // Belt-and-suspenders clamp on top of the
+                              // service-side sanitisation: garbage data
+                              // (5e12, "50.000000000000", scientific strings)
+                              // used to overflow the chip and bleed across
+                              // the card. Even if a corrupt row sneaks past
+                              // the service guard, the chip will still render
+                              // a clean 0-100 integer in ≤3 chars (2026-05-26).
+                              const safeScore = Math.min(100, Math.max(0, Math.round(Number(s) || 0)));
                               // Saturated solid gradients so white text reads.
                               // The pale GRAD_* tokens are for stat-tile
                               // backgrounds where text is dark — they killed
                               // contrast on these score chips (2026-05-26 fix).
-                              const scoreGrad = s >= 75
+                              const scoreGrad = safeScore >= 75
                                 ? "linear-gradient(135deg,#10B981 0%,#059669 100%)"
-                                : s >= 50
+                                : safeScore >= 50
                                 ? "linear-gradient(135deg,#F59E0B 0%,#D97706 100%)"
                                 : "linear-gradient(135deg,#FF3355 0%,#DC2626 100%)";
-                              const scoreShadow = s >= 75
+                              const scoreShadow = safeScore >= 75
                                 ? "0 4px 12px rgba(16,185,129,.30)"
-                                : s >= 50
+                                : safeScore >= 50
                                 ? "0 4px 12px rgba(245,158,11,.30)"
                                 : "0 4px 12px rgba(255,51,85,.30)";
                               return (
@@ -734,8 +742,9 @@ export default function AIPredictorPage() {
                                     letterSpacing:"-0.2px",
                                     boxShadow: scoreShadow,
                                     textShadow:"0 1px 2px rgba(0,0,0,.18)",
+                                    overflow:"hidden",
                                   }}>
-                                    {s}
+                                    {safeScore}
                                   </div>
                                   <p style={{ fontSize:9, fontWeight:700, color:T4, margin:"4px 0 0 0" }}>#{i + 1}</p>
                                 </div>
