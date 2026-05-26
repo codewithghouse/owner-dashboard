@@ -10,7 +10,8 @@
  * Insights (whyTop / whyHere / solutions / pills) are rule-based, generated
  * from the same metrics so the dashboard surfaces real patterns.
  */
-import { auth, db } from "./firebase";
+import { auth, db, functions } from "./firebase";
+import { httpsCallable } from "firebase/functions";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import {
   loadCoreSnapshot, calculateAHI, calculatePassRate, avg,
@@ -353,15 +354,12 @@ async function callAIRoute(
   network: OwnerNetworkSummary,
 ): Promise<CachedInsight | null> {
   try {
-    const token = await auth.currentUser?.getIdToken();
-    if (!token) return null;
-    const res = await fetch("/api/owner-insights", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ rank, branch, top, network }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
+    if (!auth.currentUser) return null;
+    const callable = httpsCallable<unknown, { insight?: any; model?: string; generatedAt?: number }>(
+      functions, "getOwnerBranchInsight",
+    );
+    const res = await callable({ rank, branch, top, network });
+    const data = res.data;
     const insight = data?.insight || {};
     return {
       isTop: rank === 1,

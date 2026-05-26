@@ -18,7 +18,8 @@
  * keeps the insight stable enough for a weekly review meeting.
  */
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { auth, db, functions } from "@/lib/firebase";
+import { httpsCallable } from "firebase/functions";
 
 export interface InsightItem {
   headline: string;
@@ -272,39 +273,31 @@ export async function fetchBranchWeeklyInsight(
 
   // Try the AI endpoint.
   try {
-    const token = await auth.currentUser?.getIdToken();
-    if (!token) {
+    if (!auth.currentUser) {
       const fb = ruleBasedFallback(branch, network);
       return { ...fb, source: "fallback" };
     }
 
-    const res = await fetch("/api/branch-weekly-insights", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        branch: {
-          name: branch.name,
-          ahi: branch.ahi,
-          attendance: branch.attendance,
-          passRate: branch.passRate,
-          feeCollection: branch.feeCollection,
-          growthRate: branch.growthRate,
-          studentCount: branch.studentCount,
-          teacherCount: branch.teacherCount,
-          activeAlerts: branch.activeAlerts,
-          historicalTrend: branch.historicalTrend,
-        },
-        network,
-      }),
+    const callable = httpsCallable<unknown, { insight?: any; model?: string; generatedAt?: number }>(
+      functions, "getBranchWeeklyInsight",
+    );
+    const res = await callable({
+      branch: {
+        name: branch.name,
+        ahi: branch.ahi,
+        attendance: branch.attendance,
+        passRate: branch.passRate,
+        feeCollection: branch.feeCollection,
+        growthRate: branch.growthRate,
+        studentCount: branch.studentCount,
+        teacherCount: branch.teacherCount,
+        activeAlerts: branch.activeAlerts,
+        historicalTrend: branch.historicalTrend,
+      },
+      network,
     });
 
-    if (!res.ok) {
-      console.warn("[branchWeeklyInsights] API returned", res.status);
-      const fb = ruleBasedFallback(branch, network);
-      return { ...fb, source: "fallback" };
-    }
-
-    const data = await res.json();
+    const data = res.data;
     const aiInsight = data?.insight;
     if (!aiInsight || !Array.isArray(aiInsight?.trendReasons)) {
       const fb = ruleBasedFallback(branch, network);

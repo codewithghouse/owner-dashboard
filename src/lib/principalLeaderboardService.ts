@@ -10,7 +10,8 @@
  * still appear at the bottom flagged as "No data" — never silently
  * dropped, so the owner can see staffing gaps.
  */
-import { auth, db } from "./firebase";
+import { auth, db, functions } from "./firebase";
+import { httpsCallable } from "firebase/functions";
 import {
   collection, query, where, getDocs,
   doc, getDoc, setDoc, serverTimestamp,
@@ -490,11 +491,11 @@ export async function fetchPrincipalLeaderboard(): Promise<PrincipalLeaderboardD
 }
 
 // ─── Real-AI insight enrichment ───────────────────────────────────────────
-// Hits the Vercel serverless `/api/principal-insights` route, caches the
-// response in Firestore at `schools/{uid}/principal_insights/{pid}_{monthKey}`
-// with a 7-day TTL. On any failure (no key, network, rate-limit, empty
-// payload) returns null so the caller keeps the rule-based fallback already
-// attached to the row. Same shape + caching strategy as ownerLeaderboardService.
+// Calls the `getPrincipalInsight` Firebase callable (teacher-dashboard
+// codebase), caches the response in Firestore at
+// `schools/{uid}/principal_insights/{pid}_{monthKey}` with a 7-day TTL. On
+// any failure (auth, permission, network, empty payload) returns null so the
+// caller keeps the rule-based fallback already attached to the row.
 
 const AI_INSIGHT_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -552,57 +553,44 @@ export async function fetchPrincipalAIInsight(
   const cached = await readCached(uid, row.id, monthKey);
   if (cached) return cached;
 
-  let idToken = "";
-  try { idToken = (await auth.currentUser?.getIdToken()) || ""; }
-  catch (err) { console.warn("[principalAI] token failed:", err); return null; }
-  if (!idToken) return null;
-
   try {
-    const res = await fetch("/api/principal-insights", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${idToken}`,
+    const callable = httpsCallable<unknown, { insight?: Partial<PrincipalInsight>; model?: string }>(
+      functions, "getPrincipalInsight",
+    );
+    const res = await callable({
+      rank,
+      principal: {
+        id: row.id,
+        name: row.name,
+        branchName: row.branchName,
+        ahi: row.ahi,
+        attendance: row.attendance,
+        passRate: row.passRate,
+        feeCollection: row.feeCollection,
+        students: row.students,
+        teachers: row.teachers,
+        atRiskStudents: row.atRiskStudents,
+        weekChange: row.weekChange,
       },
-      body: JSON.stringify({
-        rank,
-        principal: {
-          id: row.id,
-          name: row.name,
-          branchName: row.branchName,
-          ahi: row.ahi,
-          attendance: row.attendance,
-          passRate: row.passRate,
-          feeCollection: row.feeCollection,
-          students: row.students,
-          teachers: row.teachers,
-          atRiskStudents: row.atRiskStudents,
-          weekChange: row.weekChange,
-        },
-        top: top && rank > 1 ? {
-          name: top.name,
-          branchName: top.branchName,
-          ahi: top.ahi,
-          attendance: top.attendance,
-          passRate: top.passRate,
-          feeCollection: top.feeCollection,
-        } : null,
-        network: {
-          name: "Network",   // schoolName not strictly required server-side
-          monthLabel: network.monthLabel,
-          totalPrincipals: network.totalPrincipals,
-          networkAvgAhi: network.networkAvgAhi,
-          networkAvgAtt: network.networkAvgAtt,
-          networkAvgPass: network.networkAvgPass,
-          networkAvgFee: network.networkAvgFee,
-        },
-      }),
+      top: top && rank > 1 ? {
+        name: top.name,
+        branchName: top.branchName,
+        ahi: top.ahi,
+        attendance: top.attendance,
+        passRate: top.passRate,
+        feeCollection: top.feeCollection,
+      } : null,
+      network: {
+        name: "Network",
+        monthLabel: network.monthLabel,
+        totalPrincipals: network.totalPrincipals,
+        networkAvgAhi: network.networkAvgAhi,
+        networkAvgAtt: network.networkAvgAtt,
+        networkAvgPass: network.networkAvgPass,
+        networkAvgFee: network.networkAvgFee,
+      },
     });
-    if (!res.ok) {
-      console.warn("[principalAI] API non-200:", res.status);
-      return null;
-    }
-    const payload = await res.json();
+    const payload = res.data;
     const aiInsight = payload?.insight as Partial<PrincipalInsight> | undefined;
     if (!aiInsight || !aiInsight.oneLiner || !aiInsight.reasons?.length || !aiInsight.actions?.length) {
       return null;
