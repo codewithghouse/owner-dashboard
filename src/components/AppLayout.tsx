@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
@@ -290,10 +290,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex flex-col h-svh min-h-svh overflow-hidden font-sans bg-[#EEF4FF]">
-      {/* Mobile Sidebar Overlay */}
+      {/* Mobile Sidebar Overlay — bounded between the top header and the
+          MobileTabBar so the chrome remains visible/bright while the
+          content area dims behind the sidebar drawer. */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 lg:hidden transition-all duration-300 animate-in fade-in"
+          style={{
+            top: `calc(env(safe-area-inset-top, 0px) + 76px)`,
+            bottom: `calc(env(safe-area-inset-bottom, 0px) + 64px)`,
+            left: 0,
+            right: 0,
+          }}
+          className="fixed backdrop-blur-md z-40 lg:hidden transition-all duration-300 animate-in fade-in"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
@@ -301,8 +309,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Floating close (X) button — rendered via React Portal directly
           into document.body. Zero CSS class dependencies, everything
           inline so no global rule (.dash-card, button:active scale,
-          tilt3D containing blocks) can interfere. Mounted whenever the
-          mobile/tablet sidebar can show (< lg breakpoint = 1024px). */}
+          tilt3D containing blocks) can interfere. Positioned to sit
+          inside the sidebar's mini-header (which starts ~76px below the
+          page header top). */}
       {createPortal(
         <button
           type="button"
@@ -310,10 +319,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           aria-label="Close sidebar"
           style={{
             position: "fixed",
-            top: "max(env(safe-area-inset-top), 18px)",
-            left: 240,
-            width: 44,
-            height: 44,
+            top: `calc(env(safe-area-inset-top, 0px) + 92px)`,
+            left: 248,
+            width: 40,
+            height: 40,
             zIndex: 2147483647,
             border: "none",
             borderRadius: 10,
@@ -328,7 +337,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           }}
         >
-          <X size={20} strokeWidth={2.25} />
+          <X size={18} strokeWidth={2.25} />
         </button>,
         document.body
       )}
@@ -336,12 +345,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Mobile Sidebar Drawer — `dash-card` opts out of the global
           .bg-white[rounded-]:not(.dash-card) rule that overrides `fixed`
           with `position: relative`, which would otherwise push the header
-          and content below the viewport on mobile (blank dashboard). */}
-      <aside className={`
-        dash-card fixed inset-y-0 left-0 z-50 w-[300px] bg-white flex flex-col shrink-0
-        rounded-r-3xl shadow-[0_8px_48px_rgba(0,16,64,0.22)] transition-transform duration-300 ease-in-out lg:hidden
-        ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}
-      `}>
+          and content below the viewport on mobile (blank dashboard).
+
+          Bounded between the floating top header and the MobileTabBar
+          (instead of inset-y-0 full-height) — user wanted the drawer to
+          sit in the visible content area, not overlap the header chrome. */}
+      <aside
+        style={{
+          top: `calc(env(safe-area-inset-top, 0px) + 76px)`,
+          bottom: `calc(env(safe-area-inset-bottom, 0px) + 64px)`,
+        }}
+        className={`
+          dash-card fixed left-3 z-50 w-[290px] bg-white flex flex-col shrink-0
+          rounded-3xl shadow-[0_8px_48px_rgba(0,16,64,0.22)] transition-transform duration-300 ease-in-out lg:hidden
+          ${isSidebarOpen ? "translate-x-0" : "-translate-x-[110%]"}
+        `}
+      >
         {/* ── Branded Header ── */}
         <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid #f1f5f9", flexShrink: 0 }} className="safe-top">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -377,64 +396,98 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 {section.heading}
               </p>
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                {section.items.map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    end={item.to === "/"}
-                    onClick={() => setIsSidebarOpen(false)}
-                    style={({ isActive }) => ({
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                      padding: "11px 14px",
-                      borderRadius: 12,
-                      fontSize: 14,
-                      fontWeight: isActive ? 700 : 500,
-                      color: isActive ? "#fff" : "#374151",
-                      background: isActive ? "#1e3a8a" : "transparent",
-                      textDecoration: "none",
-                      transition: "all 0.18s ease",
-                    })}
-                  >
-                    {({ isActive }) => (
-                      <>
-                        <item.icon style={{ width: 18, height: 18, color: isActive ? "#fff" : "#6b7280", flexShrink: 0 }} />
-                        {item.label}
-                      </>
-                    )}
-                  </NavLink>
-                ))}
+                {section.items.map((item) => {
+                  /* Plain <button> driving navigate() instead of <NavLink>.
+                     NavLink's internal <a>+click flow was not reliably
+                     letting our onClick close the sidebar on touch — the
+                     drawer stayed open after navigation. With a button we
+                     close FIRST, then navigate, so the close always wins. */
+                  const isActive = item.to === "/"
+                    ? location.pathname === "/"
+                    : location.pathname === item.to || location.pathname.startsWith(item.to + "/");
+                  return (
+                    <button
+                      key={item.to}
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        /* flushSync forces the close render to commit BEFORE
+                           navigate kicks off the route change. Without it the
+                           sidebar drawer stayed visible after navigation on
+                           touch — even with the close called before navigate,
+                           React's automatic batching grouped the two updates
+                           and the visible commit happened only on the new
+                           route, by which point something kept the drawer
+                           translated in. */
+                        flushSync(() => setIsSidebarOpen(false));
+                        if (location.pathname !== item.to) navigate(item.to);
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "11px 14px",
+                        borderRadius: 12,
+                        fontSize: 14,
+                        fontWeight: isActive ? 700 : 500,
+                        color: isActive ? "#fff" : "#374151",
+                        background: isActive ? "#1e3a8a" : "transparent",
+                        textDecoration: "none",
+                        transition: "all 0.18s ease",
+                        border: "none",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        textAlign: "left",
+                        width: "100%",
+                      }}
+                    >
+                      <item.icon style={{ width: 18, height: 18, color: isActive ? "#fff" : "#6b7280", flexShrink: 0 }} />
+                      {item.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ))}
 
           {/* Settings at bottom of nav */}
           <div style={{ marginTop: 20, borderTop: "1px solid #f1f5f9", paddingTop: 12 }}>
-            <NavLink
-              to={settingsItem.to}
-              onClick={() => setIsSidebarOpen(false)}
-              style={({ isActive }) => ({
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: "11px 14px",
-                borderRadius: 12,
-                fontSize: 14,
-                fontWeight: isActive ? 700 : 500,
-                color: isActive ? "#fff" : "#374151",
-                background: isActive ? "#1e3a8a" : "transparent",
-                textDecoration: "none",
-                transition: "all 0.18s ease",
-              })}
-            >
-              {({ isActive }) => (
-                <>
+            {(() => {
+              const isActive = location.pathname === settingsItem.to || location.pathname.startsWith(settingsItem.to + "/");
+              return (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    flushSync(() => setIsSidebarOpen(false));
+                    if (location.pathname !== settingsItem.to) navigate(settingsItem.to);
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "11px 14px",
+                    borderRadius: 12,
+                    fontSize: 14,
+                    fontWeight: isActive ? 700 : 500,
+                    color: isActive ? "#fff" : "#374151",
+                    background: isActive ? "#1e3a8a" : "transparent",
+                    textDecoration: "none",
+                    transition: "all 0.18s ease",
+                    border: "none",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    textAlign: "left",
+                    width: "100%",
+                  }}
+                >
                   <settingsItem.icon style={{ width: 18, height: 18, color: isActive ? "#fff" : "#6b7280", flexShrink: 0 }} />
                   {settingsItem.label}
-                </>
-              )}
-            </NavLink>
+                </button>
+              );
+            })()}
           </div>
         </nav>
 

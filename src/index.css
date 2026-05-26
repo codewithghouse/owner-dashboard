@@ -766,10 +766,16 @@ main > div,
   }
 
   /* Disable translate3d lift on mobile — touch devices don't hover,
-     and the lift animation can cause flicker / layout jank on tap */
+     and the lift animation can cause flicker / layout jank on tap.
+     `:not(aside)` is critical: the mobile sidebar drawer is an <aside>
+     with `.dash-card` (needed to opt out of the global position:relative
+     rule), and it relies on `transform: translateX(...)` for its open/close
+     slide. Without this exclusion, touch-sticky :hover after tapping a nav
+     item would apply `transform: none !important` and lock the drawer in
+     its visible position — sidebar never closes after navigation. */
   .dash3d:hover,
   .dash-tile:hover,
-  .dash-card:hover {
+  .dash-card:not(aside):hover {
     transform: none !important;
   }
 

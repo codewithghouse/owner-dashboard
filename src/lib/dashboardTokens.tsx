@@ -121,7 +121,12 @@ export function DashGlobalStyles() {
         backface-visibility: hidden;
         -webkit-backface-visibility: hidden;
       }
-      .dash-card:hover {
+      /* Exclude <aside> — the mobile sidebar drawer is an <aside class="dash-card">
+         and relies on Tailwind's translateX for its open/close slide. The
+         hover lift transform here was overriding -translate-x-full when touch
+         hover got sticky after tapping a nav item, keeping the drawer pinned
+         on screen even though isSidebarOpen had flipped to false. */
+      .dash-card:not(aside):hover {
         transform: translate3d(0,-7px,0);
         box-shadow: 0 8px 16px rgba(0,85,255,.20), 0 24px 40px rgba(0,85,255,.24), 0 40px 80px rgba(0,85,255,.26) !important;
       }
