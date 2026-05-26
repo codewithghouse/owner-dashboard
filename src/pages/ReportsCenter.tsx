@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  FileText, Download, Star, Plus, Printer, Mail, FileSpreadsheet,
+  FileText, Download, Star, Printer, Mail, FileSpreadsheet,
   ChevronRight, GraduationCap, Presentation, DollarSign, Loader2,
   Users, TrendingUp, TrendingDown, AlertTriangle, BookOpen,
   ArrowLeft, CheckCircle, Clock, BarChart3, Bell, Calendar, RefreshCw,
@@ -664,21 +664,6 @@ export default function ReportsCenter() {
         icon={FileText}
         title="Reports Center"
         subtitle="Generate, schedule & download reports"
-        right={
-          <button
-            className="dash-btn"
-            style={{
-              display:"inline-flex", alignItems:"center", justifyContent:"center", gap: isMobile ? 6 : 7,
-              padding: isMobile ? "9px 12px" : "11px 18px", borderRadius: isMobile ? 12 : 14,
-              background:GRAD_PRIMARY, color:"#fff",
-              fontSize: isMobile ? 10 : 12, fontWeight:800, letterSpacing:"0.08em", textTransform:"uppercase",
-              border:"none", cursor:"pointer", boxShadow:SHADOW_BTN, fontFamily:"inherit",
-              whiteSpace:"nowrap",
-            }}
-          >
-            <Plus size={isMobile ? 13 : 15} strokeWidth={2.4}/> {isMobile ? "Create" : "Create Report"}
-          </button>
-        }
       />
 
       <DarkHero
@@ -768,11 +753,8 @@ export default function ReportsCenter() {
           <div className="flex flex-col divide-y divide-slate-50">
             {scheduled.map((job, i) => (
               <div key={i} className="p-4 hover:bg-slate-50/30 transition-colors">
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <p className="font-black text-[#111827] text-xs tracking-tight truncate flex-1 min-w-0">{job.name}</p>
-                  <span className={`text-[9px] font-black uppercase tracking-widest shrink-0 px-2 py-0.5 rounded-md ${job.status === "Active" ? "text-blue-600 bg-blue-50" : "text-slate-500 bg-slate-100"}`}>{job.status}</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
+                <p className="font-black text-[#111827] text-xs tracking-tight truncate mb-3">{job.name}</p>
+                <div className="grid grid-cols-4 gap-2">
                   <div>
                     <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Frequency</p>
                     <p className="text-[11px] font-bold text-slate-600 truncate">{job.frequency}</p>
@@ -784,6 +766,10 @@ export default function ReportsCenter() {
                   <div>
                     <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Users</p>
                     <p className="text-[11px] font-bold text-slate-600">{job.recipients}</p>
+                  </div>
+                  <div>
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Status</p>
+                    <span className={`inline-block mt-0.5 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${job.status === "Active" ? "text-blue-600 bg-blue-50" : "text-slate-500 bg-slate-100"}`}>{job.status}</span>
                   </div>
                 </div>
               </div>

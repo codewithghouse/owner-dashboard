@@ -37,7 +37,7 @@ export type ScheduledReport = {
   frequency: string;
   nextRun: string;
   recipients: number;
-  status: "Active" | "Inactive";
+  status: string;
 };
 
 export type ReportsDashboardData = {
@@ -285,7 +285,10 @@ export async function fetchReportsDashboard(): Promise<ReportsDashboardData> {
       frequency: data.frequency || "Monthly",
       nextRun: data.nextRun || "N/A",
       recipients: data.recipients || 0,
-      status: data.status === "Inactive" ? "Inactive" as const : "Active" as const,
+      /* Preserve whatever status is actually stored on the doc (Paused,
+         Draft, Disabled, etc.) instead of collapsing every non-"Inactive"
+         value to "Active" — that defaulting hid real states from the UI. */
+      status: (data.status && String(data.status).trim()) || "Active",
     };
   });
 

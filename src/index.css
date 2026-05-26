@@ -309,6 +309,24 @@ select.settings-select {
   padding-right: 38px;
 }
 
+/* Recharts axis ticks and legend text inherit the universal
+   `* { font-weight: 400 !important }` rule and render as hairline at 9-11px
+   on white backgrounds — labels look washed out and blurry. Force a real
+   bold + slight letter tightening so axis labels read clearly. */
+.recharts-cartesian-axis-tick text,
+.recharts-cartesian-axis-tick-value,
+.recharts-polar-angle-axis-tick text,
+.recharts-polar-radius-axis-tick text,
+.recharts-legend-item-text,
+.recharts-label,
+.recharts-text,
+/* Custom legends (rendered via the <Legend content={...}> prop) wrap their
+   JSX in .recharts-legend-wrapper; force a real weight on every descendant
+   so plain <span> labels don't fall back to the universal hairline. */
+.recharts-legend-wrapper * {
+  font-weight: 700 !important;
+}
+
 /* TeachersDirectory filter tab pills (By Branch / By Class / Top Performers /
    Needs Attention). Inline fontWeight:800 is wiped by the universal
    `* { font-weight: 400 !important }` rule, so inactive labels render in a
@@ -748,11 +766,31 @@ main > div,
   }
 
   /* Disable translate3d lift on mobile — touch devices don't hover,
-     and the lift animation can cause flicker / layout jank on tap */
+     and the lift animation can cause flicker / layout jank on tap.
+     `:not(aside)` is critical: the mobile sidebar drawer is an <aside>
+     with `.dash-card` (needed to opt out of the global position:relative
+     rule), and it relies on `transform: translateX(...)` for its open/close
+     slide. Without this exclusion, touch-sticky :hover after tapping a nav
+     item would apply `transform: none !important` and lock the drawer in
+     its visible position — sidebar never closes after navigation. */
   .dash3d:hover,
   .dash-tile:hover,
-  .dash-card:hover {
+  .dash-card:not(aside):hover {
     transform: none !important;
+  }
+
+  /* Kill the permanent GPU compositing layer on mobile.
+     `.dash3d/.dash-tile/.dash-card` set `will-change: transform` +
+     `backface-visibility: hidden` so the hover lift is buttery on desktop,
+     but on touch devices there IS no hover (rule above) and the permanent
+     compositor layer rasterizes SVG/text content at the layer's coordinates,
+     then composes it at sub-pixel offsets on high-DPI screens — the entire
+     card's text (especially recharts axis labels) reads as soft / blurry.
+     Without will-change the browser keeps text on the main raster, crisp. */
+  .dash3d, .dash-tile, .dash-card {
+    will-change: auto !important;
+    backface-visibility: visible !important;
+    -webkit-backface-visibility: visible !important;
   }
 
   /* Active press feedback instead of hover lift.
