@@ -120,7 +120,7 @@ export default function RisksAlerts() {
       <div style={{ ...pageShellStyle, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:14 }}>
         <div style={{ width:44, height:44, borderRadius:"50%", border:`3px solid rgba(0,85,255,.2)`, borderTopColor:B1, animation:"spin 1s linear infinite" }}/>
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-        <p style={{ fontSize:10, fontWeight:800, color:T4, letterSpacing:"0.14em", textTransform:"uppercase" }}>Aggregating Global Risk Data...</p>
+        <p style={{ fontSize:10, fontWeight:800, color:T3, letterSpacing:"0.14em", textTransform:"uppercase" }}>Aggregating Global Risk Data...</p>
       </div>
     );
   }
@@ -136,7 +136,7 @@ export default function RisksAlerts() {
           <AlertOctagon size={28} color={RED} strokeWidth={2.2}/>
         </div>
         <p style={{ fontSize:13, fontWeight:800, color:T1, margin:0 }}>Could not load risk data</p>
-        <p style={{ fontSize:11, fontWeight:500, color:T4, margin:0, maxWidth:340 }}>
+        <p style={{ fontSize:11, fontWeight:500, color:T3, margin:0, maxWidth:340 }}>
           Either Firestore is unreachable or your account lacks permission. Check your network or contact support.
         </p>
         <button
@@ -171,7 +171,7 @@ export default function RisksAlerts() {
           right={
             <div style={{ display:"flex", alignItems:"center", gap:8, width: isMobile ? "100%" : "auto" }}>
               {!isMobile && (
-                <div style={{ display:"inline-flex", alignItems:"center", gap:5, fontSize:10, fontWeight:800, color:T4, letterSpacing:"0.12em", textTransform:"uppercase" }}>
+                <div style={{ display:"inline-flex", alignItems:"center", gap:5, fontSize:10, fontWeight:800, color:T3, letterSpacing:"0.12em", textTransform:"uppercase" }}>
                   <Filter size={12}/> Branch
                 </div>
               )}
@@ -318,7 +318,7 @@ export default function RisksAlerts() {
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: isMobile ? 10 : 14 }}>
               <div style={{ minWidth:0 }}>
                 <h3 style={{ fontSize: isMobile ? 14 : 15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Risk Distribution</h3>
-                <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>By category</p>
+                <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:600, color:T3, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>By category</p>
               </div>
               <div style={{ width: isMobile ? 28 : 32, height: isMobile ? 28 : 32, borderRadius:10, background:"rgba(0,85,255,.08)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
                 <BarChart3 size={isMobile ? 14 : 16} color={B1} strokeWidth={2.3}/>
@@ -359,7 +359,7 @@ export default function RisksAlerts() {
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: isMobile ? 10 : 14 }}>
               <div style={{ minWidth:0 }}>
                 <h3 style={{ fontSize: isMobile ? 14 : 15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Risk Trend</h3>
-                <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Critical vs Warning</p>
+                <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:600, color:T3, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Critical vs Warning</p>
               </div>
               <div style={{ width: isMobile ? 28 : 32, height: isMobile ? 28 : 32, borderRadius:10, background:"rgba(255,51,85,.1)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
                 <TrendingUp size={isMobile ? 14 : 16} color={RED} strokeWidth={2.3}/>
@@ -386,7 +386,7 @@ export default function RisksAlerts() {
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: isMobile ? 10 : 14 }}>
               <div style={{ minWidth:0 }}>
                 <h3 style={{ fontSize: isMobile ? 14 : 15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>Branch-wise Risk</h3>
-                <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Risk volume</p>
+                <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:600, color:T3, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>Risk volume</p>
               </div>
               <div style={{ width: isMobile ? 28 : 32, height: isMobile ? 28 : 32, borderRadius:10, background:"rgba(0,200,83,.1)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
                 <Building2 size={isMobile ? 14 : 16} color={GREEN} strokeWidth={2.3}/>
@@ -452,7 +452,7 @@ export default function RisksAlerts() {
                       <h3 style={{ fontSize: isMobile ? 14 : 15, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.3px" }}>
                         Active Alerts
                       </h3>
-                      <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:600, color:T4, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>
+                      <p style={{ fontSize: isMobile ? 9 : 10, fontWeight:600, color:T3, margin:"3px 0 0 0", letterSpacing:"0.08em", textTransform:"uppercase" }}>
                         {filteredList.length} of {totalAlerts} · {filterLabel}
                       </p>
                     </div>
@@ -480,7 +480,7 @@ export default function RisksAlerts() {
                       <CheckCircle2 size={isMobile ? 28 : 34} color={GREEN} strokeWidth={2.2}/>
                     </div>
                     <p style={{ fontSize: isMobile ? 12 : 13, fontWeight:800, color:GREEN, margin:0, letterSpacing:"0.04em", textAlign:"center" }}>Great! No active alerts found</p>
-                    <p style={{ fontSize: isMobile ? 10 : 11, fontWeight:500, color:T4, margin:0, textAlign:"center", padding:"0 12px" }}>All systems healthy across branches</p>
+                    <p style={{ fontSize: isMobile ? 10 : 11, fontWeight:500, color:T3, margin:0, textAlign:"center", padding:"0 12px" }}>All systems healthy across branches</p>
                   </div>
                 ) : filteredList.length === 0 ? (
                   <div style={{ padding: isMobile ? "30px 12px" : "40px 16px", display:"flex", flexDirection:"column", alignItems:"center", gap: 8, textAlign: "center" }}>
@@ -488,7 +488,7 @@ export default function RisksAlerts() {
                       <Filter size={20} color={B1} strokeWidth={2.2}/>
                     </div>
                     <p style={{ fontSize: 12, fontWeight: 700, color: T1, margin: 0 }}>No {severityFilter} alerts to show</p>
-                    <p style={{ fontSize: 11, color: T4, margin: 0 }}>Tap a different stat tile above or clear the filter.</p>
+                    <p style={{ fontSize: 11, color: T3, margin: 0 }}>Tap a different stat tile above or clear the filter.</p>
                   </div>
                 ) : (
                   <div style={{ display:"flex", flexDirection:"column", gap: isMobile ? 10 : 12 }}>
@@ -534,7 +534,7 @@ export default function RisksAlerts() {
                             </div>
                             <p style={{ fontSize:11, fontWeight:500, color:T3, margin:0, lineHeight:1.5 }}>
                               {alert.desc}
-                              {alert.timing && <span style={{ color:T4 }}> · {alert.timing}</span>}
+                              {alert.timing && <span style={{ color:T3 }}> · {alert.timing}</span>}
                             </p>
                           </div>
                         </div>
@@ -577,7 +577,7 @@ export default function RisksAlerts() {
                             </div>
                             <p style={{ fontSize:12, fontWeight:500, color:T3, margin:0, lineHeight:1.5 }}>
                               {alert.desc}
-                              {alert.timing && <span style={{ color:T4 }}> · {alert.timing}</span>}
+                              {alert.timing && <span style={{ color:T3 }}> · {alert.timing}</span>}
                             </p>
                           </div>
                         </div>
