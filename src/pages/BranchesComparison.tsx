@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -10,6 +10,7 @@ import {
   BarChart3, CircleDollarSign, GraduationCap, CalendarCheck2,
   Sparkles, FileText, Activity, TrendingUp,
   Lightbulb, ListChecks, Award, Target,
+  ArrowLeftRight, ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,7 +35,7 @@ import { Trophy, Crown } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import {
   collection, addDoc, updateDoc, deleteDoc,
-  doc, serverTimestamp, getDocs, query, where,
+  doc, getDoc, serverTimestamp, getDocs, query, where,
 } from "firebase/firestore";
 import { invalidateCache } from "@/lib/analyticsService";
 import { addAuditLog } from "@/lib/auditService";
@@ -464,7 +465,9 @@ const BranchCardImpl: React.FC<{
   onClick: () => void;
   onEdit: () => void;
   onDelete: () => void;
-}> = ({ branch: b, cellsByMetric, isMobile, totalBranches, onClick, onEdit, onDelete }) => {
+  onPickForCompare: () => void;
+  pickedSlot: "A" | "B" | null;   // visual badge when this branch is in the compare picker
+}> = ({ branch: b, cellsByMetric, isMobile, totalBranches, onClick, onEdit, onDelete, onPickForCompare, pickedSlot }) => {
   const accent = b.color || "#3B82F6";
   // 3-mode discriminator: empty / awaiting / active
   const mode: "empty" | "awaiting" | "active" =
@@ -556,6 +559,63 @@ const BranchCardImpl: React.FC<{
           style={{ top: 14, right: 14 }}
           onClick={(e) => e.stopPropagation()}
         >
+          {/* Add to pairwise comparison — shows a small badge if this branch
+              is already in slot A or B. Click toggles in/out. */}
+          <button
+            onClick={(e) => { e.stopPropagation(); onPickForCompare(); }}
+            className="dash-tile flex items-center justify-center"
+            title={pickedSlot
+              ? `In compare slot ${pickedSlot} — click to remove`
+              : "Add to Branch vs Branch compare"}
+            aria-label="Add to compare"
+            style={{
+              position: "relative",
+              width: isMobile ? 34 : 32,
+              height: isMobile ? 34 : 32,
+              borderRadius: 10,
+              background: pickedSlot ? "#0055FF" : "rgba(255,255,255,0.96)",
+              border: pickedSlot ? "1px solid #0044CC" : "1px solid rgba(59,130,246,0.35)",
+              boxShadow: pickedSlot
+                ? "0 4px 12px rgba(0,85,255,0.30), 0 0 0 1px rgba(255,255,255,0.4) inset"
+                : "0 2px 6px rgba(15,23,42,0.10), 0 0 0 1px rgba(255,255,255,0.6) inset",
+              backdropFilter: "blur(6px)",
+              WebkitBackdropFilter: "blur(6px)",
+              cursor: "pointer",
+              padding: 0,
+              transition: "background 0.15s ease, border-color 0.15s ease, transform 0.1s ease",
+            }}
+            onMouseEnter={(e) => {
+              const el = e.currentTarget as HTMLButtonElement;
+              if (!pickedSlot) {
+                el.style.background = "#EFF6FF";
+                el.style.borderColor = "#3B82F6";
+              }
+              el.style.transform = "translateY(-1px)";
+            }}
+            onMouseLeave={(e) => {
+              const el = e.currentTarget as HTMLButtonElement;
+              if (!pickedSlot) {
+                el.style.background = "rgba(255,255,255,0.96)";
+                el.style.borderColor = "rgba(59,130,246,0.35)";
+              }
+              el.style.transform = "translateY(0)";
+            }}
+          >
+            <Plus size={isMobile ? 16 : 15} strokeWidth={2.4} color={pickedSlot ? "#fff" : "#1D4ED8"} />
+            {pickedSlot && (
+              <span style={{
+                position: "absolute", top: -4, right: -4,
+                width: 14, height: 14, borderRadius: 999,
+                background: "#fff", color: "#0044CC",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 8, fontWeight: 900, letterSpacing: "0",
+                boxShadow: "0 2px 4px rgba(0,0,0,.20)",
+                border: "1.5px solid #0055FF",
+              }}>
+                {pickedSlot}
+              </span>
+            )}
+          </button>
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(); }}
             className="dash-tile flex items-center justify-center"
@@ -750,6 +810,470 @@ const BranchCardImpl: React.FC<{
   );
 };
 
+// ── Pairwise Compare — Branch A vs Branch B focused view ─────────────────
+// Sits above the all-branches matrix so the Owner can pick any two branches
+// and see a 1:1 deep-dive. Default selection: headline leader vs headline
+// laggard. Winner per metric highlighted with crown + delta. Lower-is-better
+// metrics (at-risk students) flip the comparison.
+type CompareBranch = {
+  id: string;
+  name: string;
+  color: string;
+  ahi: number;
+  attendance: number;
+  passRate: number;
+  feeCollection: number;
+  studentCount: number;
+  teacherCount: number;
+  activeAlerts: number;
+};
+
+const COMPARE_METRICS: {
+  key: keyof CompareBranch;
+  label: string;
+  suffix: string;
+  betterLower: boolean;
+  neutral?: boolean;
+}[] = [
+  { key: "ahi",            label: "AHI",              suffix: "%", betterLower: false },
+  { key: "attendance",     label: "Attendance",       suffix: "%", betterLower: false },
+  { key: "passRate",       label: "Pass Rate",        suffix: "%", betterLower: false },
+  { key: "feeCollection",  label: "Fee Collection",   suffix: "%", betterLower: false },
+  { key: "activeAlerts",   label: "At-Risk Students", suffix: "",  betterLower: true  },
+  { key: "studentCount",   label: "Students",         suffix: "",  betterLower: false, neutral: true },
+  { key: "teacherCount",   label: "Teachers",         suffix: "",  betterLower: false, neutral: true },
+];
+
+const PairwiseCompareImpl: React.FC<{
+  branches: CompareBranch[];
+  aId: string;
+  bId: string;
+  onChangeA: (id: string) => void;
+  onChangeB: (id: string) => void;
+  isMobile: boolean;
+  containerRef?: React.RefObject<HTMLDivElement>;
+}> = ({ branches, aId, bId, onChangeA, onChangeB, isMobile, containerRef }) => {
+  if (branches.length < 2) return null;
+  const a = branches.find(x => x.id === aId);
+  const b = branches.find(x => x.id === bId);
+  if (!a || !b) return null;
+
+  // Compute winners for verdict — only competitive metrics count
+  const winners: ("a" | "b" | "tie")[] = COMPARE_METRICS
+    .filter(m => !m.neutral)
+    .map(m => {
+      const av = (a[m.key] as number) || 0;
+      const bv = (b[m.key] as number) || 0;
+      if (av === bv) return "tie";
+      const aBetter = m.betterLower ? av < bv : av > bv;
+      return aBetter ? "a" : "b";
+    });
+  const aWins = winners.filter(w => w === "a").length;
+  const bWins = winners.filter(w => w === "b").length;
+  const ties  = winners.filter(w => w === "tie").length;
+  const competitive = winners.length;
+
+  const verdictLeader = aWins > bWins ? a : bWins > aWins ? b : null;
+  const verdictText = a.id === b.id
+    ? "Pick two different branches to compare them."
+    : verdictLeader
+      ? `${verdictLeader.name} leads on ${Math.max(aWins, bWins)} of ${competitive} outcomes${ties > 0 ? ` (${ties} tied)` : ""}.`
+      : `Both branches are evenly matched at ${aWins}-${bWins}${ties > 0 ? ` with ${ties} tied` : ""}.`;
+
+  const selectStyle: React.CSSProperties = {
+    appearance: "none",
+    padding: isMobile ? "9px 28px 9px 12px" : "10px 32px 10px 14px",
+    borderRadius: 12,
+    border: "0.5px solid rgba(0,85,255,.12)",
+    background: "#fff",
+    boxShadow: SHADOW_SM,
+    fontSize: isMobile ? 12 : 13,
+    fontWeight: 800, color: T1, letterSpacing: "-0.1px",
+    outline: "none", fontFamily: "inherit",
+    cursor: "pointer", width: "100%",
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        background: "#fff", borderRadius: isMobile ? 16 : 22,
+        padding: isMobile ? "14px 14px" : "20px 22px",
+        boxShadow: SHADOW_SM,
+        border: "0.5px solid rgba(0,85,255,.08)",
+        marginBottom: isMobile ? 14 : 20,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: isMobile ? 12 : 14 }}>
+        <div style={{
+          width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: 11,
+          background: GRAD_PRIMARY,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          boxShadow: "0 6px 14px rgba(0,85,255,.28)", flexShrink: 0,
+        }}>
+          <ArrowLeftRight size={isMobile ? 16 : 18} color="#fff" strokeWidth={2.3}/>
+        </div>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <h3 style={{ fontSize: isMobile ? 14 : 16, fontWeight: 800, color: T1, margin: 0, letterSpacing: "-0.3px" }}>
+            Branch vs Branch
+          </h3>
+          <p style={{ fontSize: isMobile ? 9 : 10, fontWeight: 700, color: T4, margin: "2px 0 0 0", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+            Pick any two — or tap <Plus size={9} style={{ display: "inline", verticalAlign: "middle" }}/> on any branch card below
+          </p>
+        </div>
+      </div>
+
+      {/* Selector row */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: isMobile ? "1fr" : "1fr auto 1fr",
+        gap: isMobile ? 8 : 12,
+        alignItems: "center",
+        marginBottom: isMobile ? 14 : 18,
+      }}>
+        <div style={{ position: "relative" }}>
+          <select value={aId} onChange={e => onChangeA(e.target.value)} style={selectStyle} aria-label="Branch A">
+            {branches.map(br => <option key={br.id} value={br.id}>{br.name}</option>)}
+          </select>
+          <ChevronDown size={14} color={T4} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}/>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: 999,
+            background: "rgba(0,85,255,.08)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: B1, fontSize: 11, fontWeight: 900, letterSpacing: "0.1em",
+          }}>
+            VS
+          </div>
+        </div>
+        <div style={{ position: "relative" }}>
+          <select value={bId} onChange={e => onChangeB(e.target.value)} style={selectStyle} aria-label="Branch B">
+            {branches.map(br => <option key={br.id} value={br.id}>{br.name}</option>)}
+          </select>
+          <ChevronDown size={14} color={T4} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}/>
+        </div>
+      </div>
+
+      {/* Header row — branch name chips */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: isMobile ? "1fr 56px 1fr" : "1fr 100px 1fr",
+        gap: isMobile ? 6 : 10,
+        alignItems: "center",
+        marginBottom: 8,
+      }}>
+        <BranchChip branch={a} side="left" isMobile={isMobile}/>
+        <div style={{ textAlign: "center", fontSize: 8, fontWeight: 800, color: T4, letterSpacing: "0.14em", textTransform: "uppercase" }}>
+          Metric
+        </div>
+        <BranchChip branch={b} side="right" isMobile={isMobile}/>
+      </div>
+
+      {/* Metric rows */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {COMPARE_METRICS.map(m => {
+          const av = (a[m.key] as number) || 0;
+          const bv = (b[m.key] as number) || 0;
+          const tie = av === bv;
+          const aBetter = !m.neutral && !tie && (m.betterLower ? av < bv : av > bv);
+          const bBetter = !m.neutral && !tie && (m.betterLower ? bv < av : bv > av);
+          const delta = Math.abs(av - bv);
+          const display = (n: number) => n > 0 ? `${n}${m.suffix}` : (m.suffix === "%" ? "—" : n.toString());
+          return (
+            <div
+              key={m.key}
+              style={{
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr 76px 1fr" : "1fr 120px 1fr",
+                gap: isMobile ? 6 : 10,
+                alignItems: "center",
+                padding: isMobile ? "8px 8px" : "10px 12px",
+                borderRadius: 12,
+                background: "rgba(0,85,255,.02)",
+              }}
+            >
+              {/* A value cell */}
+              <MetricCell
+                value={display(av)}
+                isWinner={aBetter}
+                tier={m.neutral ? "neutral" : "competitive"}
+                align="right"
+                isMobile={isMobile}
+              />
+              {/* Metric label + delta */}
+              <div style={{ textAlign: "center" }}>
+                <p style={{ fontSize: isMobile ? 10 : 11, fontWeight: 800, color: T1, margin: 0, letterSpacing: "-0.1px" }}>
+                  {m.label}
+                </p>
+                {!m.neutral && !tie && delta > 0 && (
+                  <p style={{ fontSize: 8, fontWeight: 700, color: T4, margin: "2px 0 0 0", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                    Δ {delta}{m.suffix}
+                  </p>
+                )}
+                {!m.neutral && tie && (
+                  <p style={{ fontSize: 8, fontWeight: 700, color: T4, margin: "2px 0 0 0", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                    Tied
+                  </p>
+                )}
+              </div>
+              {/* B value cell */}
+              <MetricCell
+                value={display(bv)}
+                isWinner={bBetter}
+                tier={m.neutral ? "neutral" : "competitive"}
+                align="left"
+                isMobile={isMobile}
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Verdict line */}
+      {a.id !== b.id && (
+        <div style={{
+          display: "flex", alignItems: "flex-start", gap: 8,
+          marginTop: isMobile ? 14 : 16,
+          padding: isMobile ? "10px 12px" : "12px 14px",
+          borderRadius: 12,
+          background: verdictLeader
+            ? `linear-gradient(135deg, ${verdictLeader.color || B1}11 0%, ${verdictLeader.color || B1}22 100%)`
+            : "rgba(0,85,255,.05)",
+          border: `0.5px solid ${verdictLeader ? `${verdictLeader.color || B1}33` : "rgba(0,85,255,.12)"}`,
+        }}>
+          <Sparkles size={14} color={verdictLeader?.color || B1} strokeWidth={2.4} style={{ flexShrink: 0, marginTop: 1 }}/>
+          <p style={{ fontSize: isMobile ? 11 : 12, fontWeight: 800, color: T1, margin: 0, lineHeight: 1.45, letterSpacing: "-0.1px" }}>
+            {verdictText}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Branch chip used in the header row of PairwiseCompare
+const BranchChip: React.FC<{ branch: CompareBranch; side: "left" | "right"; isMobile: boolean }> = ({ branch, side, isMobile }) => (
+  <div style={{
+    display: "flex", alignItems: "center", gap: 8,
+    justifyContent: side === "left" ? "flex-end" : "flex-start",
+    minWidth: 0,
+  }}>
+    {side === "right" && (
+      <div style={{
+        width: isMobile ? 26 : 30, height: isMobile ? 26 : 30, borderRadius: 9,
+        background: branch.color || GRAD_PRIMARY,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: "#fff", fontSize: isMobile ? 10 : 11, fontWeight: 800, flexShrink: 0,
+        boxShadow: `0 4px 10px ${branch.color || "#0055FF"}33`,
+      }}>
+        {(branch.name[0] || "B").toUpperCase()}
+      </div>
+    )}
+    <p style={{
+      fontSize: isMobile ? 11 : 12, fontWeight: 800, color: T1, margin: 0,
+      letterSpacing: "-0.1px",
+      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+      textAlign: side === "left" ? "right" : "left",
+      minWidth: 0,
+    }}>
+      {branch.name}
+    </p>
+    {side === "left" && (
+      <div style={{
+        width: isMobile ? 26 : 30, height: isMobile ? 26 : 30, borderRadius: 9,
+        background: branch.color || GRAD_PRIMARY,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: "#fff", fontSize: isMobile ? 10 : 11, fontWeight: 800, flexShrink: 0,
+        boxShadow: `0 4px 10px ${branch.color || "#0055FF"}33`,
+      }}>
+        {(branch.name[0] || "B").toUpperCase()}
+      </div>
+    )}
+  </div>
+);
+
+// Metric value cell — winner gets a green tint + crown
+const MetricCell: React.FC<{
+  value: string;
+  isWinner: boolean;
+  tier: "competitive" | "neutral";
+  align: "left" | "right";
+  isMobile: boolean;
+}> = ({ value, isWinner, align, isMobile }) => (
+  <div style={{
+    display: "flex", alignItems: "center", gap: 5,
+    justifyContent: align === "left" ? "flex-start" : "flex-end",
+    padding: isMobile ? "6px 9px" : "8px 12px",
+    borderRadius: 10,
+    background: isWinner ? "rgba(16,185,129,.10)" : "transparent",
+    border: isWinner ? "0.5px solid rgba(16,185,129,.30)" : "0.5px solid transparent",
+  }}>
+    {isWinner && align === "right" && <Crown size={11} color={GREEN} strokeWidth={2.4}/>}
+    <span style={{
+      fontSize: isMobile ? 13 : 14, fontWeight: 800,
+      color: isWinner ? GREEN : T1,
+      letterSpacing: "-0.2px",
+    }}>
+      {value}
+    </span>
+    {isWinner && align === "left" && <Crown size={11} color={GREEN} strokeWidth={2.4}/>}
+  </div>
+);
+
+// ── Compare-with picker modal — opens when the Owner clicks Plus on a
+// branch card. Shows every OTHER branch so they explicitly pick what to
+// compare against (rather than the previous silent auto-fill).
+const CompareBranchPickerModal: React.FC<{
+  open: boolean;
+  sourceBranch: BranchSummary | null;
+  branches: BranchSummary[];
+  isMobile: boolean;
+  onPick: (otherId: string) => void;
+  onClose: () => void;
+}> = ({ open, sourceBranch, branches, isMobile, onPick, onClose }) => {
+  if (!open || !sourceBranch) return null;
+  const others = branches.filter(b => b.id !== sourceBranch.id);
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 80,
+        background: "rgba(15,23,42,0.55)",
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: isMobile ? 16 : 24,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "#fff",
+          borderRadius: isMobile ? 18 : 22,
+          boxShadow: "0 24px 60px rgba(15,23,42,0.30)",
+          width: "100%",
+          maxWidth: isMobile ? 380 : 480,
+          maxHeight: isMobile ? "85vh" : "80vh",
+          display: "flex", flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 12,
+          padding: isMobile ? "16px 16px 12px 16px" : "20px 22px 14px 22px",
+          borderBottom: "0.5px solid rgba(0,85,255,.10)",
+        }}>
+          <div style={{
+            width: isMobile ? 34 : 38, height: isMobile ? 34 : 38, borderRadius: 11,
+            background: sourceBranch.color || GRAD_PRIMARY,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#fff", fontSize: isMobile ? 12 : 14, fontWeight: 800, flexShrink: 0,
+            boxShadow: `0 6px 14px ${sourceBranch.color || "#0055FF"}33`,
+          }}>
+            {(sourceBranch.name[0] || "B").toUpperCase()}
+          </div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <p style={{ fontSize: isMobile ? 11 : 12, fontWeight: 700, color: T4, margin: 0, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+              Compare with
+            </p>
+            <p style={{ fontSize: isMobile ? 14 : 16, fontWeight: 800, color: T1, margin: "2px 0 0 0", letterSpacing: "-0.2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {sourceBranch.name}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close picker"
+            className="dash-btn"
+            style={{
+              width: 32, height: 32, borderRadius: 10,
+              background: "#F5F9FF", border: "0.5px solid rgba(0,85,255,.14)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", flexShrink: 0,
+            }}
+          >
+            <X size={15} color={T3}/>
+          </button>
+        </div>
+
+        {/* List of other branches */}
+        <div style={{
+          flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch",
+          padding: isMobile ? "8px 8px 12px 8px" : "10px 10px 14px 10px",
+        }}>
+          {others.length === 0 ? (
+            <div style={{
+              padding: "32px 16px", textAlign: "center",
+              fontSize: 12, fontWeight: 700, color: T4,
+            }}>
+              No other branches yet — add another branch first.
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {others.map(b => {
+                const ahiPct = b.ahi > 0 ? `${b.ahi}%` : "—";
+                const ahiColor = b.ahi >= 85 ? GREEN : b.ahi >= 70 ? B1 : b.ahi >= 50 ? GOLD : b.ahi > 0 ? RED : T4;
+                return (
+                  <button
+                    key={b.id}
+                    onClick={() => onPick(b.id)}
+                    className="dash-btn"
+                    style={{
+                      display: "flex", alignItems: "center", gap: 12,
+                      padding: isMobile ? "10px 12px" : "11px 14px",
+                      borderRadius: 12, border: "0.5px solid transparent",
+                      background: "transparent",
+                      cursor: "pointer", fontFamily: "inherit",
+                      textAlign: "left", width: "100%",
+                      transition: "background .12s, border-color .12s",
+                    }}
+                    onMouseEnter={(e) => {
+                      const el = e.currentTarget as HTMLButtonElement;
+                      el.style.background = "rgba(0,85,255,.05)";
+                      el.style.borderColor = "rgba(0,85,255,.14)";
+                    }}
+                    onMouseLeave={(e) => {
+                      const el = e.currentTarget as HTMLButtonElement;
+                      el.style.background = "transparent";
+                      el.style.borderColor = "transparent";
+                    }}
+                  >
+                    <div style={{
+                      width: isMobile ? 34 : 36, height: isMobile ? 34 : 36, borderRadius: 11,
+                      background: b.color || GRAD_PRIMARY,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      color: "#fff", fontSize: isMobile ? 12 : 13, fontWeight: 800, flexShrink: 0,
+                      boxShadow: `0 4px 10px ${b.color || "#0055FF"}26`,
+                    }}>
+                      {(b.name[0] || "B").toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: isMobile ? 12 : 13, fontWeight: 800, color: T1, margin: 0, letterSpacing: "-0.2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {b.name}
+                      </p>
+                      <p style={{ fontSize: isMobile ? 9 : 10, fontWeight: 700, color: T4, margin: "2px 0 0 0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {b.studentCount.toLocaleString()} students · {b.teacherCount} teachers
+                      </p>
+                    </div>
+                    <span style={{
+                      fontSize: isMobile ? 13 : 14, fontWeight: 800, color: ahiColor, flexShrink: 0,
+                      letterSpacing: "-0.2px",
+                    }}>
+                      {ahiPct}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function BranchesComparison() {
   const { id }     = useParams();
   const navigate   = useNavigate();
@@ -778,6 +1302,40 @@ export default function BranchesComparison() {
   const [orphanCounts, setOrphanCounts] = useState<OrphanCounts>({
     loading: false, teachers: 0, students: 0,
   });
+
+  // Pairwise compare state lifted up so branch cards can drive the selector
+  // via their Plus button. `null` means "no manual override — use smart
+  // default" which kicks in on first render once branches arrive.
+  const [pairwiseAId, setPairwiseAId] = useState<string | null>(null);
+  const [pairwiseBId, setPairwiseBId] = useState<string | null>(null);
+  // When the Owner clicks Plus on a branch card, we open a picker modal
+  // listing every OTHER branch so they explicitly choose what to compare
+  // against. This is more deliberate than the previous auto-fill flow
+  // (where Plus silently went to slot A/B/rotation).
+  const [pickerOpenForId, setPickerOpenForId] = useState<string | null>(null);
+  const pairwiseCardRef = useRef<HTMLDivElement>(null);
+
+  const handlePickForCompare = (branchId: string) => {
+    // Toggle OFF when clicking Plus on a branch that's already in compare.
+    if (pairwiseAId === branchId) { setPairwiseAId(null); return; }
+    if (pairwiseBId === branchId) { setPairwiseBId(null); return; }
+    // Fresh pick → open picker modal asking which branch to compare against.
+    setPickerOpenForId(branchId);
+  };
+
+  const handlePickerSelect = (otherBranchId: string) => {
+    if (!pickerOpenForId) return;
+    setPairwiseAId(pickerOpenForId);
+    setPairwiseBId(otherBranchId);
+    setPickerOpenForId(null);
+    maybeScrollToCompare();
+  };
+
+  const maybeScrollToCompare = () => {
+    setTimeout(() => {
+      pairwiseCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  };
 
   // ── Add branch ────────────────────────────────────────────────────────
   const handleAddBranch = async () => {
@@ -843,7 +1401,12 @@ export default function BranchesComparison() {
     }
     setCrudSaving(true);
     try {
-      await updateDoc(doc(db, "schools", uid, "branches", crudDocId), {
+      const actualDocId = await resolveBranchDocId(uid, crudDocId);
+      if (!actualDocId) {
+        toast.error(`Branch document not found — refresh and try again.`);
+        return;
+      }
+      await updateDoc(doc(db, "schools", uid, "branches", actualDocId), {
         name:        trimmedName,
         location:    crudForm.location.trim(),
         established: crudForm.established.trim(),
@@ -854,12 +1417,37 @@ export default function BranchesComparison() {
       addAuditLog("branch_edited", `Branch "${trimmedName}" updated`).catch(() => {});
       toast.success(`Branch updated!`);
       setEditOpen(false);
-    } catch (e) {
-      console.error(e);
-      toast.error("Failed to update branch.");
+    } catch (e: any) {
+      console.error("[BranchesComparison] edit failed:", e);
+      toast.error(`Failed to update branch: ${e?.code || e?.message || "unknown"}`);
     } finally {
       setCrudSaving(false);
     }
+  };
+
+  // ── Resilient docId resolver ───────────────────────────────────────────
+  // BranchSummary.id is computed as `data.branchId || d.id` in analyticsService,
+  // so legacy branches whose stored `branchId` is a slug (not the Firestore
+  // docId) used to fail edits/deletes with "no document to update". This
+  // tries the direct path first; on miss it falls back to a query by the
+  // branchId field. Returns the real Firestore doc id, or null when missing.
+  const resolveBranchDocId = async (uid: string, idCandidate: string): Promise<string | null> => {
+    try {
+      const directRef  = doc(db, "schools", uid, "branches", idCandidate);
+      const directSnap = await getDoc(directRef);
+      if (directSnap.exists()) return idCandidate;
+    } catch (err) {
+      console.warn("[resolveBranchDocId] direct getDoc threw:", err);
+    }
+    try {
+      const subColl = collection(db, "schools", uid, "branches");
+      const qByBranchId = query(subColl, where("branchId", "==", idCandidate));
+      const snap = await getDocs(qByBranchId);
+      if (!snap.empty) return snap.docs[0].id;
+    } catch (err) {
+      console.warn("[resolveBranchDocId] branchId-query failed:", err);
+    }
+    return null;
   };
 
   // ── Delete branch ─────────────────────────────────────────────────────
@@ -868,14 +1456,19 @@ export default function BranchesComparison() {
     if (!uid || !crudDocId) return;
     setCrudSaving(true);
     try {
-      await deleteDoc(doc(db, "schools", uid, "branches", crudDocId));
+      const actualDocId = await resolveBranchDocId(uid, crudDocId);
+      if (!actualDocId) {
+        toast.error(`Branch document not found — refresh and try again.`);
+        return;
+      }
+      await deleteDoc(doc(db, "schools", uid, "branches", actualDocId));
       invalidateCache(`core:${uid}`);
       addAuditLog("branch_deleted", `Branch "${crudName}" deleted`).catch(() => {});
       toast.success(`Branch "${crudName}" deleted.`);
       setDeleteOpen(false);
-    } catch (e) {
-      console.error(e);
-      toast.error("Failed to delete branch.");
+    } catch (e: any) {
+      console.error("[BranchesComparison] delete failed:", e);
+      toast.error(`Failed to delete branch: ${e?.code || e?.message || "unknown"}`);
     } finally {
       setCrudSaving(false);
     }
@@ -1442,29 +2035,11 @@ export default function BranchesComparison() {
               )}
             </div>
 
-            {/* Strengths & Improvements */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-              <div className="p-4 md:p-8 rounded-2xl md:rounded-[1.5rem] border border-emerald-100 bg-[#f0fdf4]/50">
-                <h4 className="text-sm md:text-base font-bold text-[#22c55e] mb-4 md:mb-6 flex items-center gap-2.5">
-                  <CheckCircle className="w-4 h-4 md:w-5 md:h-5" /> Strengths
-                </h4>
-                <ul className="space-y-2 md:space-y-3">
-                  {strengths.map((s, i) => (
-                    <li key={i} className="text-slate-700 font-medium text-[13px] md:text-sm leading-relaxed">• {s}</li>
-                  ))}
-                </ul>
-              </div>
-              <div className="p-4 md:p-8 rounded-2xl md:rounded-[1.5rem] border border-rose-100 bg-[#fef2f2]/50">
-                <h4 className="text-sm md:text-base font-bold text-[#ef4444] mb-4 md:mb-6 flex items-center gap-2.5">
-                  <AlertTriangle className="w-4 h-4 md:w-5 md:h-5" /> Areas for Improvement
-                </h4>
-                <ul className="space-y-2 md:space-y-3">
-                  {improvements.map((s, i) => (
-                    <li key={i} className="text-slate-700 font-medium text-[13px] md:text-sm leading-relaxed">• {s}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
+            {/* Duplicate rule-based Strengths/Areas for Improvement removed
+                2026-05-26 — the AI Weekly Insights panel above already
+                surfaces both lists (Reasons, Suggestions, Strengths, Areas
+                of Improvement) with richer context. Keeping a second
+                "system-generated" block just confused the page. */}
           </div>
         </div>
 
@@ -1679,6 +2254,15 @@ export default function BranchesComparison() {
         onConfirm={handleDeleteBranch} deleting={crudSaving}
       />
 
+      <CompareBranchPickerModal
+        open={pickerOpenForId !== null}
+        sourceBranch={pickerOpenForId ? branches.find(b => b.id === pickerOpenForId) || null : null}
+        branches={branches}
+        isMobile={isMobile}
+        onPick={handlePickerSelect}
+        onClose={() => setPickerOpenForId(null)}
+      />
+
       <PageHead
         icon={Building2}
         title="Branches Comparison"
@@ -1739,6 +2323,43 @@ export default function BranchesComparison() {
       {branches.length > 0 && winners.length > 0 && (
         <WinnersStripImpl winners={winners} isMobile={isMobile} />
       )}
+
+      {/* PAIRWISE COMPARE — focused Branch A vs Branch B picker. Smart
+          default leader vs laggard; can be overridden via the Plus icon
+          on any branch card below. */}
+      {branches.length >= 2 && (() => {
+        const compareBranches = branches.map(b => ({
+          id: b.id,
+          name: b.name,
+          color: b.color,
+          ahi: b.ahi || 0,
+          attendance: b.attendance || 0,
+          passRate: b.passRate || 0,
+          feeCollection: b.feeCollection || 0,
+          studentCount: b.studentCount || 0,
+          teacherCount: b.teacherCount || 0,
+          activeAlerts: b.activeAlerts || 0,
+        }));
+        const sortedByAhi = [...compareBranches].sort((a, b) => b.ahi - a.ahi);
+        const defaultA = headlineLeader?.id || sortedByAhi[0]?.id || compareBranches[0]?.id || "";
+        const defaultB = (() => {
+          const candidate = headlineLaggard?.id || sortedByAhi[sortedByAhi.length - 1]?.id || compareBranches[1]?.id || "";
+          return candidate && candidate !== defaultA ? candidate : (sortedByAhi[1]?.id || compareBranches[1]?.id || "");
+        })();
+        const effectiveA = pairwiseAId || defaultA;
+        const effectiveB = pairwiseBId || defaultB;
+        return (
+          <PairwiseCompareImpl
+            branches={compareBranches}
+            aId={effectiveA}
+            bId={effectiveB}
+            onChangeA={setPairwiseAId}
+            onChangeB={setPairwiseBId}
+            isMobile={isMobile}
+            containerRef={pairwiseCardRef}
+          />
+        );
+      })()}
 
       {/* SIDE-BY-SIDE COMPARISON MATRIX — the headline view that delivers
           on the page subtitle. Branches × metrics, leader marked with crown,
@@ -1817,6 +2438,12 @@ export default function BranchesComparison() {
                 onClick={() => navigate(`/branches/${b.id}`)}
                 onEdit={() => openEdit(b, b.id)}
                 onDelete={() => openDelete(b.id, b.name)}
+                onPickForCompare={() => handlePickForCompare(b.id)}
+                pickedSlot={
+                  pairwiseAId === b.id ? "A"
+                  : pairwiseBId === b.id ? "B"
+                  : null
+                }
               />
             );
           })}
