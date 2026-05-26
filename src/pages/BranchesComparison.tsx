@@ -1840,9 +1840,9 @@ export default function BranchesComparison() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={rankingWithData} layout="vertical" barGap={4} margin={{ left: isMobile ? -8 : 0, right: isMobile ? 8 : 20 }}>
                     <XAxis type="number" domain={[0, 100]} axisLine={false} tickLine={false}
-                      tick={{ fill: "#94a3b8", fontSize: isMobile ? 9 : 10, fontWeight: "bold" }} ticks={isMobile ? [0, 50, 100] : [0, 20, 40, 60, 80, 100]} />
+                      tick={{ fill: "#475569", fontSize: isMobile ? 10 : 11, fontWeight: "bold" }} ticks={isMobile ? [0, 50, 100] : [0, 20, 40, 60, 80, 100]} />
                     <YAxis dataKey="metric" type="category" axisLine={false} tickLine={false}
-                      tick={{ fill: "#64748b", fontSize: isMobile ? 9 : 11, fontWeight: "bold" }} width={isMobile ? 68 : 80} />
+                      tick={{ fill: "#1e293b", fontSize: isMobile ? 10 : 11, fontWeight: "bold" }} width={isMobile ? 68 : 80} />
                     <Tooltip cursor={{ fill: "#f8fafc" }} contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} />
                     <Legend verticalAlign="bottom" align="center" wrapperStyle={{ paddingTop: isMobile ? "10px" : "20px" }}
                       content={({ payload }) => (
@@ -1850,7 +1850,7 @@ export default function BranchesComparison() {
                           {payload?.map((e: any, i: number) => (
                             <div key={i} className="flex items-center gap-2">
                               <div className="w-3 h-3 md:w-4 md:h-4 rounded-sm" style={{ backgroundColor: e.color }}></div>
-                              <span className="text-[10px] md:text-[11px] font-bold text-slate-500">{e.value}</span>
+                              <span className="text-[11px] md:text-[12px] font-bold text-slate-700">{e.value}</span>
                             </div>
                           ))}
                         </div>
@@ -1880,9 +1880,9 @@ export default function BranchesComparison() {
                   <LineChart data={comparativeTrends} margin={{ left: isMobile ? -14 : -10, right: 10, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis dataKey="month" axisLine={false} tickLine={false}
-                      tick={{ fill: "#94a3b8", fontSize: isMobile ? 10 : 11, fontWeight: "bold" }} dy={10} />
+                      tick={{ fill: "#475569", fontSize: isMobile ? 10 : 11, fontWeight: "bold" }} dy={10} />
                     <YAxis axisLine={false} tickLine={false}
-                      tick={{ fill: "#94a3b8", fontSize: isMobile ? 9 : 11, fontWeight: "bold" }}
+                      tick={{ fill: "#475569", fontSize: isMobile ? 10 : 11, fontWeight: "bold" }}
                       domain={[0, 100]} ticks={isMobile ? [0, 50, 100] : [0, 20, 40, 60, 80, 100]} width={isMobile ? 30 : 40} />
                     <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} />
                     <Legend verticalAlign="bottom" align="center" wrapperStyle={{ paddingTop: isMobile ? "8px" : "20px" }}
@@ -1891,7 +1891,7 @@ export default function BranchesComparison() {
                           {payload?.map((e: any, i: number) => (
                             <div key={i} className="flex items-center gap-2">
                               <div className="w-3 h-3 md:w-4 md:h-4 rounded-full border-[2.5px] bg-white" style={{ borderColor: e.color }}></div>
-                              <span className="text-[10px] md:text-[11px] font-bold text-slate-500">{e.value}</span>
+                              <span className="text-[11px] md:text-[12px] font-bold text-slate-700">{e.value}</span>
                             </div>
                           ))}
                         </div>
