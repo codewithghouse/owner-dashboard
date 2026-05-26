@@ -80,6 +80,11 @@ export default function FeeStructureOverview() {
   const [viewMode, setViewMode]       = useState<"table" | "chart">("table");
   const [activeBarKey, setActiveBarKey] = useState<string | null>(null);
   const [principals, setPrincipals]   = useState<{ id: string; email: string; name: string; branchId: string; branchName?: string }[]>([]);
+  // School-wide logoUrl from schools/{uid}.logoUrl (set in SettingsPage).
+  // Used in the defaulter branch card header — the previous Building2
+  // icon-only placeholder rendered as an empty white square in the
+  // founder's screenshot (2026-05-26).
+  const [ownerLogoUrl, setOwnerLogoUrl] = useState<string>("");
   const [notifyState, setNotifyState] = useState<{
     mode: "single" | "bulk";
     branchName: string;
@@ -138,6 +143,15 @@ export default function FeeStructureOverview() {
           };
         });
         setPrincipals(pList);
+
+        /* 4. School logoUrl for the defaulter-card header avatar */
+        try {
+          const sSnap = await getDoc(doc(db, "schools", uid));
+          const sData = sSnap.exists() ? (sSnap.data() as any) : null;
+          if (sData?.logoUrl) setOwnerLogoUrl(sData.logoUrl as string);
+        } catch (e) {
+          console.warn("[FeeStructureOverview] logo fetch failed:", e);
+        }
       } catch (e) {
         console.error("[FeeStructureOverview] load error:", e);
       }
@@ -630,8 +644,17 @@ export default function FeeStructureOverview() {
                 <div key={group.branchName} {...tilt3D} className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: BLUE_SHADOW, ...tilt3DStyle }}>
                   <div className="px-3 md:px-5 py-3 md:py-3.5 border-b border-red-100 bg-gradient-to-r from-red-50 to-orange-50 flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3">
                     <div className="flex items-center gap-2.5 md:gap-3 min-w-0">
-                      <div className="w-8 h-8 rounded-lg bg-white border border-red-200 flex items-center justify-center shrink-0">
-                        <Building2 className="w-4 h-4 text-red-600" />
+                      <div className="w-8 h-8 rounded-lg bg-white border border-red-200 flex items-center justify-center shrink-0 overflow-hidden">
+                        {ownerLogoUrl ? (
+                          <img
+                            src={ownerLogoUrl}
+                            alt="School logo"
+                            className="w-full h-full object-cover"
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                          />
+                        ) : (
+                          <Building2 className="w-4 h-4 text-red-600" />
+                        )}
                       </div>
                       <div className="min-w-0">
                         <h4 className="text-[13px] md:text-sm font-extrabold text-[#1e294b] truncate">{group.branchName}</h4>
@@ -679,16 +702,18 @@ export default function FeeStructureOverview() {
                                 <Bell className="w-3 h-3" /> Notify
                               </button>
                               <button
-                                onClick={() => handleSendMsgToParent(group.branchName, d)}
-                                disabled={msgSendingKey === `${group.branchName}::${d.studentName}::${d.className}::${d.rollNo || ""}`}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-[10px] font-bold uppercase tracking-wider transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                                title="Send a fee reminder directly to the parent (appears in their Principal Notes)"
+                                onClick={() => {
+                                  const principal = principalForBranch(group.branchName);
+                                  if (!principal) {
+                                    toast.error(`No principal assigned to "${group.branchName}". Assign one in Principal Management first.`);
+                                    return;
+                                  }
+                                  navigate(`/principal-notes?principal=${encodeURIComponent(principal.id)}`);
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-[10px] font-bold uppercase tracking-wider transition-all"
+                                title="Open the principal's notes thread for this branch"
                               >
-                                {msgSendingKey === `${group.branchName}::${d.studentName}::${d.className}::${d.rollNo || ""}` ? (
-                                  <Loader2 className="w-3 h-3 animate-spin" />
-                                ) : (
-                                  <MessageCircle className="w-3 h-3" />
-                                )}
+                                <MessageCircle className="w-3 h-3" />
                                 Send msg
                               </button>
                             </div>
@@ -742,16 +767,18 @@ export default function FeeStructureOverview() {
                                     <Bell className="w-3 h-3" /> Notify
                                   </button>
                                   <button
-                                    onClick={() => handleSendMsgToParent(group.branchName, d)}
-                                    disabled={msgSendingKey === `${group.branchName}::${d.studentName}::${d.className}::${d.rollNo || ""}`}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-[10px] font-bold uppercase tracking-wider transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                                    title="Send a fee reminder directly to the parent (appears in their Principal Notes)"
+                                    onClick={() => {
+                                      const principal = principalForBranch(group.branchName);
+                                      if (!principal) {
+                                        toast.error(`No principal assigned to "${group.branchName}". Assign one in Principal Management first.`);
+                                        return;
+                                      }
+                                      navigate(`/principal-notes?principal=${encodeURIComponent(principal.id)}`);
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-[10px] font-bold uppercase tracking-wider transition-all"
+                                    title="Open the principal's notes thread for this branch"
                                   >
-                                    {msgSendingKey === `${group.branchName}::${d.studentName}::${d.className}::${d.rollNo || ""}` ? (
-                                      <Loader2 className="w-3 h-3 animate-spin" />
-                                    ) : (
-                                      <MessageCircle className="w-3 h-3" />
-                                    )}
+                                    <MessageCircle className="w-3 h-3" />
                                     Send msg
                                   </button>
                                 </div>

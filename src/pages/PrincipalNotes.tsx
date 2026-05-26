@@ -15,6 +15,7 @@
  * their inbox can filter by ownerUid and never see another owner's notes.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   collection, query, where, onSnapshot, addDoc, serverTimestamp,
   doc, updateDoc, orderBy,
@@ -54,6 +55,10 @@ interface NoteDoc {
 
 const PrincipalNotes = () => {
   const isMobile = useIsMobile();
+  // `?principal=<id>` deep-link from other pages (e.g. FeeStructureOverview
+  // "Send msg" button) auto-selects that principal's chat thread.
+  const [searchParams] = useSearchParams();
+  const deepLinkPrincipalId = searchParams.get("principal");
   const [principals, setPrincipals] = useState<PrincipalRow[]>([]);
   const [notes, setNotes] = useState<NoteDoc[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -65,6 +70,14 @@ const PrincipalNotes = () => {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const uid = auth.currentUser?.uid;
+
+  // Honour ?principal=<id> deep-link as soon as principals load. Set once
+  // per id change so navigating between principals inside the page still
+  // works (user clicks left-panel row → updates selectedId → URL keeps
+  // old param but our effect only fires when the param itself changes).
+  useEffect(() => {
+    if (deepLinkPrincipalId) setSelectedId(deepLinkPrincipalId);
+  }, [deepLinkPrincipalId]);
 
   // ── 1. Load principals scoped to this owner ────────────────────────────
   useEffect(() => {
