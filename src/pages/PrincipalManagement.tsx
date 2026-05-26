@@ -71,6 +71,7 @@ export default function PrincipalManagement() {
   const [editBranchData, setEditBranchData] = useState<any>(null);
   // Manage branch panel
   const [manageBranch, setManageBranch] = useState<any>(null);
+  const managePanelRef = useRef<HTMLDivElement>(null);
   
   // Real Source Data
   const [branches, setBranches] = useState<any[]>([]);
@@ -96,6 +97,16 @@ export default function PrincipalManagement() {
     document.addEventListener("mousedown", onMouseDown);
     return () => document.removeEventListener("mousedown", onMouseDown);
   }, [showActionMenu]);
+
+  /* Manage panel renders at the end of the branches grid, so when the user
+     clicks "Manage" on the first card it can open far below the viewport —
+     looks like the button did nothing. Scroll it into view on open. */
+  useEffect(() => {
+    if (!manageBranch) return;
+    requestAnimationFrame(() => {
+      managePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, [manageBranch?.id]);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -806,26 +817,29 @@ export default function PrincipalManagement() {
                       )}
                     </div>
 
-                    {/* Branch Actions */}
+                    {/* Branch Actions — labels only on xl+. Below xl the grid
+                        splits cards into 2/3 cols making each card ~280-400px
+                        wide, which can't fit 4 buttons with the "Reassign"
+                        label without overflowing the card. */}
                     <div className="grid grid-cols-4 gap-1.5 md:gap-2 mt-4 md:mt-5">
                       <button
                         onClick={(e) => { e.stopPropagation(); setEditBranchData({ ...branch }); setShowEditBranchModal(true); }}
-                        className="flex items-center justify-center gap-1.5 p-2.5 md:p-3 rounded-xl border border-slate-100 bg-[#f8fafc] hover:bg-white hover:shadow-md transition-all text-[11px] md:text-xs font-bold text-slate-500">
-                        <Edit3 className="w-3.5 h-3.5 shrink-0" /> <span className="hidden sm:inline">Edit</span>
+                        className="min-w-0 flex items-center justify-center gap-1.5 p-2.5 md:p-3 rounded-xl border border-slate-100 bg-[#f8fafc] hover:bg-white hover:shadow-md transition-all text-[11px] xl:text-xs font-bold text-slate-500">
+                        <Edit3 className="w-3.5 h-3.5 shrink-0" /> <span className="hidden xl:inline truncate">Edit</span>
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); setManageBranch(manageBranch?.id === branch.id ? null : branch); }}
-                        className="flex items-center justify-center gap-1.5 p-2.5 md:p-3 rounded-xl border border-slate-100 bg-[#f8fafc] hover:bg-white hover:shadow-md transition-all text-[11px] md:text-xs font-bold text-slate-500">
-                        <Users className="w-3.5 h-3.5 shrink-0" /> <span className="hidden sm:inline">Manage</span>
+                        className="min-w-0 flex items-center justify-center gap-1.5 p-2.5 md:p-3 rounded-xl border border-slate-100 bg-[#f8fafc] hover:bg-white hover:shadow-md transition-all text-[11px] xl:text-xs font-bold text-slate-500">
+                        <Users className="w-3.5 h-3.5 shrink-0" /> <span className="hidden xl:inline truncate">Manage</span>
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleReassignPrincipal(branch.name, branch.color); }}
-                        className="flex items-center justify-center gap-1.5 p-2.5 md:p-3 rounded-xl border border-amber-100 bg-amber-50/50 hover:bg-white hover:shadow-md transition-all text-[11px] md:text-xs font-bold text-amber-600">
-                        <RefreshCcw className="w-3.5 h-3.5 shrink-0" /> <span className="hidden sm:inline">Reassign</span>
+                        className="min-w-0 flex items-center justify-center gap-1.5 p-2.5 md:p-3 rounded-xl border border-amber-100 bg-amber-50/50 hover:bg-white hover:shadow-md transition-all text-[11px] xl:text-xs font-bold text-amber-600">
+                        <RefreshCcw className="w-3.5 h-3.5 shrink-0" /> <span className="hidden xl:inline truncate">Reassign</span>
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDeleteBranch(branch.id); }}
-                        className="flex items-center justify-center p-2.5 md:p-3 rounded-xl border border-rose-100 bg-[#fef2f2] hover:bg-rose-50 transition-all text-[11px] md:text-xs font-bold text-rose-400">
+                        className="min-w-0 flex items-center justify-center p-2.5 md:p-3 rounded-xl border border-rose-100 bg-[#fef2f2] hover:bg-rose-50 transition-all text-[11px] xl:text-xs font-bold text-rose-400">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -836,7 +850,7 @@ export default function PrincipalManagement() {
 
             {/* ── Manage Panel (shown below grid when a branch is selected) ── */}
             {manageBranch && (
-              <div className="dash3d md:col-span-2 lg:col-span-3 bg-white rounded-2xl md:rounded-[2rem] border border-[#1e3a8a]/20 p-4 md:p-6 animate-in slide-in-from-top-2 duration-200" style={{ boxShadow: SHADOW_LG }}>
+              <div ref={managePanelRef} className="dash3d md:col-span-2 lg:col-span-3 bg-white rounded-2xl md:rounded-[2rem] border border-[#1e3a8a]/20 p-4 md:p-6 animate-in slide-in-from-top-2 duration-200" style={{ boxShadow: SHADOW_LG }}>
                 <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white shrink-0" style={{ backgroundColor: manageBranch.color }}>
