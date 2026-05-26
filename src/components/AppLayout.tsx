@@ -60,6 +60,7 @@ const navSections: { heading: string; items: { to: string; label: string; icon: 
       { to: "/teacher-leaderboard", label: "Teacher Leaderboard",  icon: Trophy },
       { to: "/principals",          label: "Principal Management", icon: UserCog },
       { to: "/principal-notes",     label: "Principal Notes",      icon: MessageSquare },
+      { to: "/principal-leaderboard", label: "Principal Leaderboard", icon: Trophy },
       { to: "/deo",                 label: "DEO Management",       icon: ShieldCheck },
     ],
   },

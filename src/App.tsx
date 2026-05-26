@@ -37,6 +37,7 @@ const DEOManagement        = lazy(() => import("@/pages/DEOManagement"));
 const AuditLogPage         = lazy(() => import("@/pages/AuditLogPage"));
 const AIPredictorPage      = lazy(() => import("@/pages/AIPredictorPage"));
 const TeacherLeaderboard   = lazy(() => import("@/pages/TeacherLeaderboard"));
+const PrincipalLeaderboard = lazy(() => import("@/pages/PrincipalLeaderboard"));
 const OwnerDashboard       = lazy(() => import("@/pages/owner/OwnerDashboard"));
 const ParentPortal         = lazy(() => import("@/pages/ParentPortal"));
 const Help                 = lazy(() => import("@/pages/Help"));
@@ -164,6 +165,7 @@ const App = () => {
                         <Route path="/audit"                 element={<AuditLogPage />} />
                         <Route path="/ai-predictor"          element={<AIPredictorPage />} />
                         <Route path="/teacher-leaderboard"   element={<TeacherLeaderboard />} />
+                        <Route path="/principal-leaderboard" element={<PrincipalLeaderboard />} />
                         <Route path="/branch-leaderboard"    element={<OwnerDashboard />} />
                         <Route path="/help"                  element={<Help />} />
                         <Route path="/settings"              element={<SettingsPage />} />
