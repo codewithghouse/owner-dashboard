@@ -1151,7 +1151,7 @@ export default function TeacherPerformance() {
                         display:"flex", alignItems:"center", gap:10,
                         padding:"10px 12px", borderRadius:12, cursor:"pointer",
                       }}
-                      onClick={(e)=>{e.stopPropagation();navigate(`/teachers/${t.id}`);}}
+                      onClick={(e)=>{e.stopPropagation();navigate(`/teachers/profile/${t.id}`);}}
                     >
                       <span style={{ fontSize:14, fontWeight:800, color: i===0 ? GOLD : i===1 ? T3 : i===2 ? "#CD7F32" : T4, width:20, flexShrink:0 }}>{i + 1}</span>
                       <div style={{
@@ -1263,7 +1263,7 @@ export default function TeacherPerformance() {
                     position:"relative", overflow:"hidden",
                     ...tilt3DStyle,
                   }}
-                  onClick={(e)=>{e.stopPropagation();navigate(`/teachers/${t.id}`);}}
+                  onClick={(e)=>{e.stopPropagation();navigate(`/teachers/profile/${t.id}`);}}
                 >
                   <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 12, marginBottom: isMobile ? 12 : 14 }}>
                     <div style={{
