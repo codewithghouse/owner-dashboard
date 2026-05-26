@@ -1,9 +1,8 @@
-import { useState, useEffect, useMemo, useRef, useLayoutEffect } from "react";
-import { createPortal } from "react-dom";
+import { useState, useEffect, useMemo } from "react";
 import { db, auth } from "@/lib/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import {
-  Search, ChevronDown, Loader2, Users, GraduationCap,
+  Search, Loader2, Users, GraduationCap,
   TrendingDown, Award, Building2, BookOpen, AlertTriangle,
   ChevronRight, Trophy, Medal, Target, CheckCircle2, Filter, X,
   ClipboardCheck, FileText, MessageSquare, Sparkles, Activity,
@@ -17,6 +16,7 @@ import {
   DashGlobalStyles, PageHead, StatTile, DarkHero, Card3D, AIInsightCard,
 } from "@/lib/dashboardTokens";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { PortalSelect } from "@/components/PortalSelect";
 
 /* Performance thresholds on the 0-100 overall score */
 const TOP_SCORE_THRESHOLD = 75;
@@ -76,142 +76,6 @@ function parseScoreValue(data: any): number | null {
 }
 
 type TabKey = "branch" | "class" | "top" | "defaulter";
-
-/* ── PortalSelect ─────────────────────────────────────────
-   Native <select> with appearance:none breaks positioning when an ancestor
-   has CSS transforms (the page-level ownerFadeSlideIn animation creates a
-   containing block, so Chromium opens the popup upward / off-screen).
-   This is a custom dropdown that renders its menu via createPortal to
-   document.body, so it escapes every ancestor transform. */
-function PortalSelect({
-  value,
-  options,
-  onChange,
-  leftIcon,
-  formatLabel,
-  fontSize = 12,
-}: {
-  value: string;
-  options: string[];
-  onChange: (v: string) => void;
-  leftIcon: React.ReactNode;
-  formatLabel?: (v: string) => string;
-  fontSize?: number;
-}) {
-  const [open, setOpen] = useState(false);
-  const [rect, setRect] = useState<{ top: number; left: number; width: number; openUp: boolean } | null>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  const label = formatLabel ? formatLabel(value) : value;
-
-  const measure = () => {
-    const el = triggerRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const menuHeight = Math.min(options.length * 40 + 12, 280);
-    const spaceBelow = window.innerHeight - r.bottom;
-    const openUp = spaceBelow < menuHeight + 16 && r.top > menuHeight + 16;
-    setRect({ top: openUp ? r.top - 6 : r.bottom + 6, left: r.left, width: r.width, openUp });
-  };
-
-  useLayoutEffect(() => {
-    if (!open) return;
-    measure();
-    const onScrollOrResize = () => measure();
-    window.addEventListener("scroll", onScrollOrResize, true);
-    window.addEventListener("resize", onScrollOrResize);
-    return () => {
-      window.removeEventListener("scroll", onScrollOrResize, true);
-      window.removeEventListener("resize", onScrollOrResize);
-    };
-  }, [open, options.length]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDocDown = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (triggerRef.current?.contains(t)) return;
-      if (menuRef.current?.contains(t)) return;
-      setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("mousedown", onDocDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDocDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  return (
-    <>
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        style={{
-          width: "100%", display: "flex", alignItems: "center", gap: 8,
-          padding: "10px 36px 10px 36px", borderRadius: 12, position: "relative",
-          border: "0.5px solid rgba(0,85,255,.14)", background: "#F5F9FF",
-          fontSize, color: T3, outline: "none", fontFamily: "inherit",
-          cursor: "pointer", textAlign: "left",
-        }}
-        className="td-tab"
-      >
-        <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", pointerEvents: "none" }}>
-          {leftIcon}
-        </span>
-        <span style={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
-        <ChevronDown
-          size={14} color={T4}
-          style={{ position: "absolute", right: 12, top: "50%", transform: `translateY(-50%) rotate(${open ? 180 : 0}deg)`, transition: "transform .15s", pointerEvents: "none" }}
-        />
-      </button>
-      {open && rect && createPortal(
-        <div
-          ref={menuRef}
-          style={{
-            position: "fixed",
-            top: rect.openUp ? undefined : rect.top,
-            bottom: rect.openUp ? window.innerHeight - rect.top : undefined,
-            left: rect.left, width: rect.width,
-            background: "#fff", borderRadius: 12,
-            border: "0.5px solid rgba(0,85,255,.14)",
-            boxShadow: "0 12px 32px rgba(0,30,90,.18), 0 2px 6px rgba(0,30,90,.08)",
-            maxHeight: 280, overflowY: "auto",
-            zIndex: 9999, padding: 6,
-          }}
-        >
-          {options.map(opt => {
-            const selected = opt === value;
-            return (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => { onChange(opt); setOpen(false); }}
-                style={{
-                  width: "100%", textAlign: "left",
-                  padding: "9px 12px", borderRadius: 8, border: "none",
-                  background: selected ? "rgba(0,85,255,.10)" : "transparent",
-                  color: selected ? B1 : T1,
-                  fontSize, fontFamily: "inherit", cursor: "pointer",
-                  display: "flex", alignItems: "center", gap: 8,
-                }}
-                className="td-tab"
-                onMouseEnter={e => { if (!selected) (e.currentTarget as HTMLButtonElement).style.background = "rgba(0,85,255,.05)"; }}
-                onMouseLeave={e => { if (!selected) (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
-              >
-                {formatLabel ? formatLabel(opt) : opt}
-              </button>
-            );
-          })}
-        </div>,
-        document.body
-      )}
-    </>
-  );
-}
 
 /* ══════════════════════════════════════════════════════ */
 export default function TeachersDirectory() {
@@ -777,17 +641,15 @@ export default function TeachersDirectory() {
             </div>
             <PortalSelect
               value={branchFilter}
-              options={branchList}
+              options={branchList.map(b => ({ value: b, label: b === "All" ? "All Branches" : b }))}
               onChange={setBranchFilter}
               leftIcon={<Building2 size={14} color={T4}/>}
-              formatLabel={(b) => b === "All" ? "All Branches" : b}
             />
             <PortalSelect
               value={classFilter}
-              options={classList}
+              options={classList.map(c => ({ value: c, label: c === "All" ? "All Classes" : c }))}
               onChange={setClassFilter}
               leftIcon={<BookOpen size={14} color={T4}/>}
-              formatLabel={(c) => c === "All" ? "All Classes" : c}
             />
           </div>
         </Card3D>
