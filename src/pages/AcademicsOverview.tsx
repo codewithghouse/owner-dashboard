@@ -5,7 +5,7 @@ import {
 import {
   X, BookOpen, Loader2, Sparkles, GraduationCap, Award, Target,
   AlertTriangle, TrendingUp, Users, BarChart3, Building2, ChevronDown,
-  ChevronRight, Layers,
+  ChevronRight, Layers, RefreshCw,
 } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useState } from "react";
@@ -88,7 +88,7 @@ export default function AcademicsOverview() {
   const pageShellStyle = usePageShellStyle();
   const [activeTab, setActiveTab] = useState("Performance");
 
-  const { data: overview, loading: overviewLoading, error } = useAcademicsOverview();
+  const { data: overview, loading: overviewLoading, error, refresh } = useAcademicsOverview();
   const { subject, loading: subjectLoading } = useSubjectDetail(id);
   const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
 
@@ -388,6 +388,24 @@ export default function AcademicsOverview() {
                     <X size={13}/>
                   </button>
                 )}
+                <button
+                  onClick={refresh}
+                  aria-label="Refresh data"
+                  title="Refresh data"
+                  className="dash-btn"
+                  style={{
+                    display:"inline-flex", alignItems:"center", justifyContent:"center", gap:6,
+                    padding: isMobile ? "9px 12px" : "10px 14px", borderRadius:12,
+                    background:"#fff", border:"0.5px solid rgba(0,85,255,.12)",
+                    fontSize: isMobile ? 10 : 11, fontWeight:800, color:T3,
+                    letterSpacing:"0.06em", textTransform:"uppercase",
+                    cursor:"pointer", boxShadow:SHADOW_SM, fontFamily:"inherit",
+                    flexShrink:0,
+                  }}
+                >
+                  <RefreshCw size={13} className={overviewLoading ? "animate-spin" : ""}/>
+                  {!isMobile && <span>Refresh</span>}
+                </button>
               </div>
             )
           }
@@ -452,7 +470,11 @@ export default function AcademicsOverview() {
               <div style={{ height: isMobile ? 220 : 260, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:T4 }}>No results found yet</div>
             ) : (() => {
               const cellMin = isMobile ? 42 : 0;
-              const labelWidth = isMobile ? 56 : 56;
+              // Widened from 56 → 96 (mobile) / 110 (desktop) so subject
+              // names show in full with CSS ellipsis instead of the hard
+              // 7-character JS slice that turned "Mathematics" → "Mathema"
+              // (no ellipsis, looks like a typo).
+              const labelWidth = isMobile ? 96 : 110;
               const scrollMin = isMobile ? (labelWidth + gradeColumns.length * cellMin + gradeColumns.length * 4 + 12) : 460;
               return (
                 <div className={isMobile ? "edge-fade-x" : ""} style={{ overflowX:"auto", paddingBottom:4, WebkitOverflowScrolling:"touch" }}>
@@ -466,24 +488,30 @@ export default function AcademicsOverview() {
                     </div>
                     {activeData!.gradeMatrix.map(row => (
                       <div key={row.subject as string} style={{ display:"flex", gap: isMobile ? 4 : 4, marginBottom: isMobile ? 4 : 4, alignItems:"center" }}>
-                        <div style={{ width: labelWidth, flexShrink:0, textAlign:"right", paddingRight: isMobile ? 6 : 8, fontSize: isMobile ? 9 : 10, fontWeight:800, color:T3, letterSpacing:"-0.02em", overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis", textTransform:"uppercase" }}>
-                          {(row.subject as string).slice(0,7)}
+                        <div
+                          title={row.subject as string}
+                          style={{ width: labelWidth, flexShrink:0, textAlign:"right", paddingRight: isMobile ? 6 : 8, fontSize: isMobile ? 9 : 10, fontWeight:800, color:T3, letterSpacing:"-0.02em", overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis", textTransform:"uppercase" }}
+                        >
+                          {row.subject as string}
                         </div>
                         {gradeColumns.map(g => {
                           const val = (row[g] as number) || 0;
+                          const clickable = val > 0;
                           return (
                             <div
                               key={g}
-                              onClick={()=>navigate(`/academics/${(row.subject as string).toLowerCase()}`)}
-                              className="dash-btn"
+                              onClick={clickable ? () => navigate(`/academics/${(row.subject as string).toLowerCase()}`) : undefined}
+                              className={clickable ? "dash-btn" : undefined}
+                              aria-disabled={!clickable}
                               style={{
                                 flex:1, minWidth: cellMin, height: isMobile ? 40 : 44, borderRadius: isMobile ? 8 : 10,
                                 display:"flex", alignItems:"center", justifyContent:"center",
                                 fontSize: isMobile ? 11 : 11, fontWeight:800,
                                 background: getMatrixColor(val),
                                 color: getMatrixText(val),
-                                cursor:"pointer",
+                                cursor: clickable ? "pointer" : "default",
                                 boxShadow: val>0 ? "0 3px 8px rgba(0,0,0,.08)" : "none",
+                                opacity: clickable ? 1 : 0.7,
                               }}
                             >
                               {val > 0 ? val : "—"}
@@ -756,13 +784,16 @@ export default function AcademicsOverview() {
                               <span key={subj}
                                 className="dash-btn"
                                 onClick={(e) => { e.stopPropagation(); navigate(`/academics/${subj.toLowerCase()}`); }}
+                                title={`${subj} ${score}%`}
                                 style={{
                                   fontSize:10, fontWeight:800, padding:"4px 10px", borderRadius:999,
                                   background: b.color || GRAD_PRIMARY, color:"#fff",
                                   cursor:"pointer", letterSpacing:"0.04em",
+                                  maxWidth: 140, overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis",
+                                  display:"inline-block",
                                 }}
                               >
-                                {subj.slice(0,8)} {score}%
+                                {subj} {score}%
                               </span>
                             ))}
                         </div>

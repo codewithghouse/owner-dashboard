@@ -300,14 +300,28 @@ export async function fetchAcademicsOverview(opts: { force?: boolean } = {}): Pr
   (resultsSnap.docs as any[]).forEach(processDoc("results"));
   (scoresSnap.docs  as any[]).forEach(processDoc("test_scores"));
 
-  // All upstream collections are now schoolId-scoped at the query level,
-  // but a doc may still carry an unknown branchId (typo, branch deleted).
-  // We drop those defensively so a stray entry doesn't pollute branch
-  // averages — it WILL still count toward the school-wide aggregates
-  // (overall stats, gradeMatrix, learningOutcomes) where branch attribution
-  // doesn't matter.
+  // Some legacy result/test_score docs were written before the
+  // enforceBranchId_* trigger backfilled `branchId` — they only carry
+  // `schoolId == ownerUid` and no real branchId. Earlier we silently
+  // included them in school-wide aggregates but excluded them from every
+  // per-branch rollup, which produced visible mismatches: "All Branches"
+  // showed 100 students/100% pass while the per-branch cards added up to
+  // 70. Fix: route every orphan entry into a synthetic "Unassigned"
+  // branch so the per-branch breakdown reconciles with the school total.
+  // (2026-05-26 — see AcademicsOverview audit.)
+  const UNASSIGNED_ID   = "_unassigned";
+  const UNASSIGNED_NAME = "Unassigned";
+  const initialValidBranchIds = new Set(branchDocs.map(b => b.id));
+  const isOrphanEntry = (e: ScoreEntry) =>
+    !e.schoolId || e.schoolId === uid || !initialValidBranchIds.has(e.schoolId);
+
+  if (allEntries.some(isOrphanEntry)) {
+    branchDocs.push({ id: UNASSIGNED_ID, name: UNASSIGNED_NAME, color: "#94A3B8" });
+  }
   const validBranchIds = new Set(branchDocs.map(b => b.id));
-  const finalEntries = allEntries.filter(e => !e.schoolId || validBranchIds.has(e.schoolId) || e.schoolId === uid);
+  const finalEntries = allEntries
+    .map(e => isOrphanEntry(e) ? { ...e, schoolId: UNASSIGNED_ID } : e)
+    .filter(e => validBranchIds.has(e.schoolId));
 
   // (Earlier we had a synthetic-quarter loop here that distributed undated
   // entries across Q1-Q4 by array index. That made the Learning Outcomes
@@ -326,12 +340,23 @@ export async function fetchAcademicsOverview(opts: { force?: boolean } = {}): Pr
   //    enrollment, so it's reliable), and dedup by studentId so a
   //    multi-class student counts once per branch (memory:
   //    bug_pattern_enrollment_row_dedup).
+  // If the Unassigned bucket was added (score orphans existed), route
+  // enrollment + attendance orphans here too so the per-branch breakdown
+  // stays internally consistent (total students = Σ branch students).
+  const hasUnassigned = validBranchIds.has(UNASSIGNED_ID);
+  const bucketBranchId = (bid: string): string => {
+    if (!bid || bid === uid || !validBranchIds.has(bid)) {
+      return hasUnassigned ? UNASSIGNED_ID : "";
+    }
+    return bid;
+  };
+
   const branchStudents = new Map<string, Set<string>>();
   const allStudentIds  = new Set<string>();
   (enrollSnap.docs as any[]).forEach((d: any) => {
     const e   = d.data();
     const sid = e.studentId || e.studentEmail || d.id;
-    const bid = e.branchId || classMap.get(e.classId)?.schoolId || "";
+    const bid = bucketBranchId(e.branchId || classMap.get(e.classId)?.schoolId || "");
     if (sid) allStudentIds.add(sid);
     if (!bid || !sid) return;
     let set = branchStudents.get(bid);
@@ -344,7 +369,7 @@ export async function fetchAcademicsOverview(opts: { force?: boolean } = {}): Pr
   const attBySchool = new Map<string, { total: number; present: number }>();
   (attSnap.docs as any[]).forEach((d: any) => {
     const a  = d.data();
-    const bid = a.branchId || teacherMap.get(a.teacherId)?.schoolId || "";
+    const bid = bucketBranchId(a.branchId || teacherMap.get(a.teacherId)?.schoolId || "");
     if (!bid) return;
     const prev = attBySchool.get(bid) || { total: 0, present: 0 };
     attBySchool.set(bid, {
