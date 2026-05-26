@@ -120,7 +120,7 @@ const Field = ({
   label: string; icon: React.ElementType; children: React.ReactNode;
 }) => (
   <div className="space-y-2">
-    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 ml-1">
+    <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest flex items-center gap-1.5 ml-1">
       <Icon className="w-3 h-3" /> {label}
     </label>
     {children}
@@ -457,7 +457,7 @@ export default function SettingsPage() {
 
       {/* ── Section 1: Owner Profile ─────────────────────────────────────── */}
       <div className="dash3d bg-white rounded-2xl md:rounded-[32px] border border-slate-100 p-5 md:p-8 lg:p-10" style={{ boxShadow: SHADOW_SM }}>
-        <h3 className="text-[11px] md:text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-5 md:mb-8">Owner Profile</h3>
+        <h3 className="text-[11px] md:text-xs font-black text-slate-600 uppercase tracking-[0.2em] mb-5 md:mb-8">Owner Profile</h3>
 
         {/* Avatar / Logo zone */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 md:gap-6 mb-5 md:mb-8 p-4 md:p-6 bg-slate-50 rounded-xl md:rounded-2xl">
@@ -480,8 +480,8 @@ export default function SettingsPage() {
           {/* Info + upload buttons */}
           <div className="flex-1 min-w-0 w-full">
             <p className="text-sm md:text-base font-black text-[#1e293b] truncate">{settings.ownerName || "—"}</p>
-            <p className="text-[12px] md:text-sm text-slate-400 font-medium truncate">{settings.email}</p>
-            <p className="text-[11px] md:text-xs text-slate-300 mt-0.5 truncate">{settings.schoolName || "School name not set"}</p>
+            <p className="text-[12px] md:text-sm text-slate-600 font-medium truncate">{settings.email}</p>
+            <p className="text-[11px] md:text-xs text-slate-500 mt-0.5 truncate">{settings.schoolName || "School name not set"}</p>
             <div className="flex items-center gap-2 mt-3 flex-wrap">
               <input
                 ref={logoInputRef}
@@ -509,7 +509,7 @@ export default function SettingsPage() {
                   <Trash2 className="w-3.5 h-3.5 shrink-0" /> Remove
                 </button>
               )}
-              <p className="text-[10px] text-slate-300 font-medium w-full sm:w-auto sm:ml-1">PNG/JPG, max 2MB</p>
+              <p className="text-[10px] text-slate-500 font-medium w-full sm:w-auto sm:ml-1">PNG/JPG, max 2MB</p>
             </div>
           </div>
         </div>
@@ -530,9 +530,9 @@ export default function SettingsPage() {
               type="email"
               value={settings.email}
               disabled
-              className="w-full h-12 px-4 rounded-2xl border border-slate-100 bg-slate-100 text-sm font-semibold text-slate-400 outline-none cursor-not-allowed"
+              className="w-full h-12 px-4 rounded-2xl border border-slate-100 bg-slate-100 text-sm font-semibold text-slate-600 outline-none cursor-not-allowed"
             />
-            <p className="text-[10px] text-slate-400 ml-1">Email cannot be changed here</p>
+            <p className="text-[10px] text-slate-600 ml-1">Email cannot be changed here</p>
           </Field>
 
           <Field label="Phone Number" icon={Phone}>
@@ -572,7 +572,7 @@ export default function SettingsPage() {
 
       {/* ── Section 3: Notifications ─────────────────────────────────────── */}
       <div className="dash3d bg-white rounded-2xl md:rounded-[32px] border border-slate-100 p-5 md:p-8 lg:p-10" style={{ boxShadow: SHADOW_SM }}>
-        <h3 className="text-[11px] md:text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-5 md:mb-8">Notification Preferences</h3>
+        <h3 className="text-[11px] md:text-xs font-black text-slate-600 uppercase tracking-[0.2em] mb-5 md:mb-8">Notification Preferences</h3>
         <div className="space-y-1">
           {[
             {
@@ -610,12 +610,12 @@ export default function SettingsPage() {
                 }`}>
                   {settings.notifications[key]
                     ? <Icon className="w-4 h-4 text-[#1e3a8a]" />
-                    : <BellOff className="w-4 h-4 text-slate-300" />
+                    : <BellOff className="w-4 h-4 text-slate-500" />
                   }
                 </div>
                 <div className="min-w-0">
                   <p className="text-[13px] md:text-sm font-black text-[#1e293b]">{label}</p>
-                  <p className="text-[10px] md:text-[11px] text-slate-400 font-medium mt-0.5 leading-relaxed">{desc}</p>
+                  <p className="text-[10px] md:text-[11px] text-slate-600 font-medium mt-0.5 leading-relaxed">{desc}</p>
                 </div>
               </div>
               <Toggle
@@ -630,8 +630,8 @@ export default function SettingsPage() {
 
       {/* ── Section 4: Data Export ───────────────────────────────────────── */}
       <div className="dash3d bg-white rounded-2xl md:rounded-[32px] border border-slate-100 p-5 md:p-8 lg:p-10" style={{ boxShadow: SHADOW_SM }}>
-        <h3 className="text-[11px] md:text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Data Export</h3>
-        <p className="text-[11px] md:text-xs text-slate-400 font-medium mb-5 md:mb-8">
+        <h3 className="text-[11px] md:text-xs font-black text-slate-600 uppercase tracking-[0.2em] mb-2">Data Export</h3>
+        <p className="text-[11px] md:text-xs text-slate-600 font-medium mb-5 md:mb-8">
           Download your school data as CSV files for compliance, backup, or analysis.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
@@ -691,16 +691,16 @@ export default function SettingsPage() {
 
       {/* ── Section 5: Risk Thresholds ───────────────────────────────────── */}
       <div className="dash3d bg-white rounded-2xl md:rounded-[32px] border border-slate-100 p-5 md:p-8 lg:p-10" style={{ boxShadow: SHADOW_SM }}>
-        <h3 className="text-[11px] md:text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Risk Alert Thresholds</h3>
-        <p className="text-[11px] md:text-xs text-slate-400 font-medium mb-5 md:mb-8">
+        <h3 className="text-[11px] md:text-xs font-black text-slate-600 uppercase tracking-[0.2em] mb-2">Risk Alert Thresholds</h3>
+        <p className="text-[11px] md:text-xs text-slate-600 font-medium mb-5 md:mb-8">
           Customize when students are flagged as at-risk. These thresholds power the Risks &amp; Alerts page.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
           <div className="space-y-3">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+            <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">
               Attendance Critical (%)
             </label>
-            <p className="text-[11px] text-slate-400 font-medium">Below this = Critical alert</p>
+            <p className="text-[11px] text-slate-600 font-medium">Below this = Critical alert</p>
             <div className="relative">
               <input
                 type="number"
@@ -712,14 +712,14 @@ export default function SettingsPage() {
                 }))}
                 className="w-full h-12 rounded-xl bg-slate-50 border border-slate-100 pl-4 pr-14 text-sm font-bold text-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-100 focus:border-rose-200 transition-all"
               />
-              <span className="pointer-events-none absolute right-8 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">%</span>
+              <span className="pointer-events-none absolute right-8 top-1/2 -translate-y-1/2 text-xs font-black text-slate-600">%</span>
             </div>
           </div>
           <div className="space-y-3">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+            <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">
               Attendance Warning (%)
             </label>
-            <p className="text-[11px] text-slate-400 font-medium">Below this = Warning alert</p>
+            <p className="text-[11px] text-slate-600 font-medium">Below this = Warning alert</p>
             <div className="relative">
               <input
                 type="number"
@@ -731,14 +731,14 @@ export default function SettingsPage() {
                 }))}
                 className="w-full h-12 rounded-xl bg-slate-50 border border-slate-100 pl-4 pr-14 text-sm font-bold text-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-200 transition-all"
               />
-              <span className="pointer-events-none absolute right-8 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">%</span>
+              <span className="pointer-events-none absolute right-8 top-1/2 -translate-y-1/2 text-xs font-black text-slate-600">%</span>
             </div>
           </div>
           <div className="space-y-3">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+            <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">
               Fee Overdue Days
             </label>
-            <p className="text-[11px] text-slate-400 font-medium">Days before marking fee overdue</p>
+            <p className="text-[11px] text-slate-600 font-medium">Days before marking fee overdue</p>
             <div className="relative">
               <input
                 type="number"
@@ -750,7 +750,7 @@ export default function SettingsPage() {
                 }))}
                 className="w-full h-12 rounded-xl bg-slate-50 border border-slate-100 pl-4 pr-20 text-sm font-bold text-[#1e3a8a] focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-200 transition-all"
               />
-              <span className="pointer-events-none absolute right-8 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">days</span>
+              <span className="pointer-events-none absolute right-8 top-1/2 -translate-y-1/2 text-xs font-black text-slate-600">days</span>
             </div>
           </div>
         </div>
