@@ -13,6 +13,7 @@ import {
   DashGlobalStyles, PageHead, StatTile, DarkHero, Card3D, AIInsightCard,
 } from "@/lib/dashboardTokens";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { PortalSelect } from "@/components/PortalSelect";
 import { auth, db } from "@/lib/firebase";
 import {
   collection, query, where, onSnapshot, updateDoc, doc,
@@ -258,29 +259,6 @@ export default function DEOManagement() {
         icon={ShieldCheck}
         title="DEO Management"
         subtitle={isMobile ? "Real-time oversight of all DEOs" : "Data Entry Operators across all branches — real-time oversight"}
-        right={
-          <div style={{ display:"flex", gap: isMobile ? 6 : 8, flexWrap:"wrap", width: isMobile ? "100%" : "auto" }}>
-            {(["pending", "approved", "rejected"] as const).map(s => {
-              const cfg = STATUS_CONFIG[s];
-              const grad = s === "pending" ? GRAD_GOLD : s === "approved" ? GRAD_GREEN : GRAD_RED;
-              return (
-                <div key={s}
-                  style={{
-                    display:"inline-flex", alignItems:"center", gap: isMobile ? 5 : 6,
-                    padding: isMobile ? "6px 10px" : "8px 14px", borderRadius: isMobile ? 10 : 12,
-                    background:"#fff", border:"0.5px solid rgba(0,85,255,.1)",
-                    fontSize: isMobile ? 9 : 10, fontWeight:800, color:T3,
-                    letterSpacing:"0.08em", textTransform:"uppercase",
-                    boxShadow:SHADOW_SM, flex: isMobile ? 1 : "none", justifyContent: isMobile ? "center" : "flex-start",
-                  }}
-                >
-                  <div style={{ width: isMobile ? 6 : 8, height: isMobile ? 6 : 8, borderRadius:"50%", background:grad, flexShrink:0 }}/>
-                  <span style={{ whiteSpace:"nowrap" }}>{counts[s]} {isMobile ? cfg.label.slice(0, 3) : cfg.label}</span>
-                </div>
-              );
-            })}
-          </div>
-        }
       />
 
       <DarkHero
@@ -364,25 +342,17 @@ export default function DEOManagement() {
             />
           </div>
           {branchList.length > 1 && (
-            <div style={{ position:"relative", width: isMobile ? "100%" : "auto" }}>
-              <Filter size={14} color={T4} style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}/>
-              <select
+            <div style={{ width: isMobile ? "100%" : 220 }}>
+              <PortalSelect
                 value={branchFilter}
-                onChange={e => setBranchFilter(e.target.value)}
-                style={{
-                  appearance:"none", padding: isMobile ? "9px 34px 9px 34px" : "10px 36px 10px 36px", borderRadius:12,
-                  border:"0.5px solid rgba(0,85,255,.14)", background:"#F5F9FF",
-                  fontSize: isMobile ? 12 : 12, fontWeight:700, color:T3,
-                  outline:"none", fontFamily:"inherit", cursor:"pointer",
-                  minWidth: isMobile ? 0 : 180, width: isMobile ? "100%" : "auto",
-                }}
-              >
-                <option value="all">All Branches</option>
-                {branchList.map(([id, name]) => (
-                  <option key={id} value={id}>{name}</option>
-                ))}
-              </select>
-              <ChevronDown size={13} color={T4} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}/>
+                options={[
+                  { value: "all", label: "All Branches" },
+                  ...branchList.map(([id, name]) => ({ value: id, label: name })),
+                ]}
+                onChange={setBranchFilter}
+                leftIcon={<Filter size={14} color={T4}/>}
+                fontSize={12}
+              />
             </div>
           )}
         </div>
