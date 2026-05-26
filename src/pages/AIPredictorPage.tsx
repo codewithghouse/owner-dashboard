@@ -765,21 +765,6 @@ export default function AIPredictorPage() {
                         </p>
                         <p style={{ fontSize: isMobile ? 12 : 13, fontWeight:700, color:T1, margin:0, letterSpacing:"-0.2px", lineHeight:1.4 }}>{p.recommendation}</p>
                       </div>
-
-                      <button
-                        onClick={() => generateParentLink(p)}
-                        className="dash-btn"
-                        style={{
-                          display:"inline-flex", alignItems:"center", justifyContent:"center", gap:6, alignSelf: isMobile ? "stretch" : "flex-start",
-                          padding: isMobile ? "10px 14px" : "8px 14px", borderRadius:11,
-                          background:GRAD_PRIMARY, color:"#fff",
-                          fontSize: isMobile ? 10 : 10, fontWeight:800, letterSpacing:"0.10em", textTransform:"uppercase",
-                          border:"none", cursor:"pointer", boxShadow:SHADOW_BTN, fontFamily:"inherit",
-                          width: isMobile ? "100%" : "auto",
-                        }}
-                      >
-                        <Share2 size={12}/> {isMobile ? "Parent Link (30-day)" : "Generate parent link (30-day)"}
-                      </button>
                     </div>
                   )}
                 </div>
