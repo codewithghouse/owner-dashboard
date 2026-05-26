@@ -36,6 +36,36 @@ interface PrincipalRow {
   branchId?: string;
 }
 
+// ── Case-insensitive dedup safeguard ───────────────────────────────────────
+// Defense-in-depth after the 2026-05-26 cleanup: even if a duplicate
+// principal doc sneaks back into Firestore (e.g. someone re-invites a
+// principal with a slight name variation), the UI still shows ONE row per
+// real person. Group key normalises whitespace + casing; tie-break by
+// longest original name (typically the most properly-cased "official" entry)
+// then by earliest id for stability.
+function dedupePrincipals<T extends PrincipalRow>(rows: T[]): T[] {
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "").trim();
+  const groups = new Map<string, T[]>();
+  for (const r of rows) {
+    const branchKey = (r.branchId || r.branchName || "").toString().toLowerCase().trim();
+    const nameKey   = norm(r.name);
+    if (!nameKey) continue;
+    const key = `${nameKey}|${branchKey}`;
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(r); else groups.set(key, [r]);
+  }
+  const out: T[] = [];
+  for (const bucket of groups.values()) {
+    if (bucket.length === 1) { out.push(bucket[0]); continue; }
+    const winner = bucket.slice().sort((a, b) => {
+      if (b.name.length !== a.name.length) return b.name.length - a.name.length;
+      return a.id.localeCompare(b.id);
+    })[0];
+    out.push(winner);
+  }
+  return out;
+}
+
 interface NoteDoc {
   id: string;
   principalId?: string;
@@ -86,7 +116,7 @@ const PrincipalNotes = () => {
     const unsub = onSnapshot(
       q,
       (snap) => {
-        const rows: PrincipalRow[] = snap.docs.map(d => {
+        const rawRows: PrincipalRow[] = snap.docs.map(d => {
           const data = d.data() as any;
           return {
             id: d.id,
@@ -96,6 +126,7 @@ const PrincipalNotes = () => {
             branchId: (data.branchId || "").toString(),
           };
         });
+        const rows = dedupePrincipals(rawRows);
         rows.sort((a, b) => a.name.localeCompare(b.name));
         setPrincipals(rows);
         setLoadingPrincipals(false);

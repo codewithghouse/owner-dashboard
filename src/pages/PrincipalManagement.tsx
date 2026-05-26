@@ -217,6 +217,36 @@ export default function PrincipalManagement() {
       return;
     }
 
+    // Pre-flight duplicate guard — case-insensitive match on (name, branch)
+    // OR exact-match on email. After the 2026-05-26 cleanup we want to
+    // prevent the same fakes coming back via casual re-invites
+    // ("ghouse pasha" + "Ghouse Pasha" + "GhousePasha"). The native
+    // confirm() lets the owner override when they really do mean to add
+    // a second principal with a near-identical name.
+    const nameKey   = inviteForm.name.toLowerCase().replace(/\s+/g, "").trim();
+    const branchKey = (inviteForm.branchId || inviteForm.branch || "").toLowerCase().trim();
+    const emailKey  = inviteForm.email.toLowerCase().trim();
+    const collidingDoc = (principals as any[]).find(p => {
+      const pName  = (p.name || "").toLowerCase().replace(/\s+/g, "").trim();
+      const pBranch = (p.branchId || p.branch || "").toLowerCase().trim();
+      const pEmail  = (p.email || "").toLowerCase().trim();
+      if (pEmail && pEmail === emailKey) return true;
+      if (nameKey && pName === nameKey && (!branchKey || pBranch === branchKey)) return true;
+      return false;
+    });
+    if (collidingDoc) {
+      const proceed = window.confirm(
+        `A principal called "${collidingDoc.name}" is already registered for ` +
+        `${collidingDoc.branch || collidingDoc.branchName || "this branch"} ` +
+        `(${collidingDoc.email || "no email"}).\n\n` +
+        `Add this one anyway? Click Cancel to review the existing entry first.`
+      );
+      if (!proceed) {
+        toast.info("Invite cancelled — existing principal kept.");
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       // 1. Save to Whitelist in Firestore
