@@ -278,21 +278,33 @@ export default function AlertDetailPage() {
           ) : (
             <div className="h-[250px] flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-xl gap-2">
               <p className="text-sm text-slate-400 font-semibold">
-                {data.kind === 'academic' ? "No recent test-score data found" : "No daily attendance data found"}
+                {data.kind === 'academic' ? "No recent test-score data found"
+                  : data.kind === 'fees'     ? "Trend view not applicable for fee alerts"
+                  : data.kind === 'teachers' ? "Trend view not applicable for teacher alerts"
+                  : "No daily attendance data found"}
               </p>
               <p className="text-xs text-slate-300">
                 {data.kind === 'academic'
                   ? "Trend appears once tests are recorded over the last 4 weeks"
-                  : "Trend appears once attendance is recorded per day"}
+                  : data.kind === 'fees'
+                    ? "See defaulter list on the right for affected students + amounts"
+                    : data.kind === 'teachers'
+                      ? "See affected list on the right for teachers and days-idle"
+                      : "Trend appears once attendance is recorded per day"}
               </p>
             </div>
           )}
         </div>
 
-        {/* Affected Students */}
+        {/* Affected list — heading + empty state both flex by alert kind:
+            students for attendance/academic/fees, teachers for inactive-teacher.
+            The data shape is the same (initials/name/pct/color); only the
+            human-readable label changes. */}
         <div {...tilt3D} style={tilt3DStyle} className="lg:col-span-5 bg-white p-8 rounded-[1.5rem] border border-slate-100">
           <h4 className="text-base font-bold text-[#1e294b] mb-6">
-            Affected Students
+            {data.kind === 'teachers' ? "Inactive Teachers"
+              : data.kind === 'fees'  ? "Defaulter Students"
+              : "Affected Students"}
             {data.affectedStudents.length > 0 && (
               <span className="ml-2 text-xs font-bold text-slate-400">{data.affectedSubtitle}</span>
             )}
@@ -300,7 +312,11 @@ export default function AlertDetailPage() {
           {data.affectedStudents.length === 0 ? (
             <div className="h-[200px] flex flex-col items-center justify-center gap-2">
               <CheckCircle2 className="w-10 h-10 text-emerald-400 opacity-40" />
-              <p className="text-sm font-bold text-slate-400">No at-risk students found</p>
+              <p className="text-sm font-bold text-slate-400">
+                {data.kind === 'teachers' ? "No inactive teachers found"
+                  : data.kind === 'fees'  ? "No fee defaulters resolved"
+                  : "No at-risk students found"}
+              </p>
             </div>
           ) : (
             <div className="space-y-3">

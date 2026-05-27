@@ -579,10 +579,16 @@ export type AlertDetailData = {
   alertId:    string;
   title:      string;
   type:       'critical' | 'warning' | 'info';
-  /* Drives whether the page renders attendance-style metrics + Y[50,100] %
-     chart, or academic-style metrics + Y[0,100] score chart. Carried out
-     of the alertId prefix (crit/warn → attendance, score → academic). */
-  kind:       'attendance' | 'academic';
+  /* Drives chart axes + empty-state copy. Attendance → daily 7-day % chart
+     (Y[50,100]). Academic → weekly 4-week score chart (Y[0,100]). Fees +
+     teachers don't have a meaningful trend — the chart shows its empty state
+     and the metrics row + affected-list carry the data instead.
+     Each kind maps to one cron ruleKey from [[project-critical-alerts-cron]]:
+       attendance → LOW_ATTENDANCE_7D / legacy crit-|warn- prefix
+       academic   → SCORE_DROP_MOM    / legacy score- prefix
+       fees       → FEE_DEFAULTER_SURGE
+       teachers   → INACTIVE_TEACHER */
+  kind:       'attendance' | 'academic' | 'fees' | 'teachers';
   status:     string;
   branchName: string;
   alertNum:   string;
@@ -610,21 +616,49 @@ export async function fetchAlertDetail(alertId: string): Promise<AlertDetailData
   const uid = auth.currentUser?.uid;
   if (!uid) throw new Error("Not authenticated");
 
-  /* Parse alertId — supports the three prefixes that fetchRisksOverview emits:
-       crit-{branchId}  → attendance critical
-       warn-{branchId}  → attendance warning
-       score-{branchId} → academic critical
-     Previously this only handled crit/warn and silently downgraded score to
-     'info', mis-rendering "Low Academic Performance" alerts as "Attendance
-     Monitoring" with the wrong chart, wrong students, wrong description.
-     branchId may itself contain dashes (custom IDs) — slice from FIRST dash. */
-  const dashIdx  = alertId.indexOf('-');
-  const prefix   = dashIdx !== -1 ? alertId.slice(0, dashIdx) : alertId;
-  const branchId = dashIdx !== -1 ? alertId.slice(dashIdx + 1) : alertId;
-  const alertKind: 'attendance' | 'academic' = prefix === 'score' ? 'academic' : 'attendance';
-  const alertType: 'critical' | 'warning' | 'info' =
-    prefix === 'crit' || prefix === 'score' ? 'critical' :
-    prefix === 'warn' ? 'warning' : 'info';
+  /* ── Step 1: look up `/risks/{alertId}` FIRST ─────────────────────────────
+     Two alert sources exist:
+       (a) Client-computed alerts from fetchRisksOverview — IDs prefixed
+           `crit-/warn-/score-{branchId}`
+       (b) Cron-written /risks docs from scanBranchAlertsCron (4-hr Cloud
+           Function) — auto-generated Firestore doc IDs + a `ruleKey` field
+     The previous parser only handled (a) — for (b) it split the autogen ID
+     at the first `-`, producing a garbage `branchId`. Result: branchDoc was
+     undefined → branchName='Branch' default → branchStudentIds empty → every
+     metric N/A, even though the cron clearly fired with real data. Bug
+     reported 2026-05-27 (see [[project-owner-alert-detail-bug]]).
+     Defense-in-depth: confirm the doc's schoolId matches the signed-in uid
+     before trusting any of its fields. */
+  let docData: any = null;
+  try {
+    const riskDoc = await getDoc(doc(db, "risks", alertId));
+    if (riskDoc.exists()) {
+      const r = riskDoc.data();
+      if (r.schoolId === uid) docData = r;
+    }
+  } catch { /* graceful fall-through to legacy parse */ }
+
+  let alertKind: 'attendance' | 'academic' | 'fees' | 'teachers';
+  let alertType: 'critical' | 'warning' | 'info';
+  let branchId: string;
+
+  if (docData?.ruleKey && docData?.branchId) {
+    branchId  = docData.branchId as string;
+    alertType = docData.severity === 'critical' ? 'critical' : 'warning';
+    alertKind = docData.ruleKey === 'LOW_ATTENDANCE_7D'    ? 'attendance' :
+                docData.ruleKey === 'SCORE_DROP_MOM'       ? 'academic'   :
+                docData.ruleKey === 'FEE_DEFAULTER_SURGE'  ? 'fees'       :
+                docData.ruleKey === 'INACTIVE_TEACHER'     ? 'teachers'   :
+                'attendance';
+  } else {
+    // Legacy prefix parse — branchId may itself contain dashes, slice at first.
+    const dashIdx  = alertId.indexOf('-');
+    const prefix   = dashIdx !== -1 ? alertId.slice(0, dashIdx) : alertId;
+    branchId       = dashIdx !== -1 ? alertId.slice(dashIdx + 1) : alertId;
+    alertKind      = prefix === 'score' ? 'academic' : 'attendance';
+    alertType      = prefix === 'crit' || prefix === 'score' ? 'critical' :
+                     prefix === 'warn' ? 'warning' : 'info';
+  }
 
   /* Use the same cached raw snapshot as fetchRisksOverview — students,
      attendance, scores, branches, teachers, enrollments are already loaded.
@@ -636,7 +670,13 @@ export async function fetchAlertDetail(alertId: string): Promise<AlertDetailData
   } = snap;
 
   const branchDoc  = branchesSnap.docs.find((d: any) => (d.data().branchId || d.id) === branchId);
-  const branchName = branchDoc?.data()?.name || branchDoc?.data()?.schoolName || "Branch";
+  /* Prefer the cron doc's branchName (it was captured at write-time so it
+     survives branch renames between cron and now). Fall back to branchesSnap
+     lookup, then to the literal "Branch" only if we genuinely can't resolve. */
+  const branchName = docData?.branchName as string
+    || branchDoc?.data()?.name
+    || branchDoc?.data()?.schoolName
+    || "Branch";
 
   /* Use the SAME canonical-resolution chain as fetchRisksOverview so a school
      whose students are reached only via the doc-id or enrollment-chain fallback
@@ -804,17 +844,25 @@ export async function fetchAlertDetail(alertId: string): Promise<AlertDetailData
       color:    COLORS[i % COLORS.length],
     }));
 
-    /* Detected-on: earliest day in the trend window that fell below baseline.
-       If trend has no real data (all zeros), keep null instead of misleading
-       "today" date — we surface that honestly in the metrics note. */
-    const firstBelowIdx = trend.findIndex(t => t.pct > 0 && t.pct < baseline);
-    const detectedDate  = firstBelowIdx >= 0
+    /* Detected-on resolution order:
+       1. cron doc's createdAt (most authoritative — that's literally when the
+          alert was fired)
+       2. earliest below-baseline day in the 7-day trend window
+       3. honest "No data recorded" copy (only when neither is available)
+       Previously the page rendered "No data recorded" even for cron-generated
+       alerts because firstBelowIdx was -1 whenever client-side student mapping
+       failed — misleading because the cron fired exactly because there WAS data. */
+    const cronCreatedAtMs = docData?.createdAt?.toMillis?.() || null;
+    const firstBelowIdx   = trend.findIndex(t => t.pct > 0 && t.pct < baseline);
+    const computedDate    = firstBelowIdx >= 0
       ? new Date(today.getTime() - (6 - firstBelowIdx) * 24 * 60 * 60 * 1000)
       : null;
+    const detectedDate    = cronCreatedAtMs ? new Date(cronCreatedAtMs) : computedDate;
     detectedOn = detectedDate
       ? detectedDate.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
       : "No data recorded";
-    durationDays = trend.filter(t => t.pct > 0 && t.pct < baseline).length || 0;
+    durationDays = trend.filter(t => t.pct > 0 && t.pct < baseline).length
+      || (cronCreatedAtMs ? Math.max(1, Math.floor((Date.now() - cronCreatedAtMs) / (1000 * 60 * 60 * 24))) : 0);
 
     title = alertType === 'critical'
       ? `Attendance Drop — ${branchName}`
@@ -823,9 +871,15 @@ export async function fetchAlertDetail(alertId: string): Promise<AlertDetailData
     trendLabel       = "Attendance Trend (Last 7 Days)";
     affectedSubtitle = `(below ${baseline}% attendance)`;
 
-    description = alertType === 'critical'
-      ? `Significant attendance decline detected at ${branchName}. ${affected.length} students have attendance below ${baseline}%, with overall branch attendance at ${overallPct}%. Immediate intervention is required to prevent further academic decline.`
-      : `Attendance monitoring alert for ${branchName}. ${affected.length} students showing attendance patterns below normal thresholds. Close monitoring and early action can prevent escalation.`;
+    /* Description priority: prefer the cron's own message (it was authored
+       with the actual sample size + branch attendance % when the rule fired),
+       fall back to client-computed copy when this is a legacy client-only
+       alert. The cron's message reads like:
+         "Acme Branch attendance 64% over last 7 days (target ≥ 70%)" */
+    description = (docData?.description as string) || (docData?.message as string) ||
+      (alertType === 'critical'
+        ? `Significant attendance decline detected at ${branchName}. ${affected.length} students have attendance below ${baseline}%, with overall branch attendance at ${overallPct}%. Immediate intervention is required to prevent further academic decline.`
+        : `Attendance monitoring alert for ${branchName}. ${affected.length} students showing attendance patterns below normal thresholds. Close monitoring and early action can prevent escalation.`);
 
     /* Action priority targets the CRITICAL threshold (escalation tier), since
        students dipping below warning need contact, but students below critical
@@ -840,19 +894,33 @@ export async function fetchAlertDetail(alertId: string): Promise<AlertDetailData
       { title: "Review class schedule for potential conflicts", sub: "Priority: Low • Estimated time: 1 hour", done: false },
     ];
 
+    /* When the cron fired but our client-side student→branch mapping failed
+       (zero students resolved), fall back to the cron's own captured metrics
+       so the page surfaces real numbers instead of N/A. The cron writes:
+         metrics: { windowDays, attendancePct, sampleSize } */
+    const cronAttPct      = typeof docData?.metrics?.attendancePct === 'number' ? docData.metrics.attendancePct : null;
+    const cronSampleSize  = typeof docData?.metrics?.sampleSize    === 'number' ? docData.metrics.sampleSize    : null;
+    const cronWindowDays  = typeof docData?.metrics?.windowDays    === 'number' ? docData.metrics.windowDays    : null;
+    const displayedPct    = allTotal > 0 ? overallPct : cronAttPct;
+    const showCronFallback = allTotal === 0 && cronAttPct !== null;
+
     metrics = [
       {
         label: "Current Attendance",
-        value: allTotal > 0 ? `${overallPct}%` : "N/A",
-        note: allTotal > 0
-          ? `↓ ${Math.max(0, baseline - overallPct)}% from baseline (${baseline}%)`
+        value: displayedPct !== null ? `${displayedPct}%` : "N/A",
+        note: displayedPct !== null
+          ? `↓ ${Math.max(0, baseline - displayedPct)}% from baseline (${baseline}%)${showCronFallback && cronSampleSize ? ` · ${cronSampleSize} records` : ''}`
           : "No attendance data recorded",
-        color: overallPct < 75 ? "text-rose-500" : "text-amber-500",
+        color: (displayedPct ?? 100) < 75 ? "text-rose-500" : "text-amber-500",
       },
       {
         label: "Students Affected",
-        value: affected.length.toString(),
-        note: `Out of ${totalStudents} total`,
+        value: affected.length > 0
+          ? affected.length.toString()
+          : (showCronFallback && cronSampleSize ? `~${Math.max(1, Math.round(cronSampleSize / Math.max(cronWindowDays || 7, 1)))}` : "0"),
+        note: totalStudents > 0
+          ? `Out of ${totalStudents} total`
+          : (showCronFallback ? "Branch totals unavailable — see mapping issue below" : "Out of 0 total"),
         color: "text-[#111827]",
       },
       {
@@ -862,7 +930,7 @@ export async function fetchAlertDetail(alertId: string): Promise<AlertDetailData
         color: "text-[#111827]",
       },
     ];
-  } else {
+  } else if (alertKind === 'academic') {
     // ── Academic alert: per-student avg from BOTH score collections ────────
     const PASS_THRESHOLD = 60;  // matches fetchRisksOverview's lowScoreCount cutoff
     baseline      = PASS_THRESHOLD;
@@ -957,23 +1025,29 @@ export async function fetchAlertDetail(alertId: string): Promise<AlertDetailData
       { day: 'This Wk',   pct: weekly[0].count > 0 ? Math.round(weekly[0].sum / weekly[0].count) : 0 },
     ];
 
-    // Detection week — earliest week below baseline
-    const firstBelowIdx = trend.findIndex(t => t.pct > 0 && t.pct < baseline);
-    const detectedDate  = firstBelowIdx >= 0
+    // Detection: prefer cron's createdAt (authoritative — that's when the
+    // rule actually fired), else earliest below-baseline week in the trend.
+    const cronCreatedAtMsAcad = docData?.createdAt?.toMillis?.() || null;
+    const firstBelowIdx       = trend.findIndex(t => t.pct > 0 && t.pct < baseline);
+    const computedDateAcad    = firstBelowIdx >= 0
       ? new Date(todayMs - (3 - firstBelowIdx) * 7 * 24 * 60 * 60 * 1000)
       : null;
+    const detectedDate        = cronCreatedAtMsAcad ? new Date(cronCreatedAtMsAcad) : computedDateAcad;
     detectedOn = detectedDate
       ? detectedDate.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
       : "No data recorded";
     // Each below-baseline week ≈ 7 days
-    durationDays = trend.filter(t => t.pct > 0 && t.pct < baseline).length * 7;
+    durationDays = trend.filter(t => t.pct > 0 && t.pct < baseline).length * 7
+      || (cronCreatedAtMsAcad ? Math.max(1, Math.floor((Date.now() - cronCreatedAtMsAcad) / (1000 * 60 * 60 * 24))) : 0);
 
     title = `Low Academic Performance — ${branchName}`;
 
     trendLabel       = "Test Score Trend (Last 4 Weeks)";
     affectedSubtitle = `(below ${PASS_THRESHOLD}% average)`;
 
-    description = `Academic performance decline at ${branchName}. ${affected.length} students have an average below ${PASS_THRESHOLD}%, with overall branch average at ${overallAvg}%. Targeted academic intervention is needed to prevent further decline.`;
+    // Prefer cron's message (it captured prevAvg/thisAvg/drop at fire-time).
+    description = (docData?.description as string) || (docData?.message as string)
+      || `Academic performance decline at ${branchName}. ${affected.length} students have an average below ${PASS_THRESHOLD}%, with overall branch average at ${overallAvg}%. Targeted academic intervention is needed to prevent further decline.`;
 
     actions = [
       { title: "Identify subject-area weaknesses for affected students", sub: "Priority: High • Estimated time: 2 hours", done: false },
@@ -981,25 +1055,228 @@ export async function fetchAlertDetail(alertId: string): Promise<AlertDetailData
       { title: "Review teaching methodology with subject teachers",     sub: "Priority: Medium • Estimated time: 1 hour", done: false },
     ];
 
+    /* Cron fallback when our client-side score aggregation finds nothing —
+       e.g. students lack branchId or score docs use different field shapes.
+       Cron writes: metrics: { thisAvg, prevAvg, drop, thisSample, prevSample } */
+    const cronThisAvg = typeof docData?.metrics?.thisAvg === 'number' ? docData.metrics.thisAvg : null;
+    const displayedAvg = allAvgs.length > 0 ? overallAvg : cronThisAvg;
+
     metrics = [
       {
         label: "Branch Average",
-        value: allAvgs.length > 0 ? `${overallAvg}%` : "N/A",
-        note: allAvgs.length > 0
-          ? `↓ ${Math.max(0, baseline - overallAvg)}% from passing (${baseline}%)`
+        value: displayedAvg !== null ? `${displayedAvg}%` : "N/A",
+        note: displayedAvg !== null
+          ? `↓ ${Math.max(0, baseline - displayedAvg)}% from passing (${baseline}%)${docData?.metrics?.drop ? ` · ${docData.metrics.drop} pt drop MoM` : ''}`
           : "No score data recorded",
-        color: overallAvg < 50 ? "text-rose-500" : "text-amber-500",
+        color: (displayedAvg ?? 100) < 50 ? "text-rose-500" : "text-amber-500",
       },
       {
         label: "Students Affected",
-        value: affected.length.toString(),
-        note: `Out of ${totalStudents} total`,
+        value: affected.length > 0
+          ? affected.length.toString()
+          : (typeof docData?.metrics?.thisSample === 'number' ? `~${docData.metrics.thisSample}` : "0"),
+        note: totalStudents > 0
+          ? `Out of ${totalStudents} total`
+          : "Branch totals unavailable — see mapping issue below",
         color: "text-[#111827]",
       },
       {
         label: "Duration",
         value: durationDays > 0 ? `${durationDays} day${durationDays !== 1 ? "s" : ""}` : "N/A",
         note: durationDays > 0 ? `Since ${detectedOn}` : "No below-passing weeks in window",
+        color: "text-[#111827]",
+      },
+    ];
+  } else if (alertKind === 'fees') {
+    /* ── Fee Defaulter Surge (FEE_DEFAULTER_SURGE) ───────────────────────────
+       Cron rule: ≥10 distinct students with fees overdue 30+ days. The
+       render path lists actual defaulters (top 6 by oldest overdue date)
+       with ₹ amount overdue. No meaningful daily trend — keep trend empty,
+       page falls to its "No data" state. */
+    title            = `Fee Defaulter Surge — ${branchName}`;
+    trendLabel       = "Overdue Fees Trend";
+    baseline         = 0;
+    baselineLabel    = "Cleared";
+    affectedSubtitle = `(30+ days overdue)`;
+
+    /* On-demand fetch — fees aren't in loadRisksSnapshot's parallel pull
+       because most owner pages don't need them. Worth the extra round-trip
+       on this single page. Direct branchId filter mirrors the cron's query
+       so we see the same rows the rule saw. */
+    const feesSnap = await getDocs(
+      query(collection(db, "fees"), where("schoolId", "==", uid), where("branchId", "==", branchId))
+    ).catch(() => ({ docs: [] as any[] }));
+
+    const FEE_OVERDUE_DAYS = 30;
+    const overdueCutoff    = Date.now() - FEE_OVERDUE_DAYS * 24 * 60 * 60 * 1000;
+    type Defaulter = { studentId: string; amount: number; oldestDueMs: number };
+    const byStudent = new Map<string, Defaulter>();
+    (feesSnap.docs as any[]).forEach(d => {
+      const f = d.data();
+      if (String(f.status || "").toLowerCase() === "paid") return;
+      const dueRaw = f.dueDate || f.createdAt;
+      const dueMs  = dueRaw?.toMillis?.() || (typeof dueRaw === 'string' ? new Date(dueRaw).getTime() : NaN);
+      if (!Number.isFinite(dueMs) || dueMs > overdueCutoff) return;
+      const sid    = f.studentId || f.student?.id;
+      if (!sid) return;
+      const amount = Number(f.amount ?? f.outstanding ?? 0) || 0;
+      const prev   = byStudent.get(sid);
+      if (!prev) byStudent.set(sid, { studentId: sid, amount, oldestDueMs: dueMs });
+      else { prev.amount += amount; if (dueMs < prev.oldestDueMs) prev.oldestDueMs = dueMs; }
+    });
+
+    const defaulterList = Array.from(byStudent.values()).sort((a, b) => a.oldestDueMs - b.oldestDueMs);
+    const totalAmountOverdue = defaulterList.reduce((s, d) => s + d.amount, 0);
+
+    /* Student names — reuse studentNames map from earlier, but it was built
+       only for students mapped to this branch via the enrollment chain.
+       Fee docs may reference students whose mapping resolved differently —
+       look them up directly from studentsSnap as a fallback. */
+    const allStudentNames = new Map<string, string>(studentNames);
+    (studentsSnap.docs as any[]).forEach(d => {
+      if (allStudentNames.has(d.id)) return;
+      const s = d.data();
+      const fullName = [s.firstName || s.name || "", s.lastName || ""].join(" ").trim();
+      allStudentNames.set(d.id, fullName || `Student ${d.id.slice(-4)}`);
+    });
+
+    affectedStudents = defaulterList.slice(0, 6).map((d, i) => {
+      const name = allStudentNames.get(d.studentId) || `Student ${d.studentId.slice(-4)}`;
+      const daysOverdue = Math.floor((Date.now() - d.oldestDueMs) / (1000 * 60 * 60 * 24));
+      return {
+        initials: name.split(" ").map((n: string) => n[0] || "").join("").toUpperCase().slice(0, 2) || "S",
+        name,
+        pct: d.amount > 0 ? `₹${d.amount.toLocaleString('en-IN')} · ${daysOverdue}d` : `${daysOverdue}d`,
+        color: COLORS[i % COLORS.length],
+      };
+    });
+
+    // No meaningful daily trend for fees — keep empty so chart shows empty state.
+    trend = [];
+
+    const cronCreatedAtMsFee = docData?.createdAt?.toMillis?.() || null;
+    detectedOn = cronCreatedAtMsFee
+      ? new Date(cronCreatedAtMsFee).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+      : "Detection pending";
+    durationDays = cronCreatedAtMsFee
+      ? Math.max(1, Math.floor((Date.now() - cronCreatedAtMsFee) / (1000 * 60 * 60 * 24)))
+      : 0;
+
+    const cronDefCount = typeof docData?.metrics?.defaulterCount === 'number' ? docData.metrics.defaulterCount : null;
+
+    description = (docData?.description as string) || (docData?.message as string)
+      || `Fee collection bottleneck at ${branchName}. ${defaulterList.length || cronDefCount || 'Multiple'} students have fees overdue ${FEE_OVERDUE_DAYS}+ days. Coordinated parent outreach and a payment-plan offer can recover most balances before they age further.`;
+
+    actions = [
+      { title: "Generate overdue-fee statement and send to parents",              sub: "Priority: High • Estimated time: 1 hour",  done: false },
+      { title: "Offer instalment plan to families with ₹10k+ outstanding",      sub: "Priority: High • Estimated time: 2 hours", done: false },
+      { title: "Escalate to principal for accounts >60 days overdue",            sub: "Priority: Medium • Ongoing",               done: false },
+    ];
+
+    metrics = [
+      {
+        label: "Defaulters",
+        value: (defaulterList.length || cronDefCount || 0).toString(),
+        note: cronDefCount && defaulterList.length === 0
+          ? `${cronDefCount} flagged by cron · client lookup pending`
+          : `Across ${branchName}`,
+        color: "text-rose-500",
+      },
+      {
+        label: "Amount Overdue",
+        value: totalAmountOverdue > 0 ? `₹${totalAmountOverdue.toLocaleString('en-IN')}` : "N/A",
+        note: totalAmountOverdue > 0 ? `Total outstanding 30+ days` : "Amount field missing on fee docs",
+        color: "text-[#111827]",
+      },
+      {
+        label: "Duration",
+        value: durationDays > 0 ? `${durationDays} day${durationDays !== 1 ? "s" : ""}` : "N/A",
+        note: durationDays > 0 ? `Since ${detectedOn}` : "Detection pending",
+        color: "text-[#111827]",
+      },
+    ];
+  } else {
+    /* ── Inactive Teacher (INACTIVE_TEACHER) ─────────────────────────────────
+       Cron rule: teachers idle 5+ days. Render lists idle teachers with
+       days-since-last-login. No daily trend. */
+    const TEACHER_IDLE_DAYS = 5;
+    title            = `Inactive Teachers — ${branchName}`;
+    trendLabel       = "Login Activity";
+    baseline         = TEACHER_IDLE_DAYS;
+    baselineLabel    = "Active";
+    affectedSubtitle = `(5+ days no login)`;
+
+    /* Re-use teachersSnap from cache. Filter to this branch via the same
+       canonical resolution + doc-id fallback chain used for students. */
+    type IdleTeacher = { name: string; idleDays: number };
+    const idle: IdleTeacher[] = [];
+    (teachersSnap.docs as any[]).forEach(d => {
+      const t = d.data();
+      let cid = resolveCanonical(t);
+      if (cid !== branchId) cid = anyIdToCanonical.get(d.id) || "";
+      if (cid !== branchId && t.uid) cid = anyIdToCanonical.get(t.uid) || "";
+      if (cid !== branchId) return;
+      if (t.isActive === false || t.status === "Invited") return;
+      const lastMs = t.lastLoginAt?.toMillis?.()
+        || (typeof t.lastLoginAt === 'string' ? new Date(t.lastLoginAt).getTime() : NaN);
+      const idleDays = Number.isFinite(lastMs)
+        ? Math.floor((Date.now() - lastMs) / (1000 * 60 * 60 * 24))
+        : 999; // never logged in
+      if (idleDays >= TEACHER_IDLE_DAYS) {
+        idle.push({ name: t.name || t.email || `Teacher ${d.id.slice(-4)}`, idleDays });
+      }
+    });
+    idle.sort((a, b) => b.idleDays - a.idleDays);
+
+    affectedStudents = idle.slice(0, 6).map((t, i) => ({
+      initials: t.name.split(" ").map((n: string) => n[0] || "").join("").toUpperCase().slice(0, 2) || "T",
+      name: t.name,
+      pct: t.idleDays >= 999 ? "Never" : `${t.idleDays}d idle`,
+      color: COLORS[i % COLORS.length],
+    }));
+
+    trend = [];
+
+    const cronCreatedAtMsTch = docData?.createdAt?.toMillis?.() || null;
+    detectedOn = cronCreatedAtMsTch
+      ? new Date(cronCreatedAtMsTch).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+      : "Detection pending";
+    durationDays = cronCreatedAtMsTch
+      ? Math.max(1, Math.floor((Date.now() - cronCreatedAtMsTch) / (1000 * 60 * 60 * 24)))
+      : 0;
+
+    const cronIdleCount = typeof docData?.metrics?.idleCount === 'number' ? docData.metrics.idleCount : null;
+
+    description = (docData?.description as string) || (docData?.message as string)
+      || `Teacher engagement risk at ${branchName}. ${idle.length || cronIdleCount || 'Multiple'} teachers have not logged in for ${TEACHER_IDLE_DAYS}+ days. Daily attendance + lesson updates may be slipping. A direct check-in with the affected teachers is recommended.`;
+
+    actions = [
+      { title: "Reach out to inactive teachers to confirm availability",          sub: "Priority: High • Estimated time: 30 minutes", done: false },
+      { title: "Review unmarked attendance / pending lesson plans for their classes", sub: "Priority: High • Estimated time: 1 hour",  done: false },
+      { title: "Assign substitute / reassign classes if absence is extended",    sub: "Priority: Medium • As needed",                 done: false },
+    ];
+
+    metrics = [
+      {
+        label: "Inactive Teachers",
+        value: (idle.length || cronIdleCount || 0).toString(),
+        note: cronIdleCount && idle.length === 0
+          ? `${cronIdleCount} flagged by cron · client lookup pending`
+          : `Idle 5+ days at ${branchName}`,
+        color: "text-amber-500",
+      },
+      {
+        label: "Longest Idle",
+        value: idle.length > 0
+          ? (idle[0].idleDays >= 999 ? "Never" : `${idle[0].idleDays}d`)
+          : "N/A",
+        note: idle.length > 0 ? `${idle[0].name}` : "No idle teachers resolved client-side",
+        color: "text-[#111827]",
+      },
+      {
+        label: "Duration",
+        value: durationDays > 0 ? `${durationDays} day${durationDays !== 1 ? "s" : ""}` : "N/A",
+        note: durationDays > 0 ? `Since ${detectedOn}` : "Detection pending",
         color: "text-[#111827]",
       },
     ];

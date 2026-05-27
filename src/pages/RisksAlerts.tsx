@@ -494,7 +494,17 @@ export default function RisksAlerts() {
                   <div style={{ display:"flex", flexDirection:"column", gap: isMobile ? 10 : 12 }}>
                     {filteredList.map(alert => {
                 const Icon = getAlertIcon(alert);
-                const accentGrad = alert.type === "critical" ? GRAD_RED : alert.type === "warning" ? GRAD_GOLD : GRAD_BLUE;
+                /* IMPORTANT: do NOT use GRAD_RED/GRAD_GOLD/GRAD_BLUE here — those
+                   are PASTEL gradients (white-pink, white-gold) intended for stat
+                   tile surfaces with dark text. Using them under white icons or
+                   white "CRITICAL" pill text makes both invisible (real bug
+                   reported 2026-05-27). Build saturated severity gradients
+                   inline for the left-bar stripe, icon badge, and status pill. */
+                const accentGrad = alert.type === "critical"
+                  ? "linear-gradient(135deg,#FF3355 0%,#DC2626 100%)"
+                  : alert.type === "warning"
+                    ? "linear-gradient(135deg,#FFAA00 0%,#D97706 100%)"
+                    : GRAD_PRIMARY;
                 const accentColor = alert.type === "critical" ? RED : alert.type === "warning" ? GOLD : B1;
                 const accentBg = alert.type === "critical" ? "rgba(255,51,85,.06)" : alert.type === "warning" ? "rgba(255,170,0,.06)" : "rgba(0,85,255,.05)";
                 return (
