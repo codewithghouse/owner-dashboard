@@ -5,7 +5,8 @@
       "namespace": "android_app",
       "package_name": "com.edullent.owner.twa",
       "sha256_cert_fingerprints": [
-        "72:A3:05:0D:4C:28:A0:E4:89:FB:D3:1F:2B:D1:7E:36:AA:38:65:3E:60:8F:A2:9A:00:A5:69:3E:7C:14:9B:12"
+        "72:A3:05:0D:4C:28:A0:E4:89:FB:D3:1F:2B:D1:7E:36:AA:38:65:3E:60:8F:A2:9A:00:A5:69:3E:7C:14:9B:12",
+        "FF:D2:69:36:23:0B:BE:A0:93:92:C8:2F:DF:95:BC:55:6F:22:6D:BB:B8:A7:C9:91:18:B0:E3:0E:BA:AE:85:19"
       ]
     }
   }
