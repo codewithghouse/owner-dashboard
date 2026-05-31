@@ -7,7 +7,7 @@ import {
   Menu, X, UserCog, LogOut, ShieldCheck, Bell,
   Clock, ShieldAlert, CheckCircle2, DollarSign as FeeIcon,
   Activity, Brain, ClipboardList, FileSpreadsheet, Trophy, Award,
-  MessageSquare,
+  MessageSquare, ScrollText,
 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -49,6 +49,7 @@ const navSections: { heading: string; items: { to: string; label: string; icon: 
     heading: "Academics",
     items: [
       { to: "/academics",     label: "Academics Overview", icon: BookOpen },
+      { to: "/results",       label: "Exam Results",       icon: ScrollText },
       { to: "/fee-structure", label: "Fee Structure",      icon: FileSpreadsheet },
     ],
   },
