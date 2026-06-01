@@ -947,8 +947,11 @@ export default function FinanceFees() {
         <StatTile label="Outstanding"      value={loading ? "—" : `₹${stats.outstanding.toLocaleString("en-IN")}`} sub="To be recovered" grad={GRAD_GOLD}  icon={TrendingDown}  onClick={() => navigate("/fee-structure")} />
       </div>
 
-      {/* ── Charts row: Branch-wise Revenue + Monthly Collection Trend ── */}
-      {!loading && (branchRevenue.length > 0 || historyData.some(h => h.collected > 0)) && (
+      {/* ── Charts row: Branch-wise Revenue + Monthly Collection Trend ──
+            Overview charts — scoped to the Defaulters tab so switching to
+            History/Risk/Predictive actually swaps the whole view (these used
+            to render on every tab, making tab clicks look like a no-op). */}
+      {activeTab === "Defaulters" && !loading && (branchRevenue.length > 0 || historyData.some(h => h.collected > 0)) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
           {/* Branch-wise Revenue (horizontal bars) */}
           <div className="bg-white rounded-2xl md:rounded-3xl border border-slate-100 p-4 md:p-5 shadow-sm">
@@ -1053,8 +1056,10 @@ export default function FinanceFees() {
         </div>
       )}
 
-      {/* Branch-wise revenue snapshot — always visible */}
-      {!loading && branchRevenue.length > 0 && (() => {
+      {/* Branch-wise revenue snapshot — Defaulters (overview) tab only.
+            Previously always-visible, which pushed the other tabs' content
+            below the fold and made tab switching feel broken. */}
+      {activeTab === "Defaulters" && !loading && branchRevenue.length > 0 && (() => {
         const totCollected = branchRevenue.reduce((a, b) => a + b.collected, 0);
         const totPending   = branchRevenue.reduce((a, b) => a + b.pending, 0);
         const totRevenue   = totCollected + totPending;
