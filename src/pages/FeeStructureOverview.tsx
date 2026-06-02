@@ -85,6 +85,9 @@ export default function FeeStructureOverview() {
   // icon-only placeholder rendered as an empty white square in the
   // founder's screenshot (2026-05-26).
   const [ownerLogoUrl, setOwnerLogoUrl] = useState<string>("");
+  // Tracks a failed logo load so we fall back to the Building2 icon
+  // instead of leaving an empty white square (founder screenshot 2026-06-02).
+  const [logoBroken, setLogoBroken] = useState<boolean>(false);
   const [notifyState, setNotifyState] = useState<{
     mode: "single" | "bulk";
     branchName: string;
@@ -645,12 +648,12 @@ export default function FeeStructureOverview() {
                   <div className="px-3 md:px-5 py-3 md:py-3.5 border-b border-red-100 bg-gradient-to-r from-red-50 to-orange-50 flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3">
                     <div className="flex items-center gap-2.5 md:gap-3 min-w-0">
                       <div className="w-8 h-8 rounded-lg bg-white border border-red-200 flex items-center justify-center shrink-0 overflow-hidden">
-                        {ownerLogoUrl ? (
+                        {ownerLogoUrl && !logoBroken ? (
                           <img
                             src={ownerLogoUrl}
                             alt="School logo"
                             className="w-full h-full object-cover"
-                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                            onError={() => setLogoBroken(true)}
                           />
                         ) : (
                           <Building2 className="w-4 h-4 text-red-600" />
